@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.0.9] - 2026-05-21
+
+### Changed
+- Automatic fan control no longer "pumps" (audible loud→soft→loud cycling). Three compounding causes were addressed: the raw SMC temperature, which jitters several °C between samples, is now smoothed through an EMA before it reaches the PID loop, the trend label, and the load-aware boost; the RPM dead-band and slew rate are now asymmetric (spin up readily at 200 RPM / 800 RPM-per-cycle, glide down reluctantly at 450 RPM / 250 RPM-per-cycle) and the minimum hold grew from 3 s to 8 s, with only large spin-ups allowed to break it; and the default derivative gain dropped from `Kp × 3.0` to `Kp × 2.0`, since the filtered input no longer needs a large gain to fight sensor noise (a large one was amplifying it). Net effect: fans hold a steady speed instead of chasing temperature transients, at the cost of slightly slower, gentler spin-down after load drops.
+
 ## [1.0.8] - 2026-05-21
 
 ### Fixed
