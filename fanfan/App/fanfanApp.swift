@@ -121,6 +121,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
+        // Hand the fans back to the firmware before quitting, synchronously — / 中文：退出前同步把风扇交还固件——
+        // otherwise they stay stuck at the last manual target until the next / 中文：否则它们会卡在最后的手动转速，
+        // launch or system sleep. / 中文：直到下次启动或系统睡眠才恢复。
+        viewModel.restoreAutomaticControlSync()
         iconUpdateTimer?.invalidate()
         viewModel.stopMonitoring()
 

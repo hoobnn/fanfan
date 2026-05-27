@@ -431,7 +431,12 @@ class FanControlViewModel: ObservableObject {
     func resetToSystemControl() {
         fanController.resetToSystemControl()
     }
-    
+
+    /// Synchronous restore for app teardown (see FanController). / 中文：用于退出清理的同步恢复（详见 FanController）。
+    func restoreAutomaticControlSync() {
+        fanController.restoreAutomaticControlSync()
+    }
+
     func setAutoThreshold(_ threshold: Double) {
         fanController.setAutoThreshold(threshold)
     }
