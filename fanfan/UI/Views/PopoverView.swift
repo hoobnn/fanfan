@@ -380,12 +380,24 @@ struct PopoverView: View {
         if viewModel.hasAccess && !viewModel.isMonitoring {
             viewModel.startMonitoring()
         }
+        // `BatteryMonitor` already runs app-wide (started in `fanfanApp`) so the / 中文：`BatteryMonitor` 已由 app 全程运行（在 `fanfanApp` 启动），
+        // auto-mode load feedforward always has live wattage. This call is / 中文：使自动模式负载前馈始终有实时功率。此调用幂等，
+        // idempotent — it just refreshes once immediately on open. / 中文：仅在打开时立即刷新一次。
         battery.startMonitoring()
+        // Resume the full sensor scan only now that its data is on screen. / 中文：现在数据可见了才恢复全传感器扫描。
+        viewModel.setSensorScanActive(true)
         startHistoryTimer()
     }
 
     private func onDisappear() {
-        battery.stopMonitoring()
+        // Do NOT stop `BatteryMonitor` here: it is an app-wide singleton feeding / 中文：这里不要停 `BatteryMonitor`：它是 app 级单例，
+        // the auto-mode load feedforward whether or not the popover is open. / 中文：无论 popover 是否打开都为自动模式负载前馈供数。
+        // Stopping it on close used to leave auto control without live wattage / 中文：之前关闭时停掉它，会让自动控制在重新打开 popover 前
+        // until the popover was reopened. / 中文：一直拿不到实时功率。
+        //
+        // Stop the ~30-IOKit-round-trip sensor scan while hidden; the fast / 中文：隐藏期间停掉约 30 次 IOKit 往返的传感器扫描；
+        // tier (temps + fan RPM) keeps feeding the icon and auto control. / 中文：快档（温度 + 风扇转速）继续供菜单栏图标与自动控制。
+        viewModel.setSensorScanActive(false)
         historyTimer?.invalidate()
         historyTimer = nil
     }

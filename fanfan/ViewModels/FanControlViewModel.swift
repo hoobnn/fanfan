@@ -387,7 +387,13 @@ class FanControlViewModel: ObservableObject {
     func stopMonitoring() {
         systemMonitor.stopMonitoring()
     }
-    
+
+    /// Gate the expensive full sensor scan to popover visibility — see / 中文：把开销大的全传感器扫描限制在 popover 可见时——见
+    /// `SystemMonitor.setSensorScanActive`. / 中文：`SystemMonitor.setSensorScanActive`。
+    func setSensorScanActive(_ active: Bool) {
+        systemMonitor.setSensorScanActive(active)
+    }
+
     // MARK: - Fan Control / 中文：Fan Control 分区
     
     func setManualSpeed(_ speed: Int) {

@@ -257,6 +257,13 @@ class SystemMonitor: ObservableObject {
         max(6.0, monitoringInterval * 3)
     }
 
+    /// Gates the slow-tier full sensor scan to when the popover is on screen. / 中文：把慢档全传感器扫描限制在 popover 显示期间。
+    /// The sensor list and the SSD / battery sensor temps it feeds are only / 中文：它喂养的传感器列表与 SSD / 电池温度仅在 popover
+    /// visible then; while closed the fast tier (CPU/GPU temp + fan RPM, needed / 中文：打开时可见；关闭时快档（CPU/GPU 温度 + 风扇转速，
+    /// by the menu-bar icon and auto control) keeps running but the ~30 IOKit / 中文：供菜单栏图标与自动控制使用）继续跑，但每 6 秒
+    /// round-trips of the scan are skipped. Accessed only on `readingsQueue`. / 中文：约 30 次 IOKit 往返的扫描被跳过。仅在 `readingsQueue` 访问。
+    private var sensorScanActive = false
+
     /// Fan `Mn` / `Mx` SMC keys are hardware-fixed limits; reading them every / 中文：风扇 `Mn` / `Mx` SMC 键是硬件固化上下限；每个 tick 重读
     /// tick wastes IOKit traffic. Cache once per fan-count and invalidate only / 中文：浪费 IOKit。按风扇数缓存一次，只有风扇数变化时
     /// when the fan count changes (e.g. hot-pluggable behavior on some chassis). / 中文：才失效（例如某些机型支持热插拔风扇）。
@@ -434,6 +441,19 @@ class SystemMonitor: ObservableObject {
         monitoringTimer = nil
         DispatchQueue.main.async { self.isMonitoring = false }
     }
+
+    /// Driven by the popover's appear/disappear so the slow sensor scan only / 中文：由 popover 的 appear/disappear 驱动，使慢档传感器扫描
+    /// runs while its data is on screen. Re-activating clears the throttle so / 中文：仅在其数据可见时运行。重新激活时清除节流，
+    /// the freshly opened popover gets a fresh scan on the next tick. / 中文：让刚打开的 popover 在下一个 tick 拿到新鲜扫描。
+    func setSensorScanActive(_ active: Bool) {
+        readingsQueue.async { [weak self] in
+            guard let self = self else { return }
+            if active && !self.sensorScanActive {
+                self.lastSensorScanTime = nil
+            }
+            self.sensorScanActive = active
+        }
+    }
     
     // MARK: - Fan Detection / 中文：风扇检测
     
@@ -478,6 +498,8 @@ class SystemMonitor: ObservableObject {
             // Interval`. Intervening ticks keep the previously published list. / 中文：`slowSensorScanInterval` 跑一次；中间 tick 沿用上一份。
             let now = Date()
             let needsSensorScan: Bool = {
+                // Skip entirely while the popover (the only consumer) is closed. / 中文：唯一消费方 popover 关闭时整段跳过。
+                guard self.sensorScanActive else { return false }
                 guard let last = self.lastSensorScanTime else { return true }
                 return now.timeIntervalSince(last) >= self.slowSensorScanInterval
             }()
@@ -801,73 +823,66 @@ class SystemMonitor: ObservableObject {
     private let DATA_TYPE_SINT16 = fourCharCodeFrom("si16")
     
     private func parseSMCBytes(_ bytes: SMCBytes, dataType: UInt32, dataSize: UInt32) -> Double? {
-        // Helper to get bytes as array / 中文：把字节取为数组的辅助逻辑
-        let byteArray = [
-            bytes.0, bytes.1, bytes.2, bytes.3, bytes.4, bytes.5, bytes.6, bytes.7,
-            bytes.8, bytes.9, bytes.10, bytes.11, bytes.12, bytes.13, bytes.14, bytes.15,
-            bytes.16, bytes.17, bytes.18, bytes.19, bytes.20, bytes.21, bytes.22, bytes.23,
-            bytes.24, bytes.25, bytes.26, bytes.27, bytes.28, bytes.29, bytes.30, bytes.31
-        ]
-        
+        // Read straight from the tuple. The previous version allocated a / 中文：直接从元组读取。旧版本每次调用都分配一个
+        // 32-element `[UInt8]` on every call but only ever used the first four / 中文：32 元素的 `[UInt8]`，却只用到前 4 个字节——
+        // bytes — wasted churn on a path that runs for every SMC key each tick. / 中文：在每个 tick 都为每个 SMC 键跑的热路径上纯属浪费。
         switch dataType {
         case DATA_TYPE_FLT:
             if dataSize == 4 {
-                let val = byteArray.withUnsafeBytes { $0.load(as: Float32.self) }
-                return Double(val)
+                // Little-endian on Apple Silicon / Intel: byte 0 is the LSB. / 中文：Apple Silicon / Intel 均小端：字节 0 是最低有效字节。
+                let bits = UInt32(bytes.0) | (UInt32(bytes.1) << 8)
+                         | (UInt32(bytes.2) << 16) | (UInt32(bytes.3) << 24)
+                return Double(Float32(bitPattern: bits))
             }
-            
+
         case DATA_TYPE_SP78:
             if dataSize == 2 {
                 // Fixed Point 7.8 (Signed) / 中文：7.8 定点数（有符号）
                 // First bit is sign, next 7 are integer part, last 8 are fractional / 中文：第一位是符号位，后 7 位是整数部分，最后 8 位是小数部分
-                let b0 = Int(byteArray[0])
-                let b1 = Int(byteArray[1])
-                let val = (b0 << 8) | b1
+                let val = (Int(bytes.0) << 8) | Int(bytes.1)
                 return Double(Int16(bitPattern: UInt16(val))) / 256.0
             }
-            
+
         case DATA_TYPE_FPE2:
             if dataSize == 2 {
                 // Fixed Point 14.2 (Unsigned) / 中文：14.2 定点数（无符号）
                 // First 14 bits are integer part, last 2 are fractional / 中文：前 14 位是整数部分，后 2 位是小数部分
                 // Calculation: (Byte0 << 6) + (Byte1 >> 2) / 中文：计算方式：(Byte0 << 6) + (Byte1 >> 2)
-                let b0 = Int(byteArray[0])
-                let b1 = Int(byteArray[1])
-                let val = (b0 << 6) + (b1 >> 2)
+                let val = (Int(bytes.0) << 6) + (Int(bytes.1) >> 2)
                 return Double(val)
             }
-            
+
         case DATA_TYPE_UINT8:
             if dataSize == 1 {
-                return Double(byteArray[0])
+                return Double(bytes.0)
             }
-            
+
         case DATA_TYPE_UINT16:
             if dataSize == 2 {
-                let val = (Int(byteArray[0]) << 8) + Int(byteArray[1])
+                let val = (Int(bytes.0) << 8) + Int(bytes.1)
                 return Double(val)
             }
-            
+
         case DATA_TYPE_UINT32:
             if dataSize == 4 {
-                let val = (UInt32(byteArray[0]) << 24) | (UInt32(byteArray[1]) << 16) | (UInt32(byteArray[2]) << 8) | UInt32(byteArray[3])
+                let val = (UInt32(bytes.0) << 24) | (UInt32(bytes.1) << 16) | (UInt32(bytes.2) << 8) | UInt32(bytes.3)
                 return Double(val)
             }
-        
+
         case DATA_TYPE_SINT16:
             if dataSize == 2 {
-                let val = (UInt16(byteArray[0]) << 8) | UInt16(byteArray[1])
+                let val = (UInt16(bytes.0) << 8) | UInt16(bytes.1)
                 return Double(Int16(bitPattern: val))
             }
-            
+
         default:
             // Check for potential fallback or unknown type / 中文：检查潜在回退或未知类型
             if dataSize == 2 {
-                let val = (Int(byteArray[0]) << 8) + Int(byteArray[1])
+                let val = (Int(bytes.0) << 8) + Int(bytes.1)
                 return Double(val)
             }
         }
-        
+
         return nil
     }
     
