@@ -362,6 +362,7 @@ struct PopoverView: View {
             autoThreshold: viewModel.autoThreshold,
             autoMaxSpeed: viewModel.autoMaxSpeed,
             autoAggressiveness: viewModel.autoAggressiveness,
+            powerStrategy: viewModel.powerStrategy,
             perFanManualControl: viewModel.perFanManualControl,
             manualSpeed: viewModel.manualSpeed,
             manualSpeeds: viewModel.manualSpeeds,

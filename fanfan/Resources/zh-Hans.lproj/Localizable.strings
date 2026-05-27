@@ -84,6 +84,10 @@
 "popover.no_temperature_data_desc" = "SMC已连接但无温度读数。某些Mac型号可能会出现此情况。";
 
 /* 自动模式设置 */
+"popover.strategy" = "策略";
+"popover.strategy.power_saving" = "省电";
+"popover.strategy.balanced" = "均衡";
+"popover.strategy.performance" = "性能";
 "popover.threshold" = "目标温度";
 "popover.max_speed" = "最大转速";
 "popover.response" = "响应";

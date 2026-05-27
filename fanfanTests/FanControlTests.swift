@@ -19,6 +19,7 @@ final class FanControlTests: XCTestCase {
         "autoThreshold",
         "autoMaxSpeed",
         "autoAggressiveness",
+        "powerStrategy",
         "pidKpCustom",
         "pidKiCustom",
         "pidKdCustom"
@@ -93,6 +94,54 @@ final class FanControlTests: XCTestCase {
         XCTAssertEqual(controller.mode, .automatic)
     }
     
+    func testPowerStrategyDefault() {
+        let monitor = SystemMonitor()
+        let controller = FanController(systemMonitor: monitor)
+
+        // A fresh install starts on the balanced strategy. / 中文：全新安装默认为均衡策略。
+        XCTAssertEqual(controller.powerStrategy, .balanced)
+    }
+
+    func testPowerStrategyAppliesPreset() {
+        let monitor = SystemMonitor()
+        let controller = FanController(systemMonitor: monitor)
+
+        // Selecting a named strategy fills the core auto parameters from its / 中文：选择具名策略会用该档预设
+        // preset (target temp + response notch). / 中文：填好核心自动参数（目标温度 + 响应档位）。
+        controller.setPowerStrategy(.powerSaving)
+        XCTAssertEqual(controller.powerStrategy, .powerSaving)
+        XCTAssertEqual(controller.autoThreshold, PowerStrategy.powerSaving.targetTemp!)
+        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.powerSaving.aggressiveness!)
+
+        controller.setPowerStrategy(.performance)
+        XCTAssertEqual(controller.autoThreshold, PowerStrategy.performance.targetTemp!)
+        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.performance.aggressiveness!)
+    }
+
+    func testManualTuneFlipsStrategyToCustom() {
+        let monitor = SystemMonitor()
+        let controller = FanController(systemMonitor: monitor)
+
+        controller.setPowerStrategy(.balanced)
+        XCTAssertEqual(controller.powerStrategy, .balanced)
+
+        // Hand-tuning any auto slider leaves the named presets behind. / 中文：手动调任一自动滑块即离开具名预设。
+        controller.setAutoThreshold(63)
+        XCTAssertEqual(controller.powerStrategy, .custom)
+    }
+
+    func testPowerStrategyPersists() {
+        let monitor = SystemMonitor()
+        let controller = FanController(systemMonitor: monitor)
+
+        controller.setPowerStrategy(.performance)
+        XCTAssertEqual(controller.powerStrategy, .performance)
+
+        // A freshly constructed controller reads the persisted value. / 中文：新建的控制器会读取已持久化的值。
+        let reloaded = FanController(systemMonitor: SystemMonitor())
+        XCTAssertEqual(reloaded.powerStrategy, .performance)
+    }
+
     func testUserDefaultsManager() {
         let manager = UserDefaultsManager.shared
         

@@ -16,6 +16,47 @@ enum ControlMode: String, CaseIterable {
     case system
 }
 
+/// Auto-mode efficiency strategy — a one-tap preset over the three core auto / 中文：自动模式能效策略——对三个核心自动参数
+/// parameters. Each case carries its target temperature, response notch, and / 中文：的一键预设。每个档位带有目标温度、响应档位，
+/// the fraction of the hardware RPM span to use as the ceiling. `.custom` is the / 中文：以及作为转速上限的硬件转速区间占比。`.custom`
+/// state a hand-dragged slider lands in — it carries no preset values. / 中文：是手动拖动滑块后落入的状态——不携带任何预设值。
+enum PowerStrategy: String, CaseIterable {
+    case powerSaving
+    case balanced
+    case performance
+    case custom
+
+    /// Target temperature the PID loop steers toward (°C). / 中文：PID 控制环逼近的目标温度（°C）。
+    var targetTemp: Double? {
+        switch self {
+        case .powerSaving: return 75
+        case .balanced:    return 60
+        case .performance: return 50
+        case .custom:      return nil
+        }
+    }
+
+    /// Response aggressiveness notch (matches the response slider steps). / 中文：响应强度档位（对应响应滑杆档位）。
+    var aggressiveness: Double? {
+        switch self {
+        case .powerSaving: return 0.6
+        case .balanced:    return 1.5
+        case .performance: return 2.5
+        case .custom:      return nil
+        }
+    }
+
+    /// Fraction of the [min, max] hardware RPM span used as the auto ceiling. / 中文：作为自动转速上限的 [min, max] 硬件转速区间占比。
+    var maxSpeedFraction: Double? {
+        switch self {
+        case .powerSaving: return 0.35
+        case .balanced:    return 0.65
+        case .performance: return 1.0
+        case .custom:      return nil
+        }
+    }
+}
+
 class FanController: ObservableObject {
     @Published var mode: ControlMode = .automatic
     /// Unified manual target (single slider / legacy settings). / 中文：Unified 手动 目标 (single 滑杆 / legacy 设置).
@@ -33,6 +74,12 @@ class FanController: ObservableObject {
     @Published var pidKpCustom: Double? = nil
     @Published var pidKiCustom: Double? = nil
     @Published var pidKdCustom: Double? = nil
+
+    // MARK: - Power strategy / 中文：能效策略
+    // A one-tap preset over the three core auto parameters (target temp, max / 中文：对三个核心自动参数（目标温度、最高转速、
+    // speed, response). It always applies — there is no plugged/battery branch — / 中文：响应）的一键预设。它始终生效——不再区分接电/电池——
+    // and `.custom` means the user dragged a slider so no preset is highlighted. / 中文：`.custom` 表示用户拖动过滑块，因而没有预设被高亮。
+    @Published var powerStrategy: PowerStrategy = .balanced
 
     @Published var isControlEnabled = false
     @Published var lastWriteSuccess = false
@@ -155,7 +202,7 @@ class FanController: ObservableObject {
 
     deinit {
         stopAutoControl()
-        restoreAutomaticControl()
+        restoreAutomaticControlSync()
     }
 
     // MARK: - Hardware-derived clamps / 中文：Hardware-derived clamps 分区
@@ -360,24 +407,53 @@ class FanController: ObservableObject {
         print("Fan Control: Manual control enabled")
     }
 
+    // MARK: - Daemon write dispatch / 中文：守护进程写入调度
+    // Blocking socket I/O to the daemon runs on this serial queue, off the main / 中文：与守护进程的阻塞 socket I/O 在此串行队列后台执行，
+    // thread, because the first manual write triggers an ~8 s Ftst unlock on / 中文：因为 Apple Silicon 上首次手动写入会触发约 8 秒的
+    // Apple Silicon (see fanfan-smcd.c). / 中文：Ftst 解锁（见 fanfan-smcd.c）。
+    private let smcQueue = DispatchQueue(label: "com.hoobnn.fanfan.smc-write")
+    // Coalesce SET writes so the 2 s auto timer can't pile up a backlog while a / 中文：合并 SET 写入，使 2 秒自动定时器在解锁期间
+    // write (possibly the unlock) is in flight: keep only the most recent target / 中文：不会堆积——只保留最新目标，
+    // and apply it once free. Both touched on the main thread only. / 中文：空闲后再应用。两者仅在主线程读写。
+    private var smcWriteInFlight = false
+    private var pendingFanTargets: [Int]? = nil
+
     func restoreAutomaticControl() {
         guard let monitor = systemMonitor else { return }
-        guard monitor.numberOfFans > 0 else { return }
+        let fanCount = monitor.numberOfFans
+        guard fanCount > 0 else { return }
 
-        var allSuccess = true
-        for i in 0..<monitor.numberOfFans {
-            if !runSmcHelper(args: ["auto", "\(i)"]) {
-                allSuccess = false
+        smcQueue.async { [weak self] in
+            guard let self = self else { return }
+            var allSuccess = true
+            for i in 0..<fanCount {
+                if !self.runSmcHelper(args: ["auto", "\(i)"]) {
+                    allSuccess = false
+                }
+            }
+            DispatchQueue.main.async {
+                if allSuccess {
+                    self.isControlEnabled = false
+                    self.statusMessage = "Automatic mode restored"
+                    print("Fan Control: Automatic mode restored")
+                } else {
+                    self.statusMessage = "Failed to restore auto mode"
+                    print("Fan Control: Failed to restore auto mode")
+                }
             }
         }
+    }
 
-        if allSuccess {
-            isControlEnabled = false
-            statusMessage = "Automatic mode restored"
-            print("Fan Control: Automatic mode restored")
-        } else {
-            statusMessage = "Failed to restore auto mode"
-            print("Fan Control: Failed to restore auto mode")
+    /// Synchronous restore for teardown paths (app termination, deinit) that / 中文：用于退出清理路径（app 终止、deinit）的同步恢复——
+    /// can't wait on the async queue. Each AUTO is a few ms (mode 0 + Ftst 0, no / 中文：这些路径等不了异步队列。每个 AUTO 仅几毫秒
+    /// unlock), so sending them inline is fine and leaves the fans with the / 中文：（写 mode 0 + Ftst 0，无需解锁），内联发送即可，
+    /// firmware instead of stuck at the last manual target after quit. / 中文：使退出后风扇交还固件，而非卡在最后的手动转速。
+    func restoreAutomaticControlSync() {
+        guard let monitor = systemMonitor else { return }
+        let fanCount = monitor.numberOfFans
+        guard fanCount > 0 else { return }
+        for i in 0..<fanCount {
+            _ = runSmcHelper(args: ["auto", "\(i)"])
         }
     }
 
@@ -419,22 +495,45 @@ class FanController: ObservableObject {
             return
         }
 
-        var allSuccess = true
-        for (i, t) in targets.enumerated() {
-            let safe = max(FanRPMBounds.absoluteWriteMinRPM, min(FanRPMBounds.absoluteWriteMaxRPM, t))
-            if !runSmcHelper(args: ["set", "\(i)", "\(safe)"]) {
-                allSuccess = false
-            }
+        // A write (possibly the ~8 s unlock) is already running — remember only / 中文：已有写入在途（可能是约 8 秒解锁）——只记住
+        // the latest target and apply it when that one finishes. / 中文：最新目标，待其完成后再应用。
+        if smcWriteInFlight {
+            pendingFanTargets = targets
+            return
         }
+        smcWriteInFlight = true
+        dispatchFanTargets(targets)
+    }
 
-        if allSuccess {
-            let parts = targets.enumerated().map { "F\($0.offset): \($0.element)" }.joined(separator: ", ")
-            statusMessage = "Fan targets RPM — \(parts)"
-            lastWriteSuccess = true
-            print("Fan Control: \(parts)")
-        } else {
-            statusMessage = "Failed to set fan speed"
-            lastWriteSuccess = false
+    /// Run a SET batch on the background queue, then apply any target deferred / 中文：在后台队列执行一批 SET，随后应用本次期间
+    /// while it was in flight. Must be entered with `smcWriteInFlight == true`. / 中文：被推迟的目标。进入时须满足 `smcWriteInFlight == true`。
+    private func dispatchFanTargets(_ targets: [Int]) {
+        smcQueue.async { [weak self] in
+            guard let self = self else { return }
+            var allSuccess = true
+            for (i, t) in targets.enumerated() {
+                let safe = max(FanRPMBounds.absoluteWriteMinRPM, min(FanRPMBounds.absoluteWriteMaxRPM, t))
+                if !self.runSmcHelper(args: ["set", "\(i)", "\(safe)"]) {
+                    allSuccess = false
+                }
+            }
+            DispatchQueue.main.async {
+                if allSuccess {
+                    let parts = targets.enumerated().map { "F\($0.offset): \($0.element)" }.joined(separator: ", ")
+                    self.statusMessage = "Fan targets RPM — \(parts)"
+                    self.lastWriteSuccess = true
+                    print("Fan Control: \(parts)")
+                } else {
+                    self.statusMessage = "Failed to set fan speed"
+                    self.lastWriteSuccess = false
+                }
+                if let next = self.pendingFanTargets {
+                    self.pendingFanTargets = nil
+                    self.dispatchFanTargets(next)
+                } else {
+                    self.smcWriteInFlight = false
+                }
+            }
         }
     }
 
@@ -628,6 +727,9 @@ class FanController: ObservableObject {
 
     /// Adjust fan speed based on power consumption (if available) / 中文：Adjust 风扇 speed based on 功率 consumption (if available)
     private func loadAwareAdjustment(floor: Int, ceiling: Int) -> Double {
+        // The power-saving strategy suppresses every feedforward boost — burst / 中文：省电策略关闭所有前馈加速——突发负载和
+        // and charging adjustments both spend the power we're trying to save. / 中文：充电加速都会消耗我们正想省下的电。
+        if powerStrategy == .powerSaving { return 0 }
         guard let power = BatteryMonitor.shared.batteryInfo.powerWatts, power > 0.1 else {
             return 0
         }
@@ -723,6 +825,11 @@ class FanController: ObservableObject {
         pidKpCustom = defaults.object(forKey: "pidKpCustom") as? Double
         pidKiCustom = defaults.object(forKey: "pidKiCustom") as? Double
         pidKdCustom = defaults.object(forKey: "pidKdCustom") as? Double
+
+        if let raw = defaults.string(forKey: "powerStrategy"),
+           let strategy = PowerStrategy(rawValue: raw) {
+            powerStrategy = strategy
+        }
     }
 
     func resetToSystemControl() {
@@ -740,6 +847,7 @@ class FanController: ObservableObject {
         defaults.set(autoThreshold, forKey: "autoThreshold")
         defaults.set(autoMaxSpeed, forKey: "autoMaxSpeed")
         defaults.set(autoAggressiveness, forKey: "autoAggressiveness")
+        defaults.set(powerStrategy.rawValue, forKey: "powerStrategy")
 
         if let v = pidKpCustom { defaults.set(v, forKey: "pidKpCustom") } else { defaults.removeObject(forKey: "pidKpCustom") }
         if let v = pidKiCustom { defaults.set(v, forKey: "pidKiCustom") } else { defaults.removeObject(forKey: "pidKiCustom") }
@@ -748,6 +856,7 @@ class FanController: ObservableObject {
 
     func setAutoThreshold(_ threshold: Double) {
         autoThreshold = max(40, min(90, threshold))
+        powerStrategy = .custom  // hand-tuning a slider leaves the named presets / 中文：手动调滑块即离开具名预设
         saveSettings()
         if mode == .automatic {
             resetPIDState()
@@ -757,6 +866,7 @@ class FanController: ObservableObject {
 
     func setAutoMaxSpeed(_ speed: Int) {
         autoMaxSpeed = clampUnified(speed)
+        powerStrategy = .custom
         saveSettings()
         if mode == .automatic {
             resetPIDState()
@@ -766,6 +876,7 @@ class FanController: ObservableObject {
 
     func setAutoAggressiveness(_ value: Double) {
         autoAggressiveness = max(0.0, min(3.0, value))
+        powerStrategy = .custom
         saveSettings()
         if mode == .automatic {
             resetPIDState()
@@ -777,6 +888,32 @@ class FanController: ObservableObject {
         pidKpCustom = kp
         pidKiCustom = ki
         pidKdCustom = kd
+        saveSettings()
+        if mode == .automatic {
+            resetPIDState()
+            updateAutoControl()
+        }
+    }
+
+    /// Apply a named efficiency strategy, filling the three core auto parameters. / 中文：套用具名能效策略，填好三个核心自动参数。
+    /// `.custom` is a no-op marker the manual sliders flip into. / 中文：`.custom` 是手动滑块切入的空标记。
+    func setPowerStrategy(_ strategy: PowerStrategy) {
+        powerStrategy = strategy
+
+        if let temp = strategy.targetTemp {
+            autoThreshold = max(40, min(90, temp))
+        }
+        if let agg = strategy.aggressiveness {
+            autoAggressiveness = max(0, min(3, agg))
+        }
+        if let fraction = strategy.maxSpeedFraction {
+            // Map the fraction onto this machine's [min, max] RPM span, snapping / 中文：把占比映射到本机 [min, max] 转速区间，
+            // to 50-rpm steps to match the slider. / 中文：吸附到 50 rpm 档位以匹配滑杆。
+            let span = Double(unifiedMaxClamp - unifiedMinClamp)
+            let target = Double(unifiedMinClamp) + fraction * span
+            autoMaxSpeed = clampUnified(Int((target / 50).rounded()) * 50)
+        }
+
         saveSettings()
         if mode == .automatic {
             resetPIDState()

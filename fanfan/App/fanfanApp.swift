@@ -89,6 +89,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Start monitoring regardless of permission check / 中文：无论权限检查结果如何都启动监控
         // SMC read operations typically work without special privileges / 中文：SMC 读取通常不需要特殊权限
         viewModel.startMonitoring()
+        // Keep power-source info fresh app-wide, not just while the popover is / 中文：让电源功率信息全程保持刷新，而不仅在弹窗
+        // open, so the auto-mode load-aware feedforward always has live wattage. / 中文：打开时刷新，使自动模式的负载感知前馈始终有实时功率。
+        BatteryMonitor.shared.startMonitoring()
         startIconUpdateTimer()
     }
     

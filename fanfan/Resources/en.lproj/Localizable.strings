@@ -84,6 +84,10 @@
 "popover.no_temperature_data_desc" = "SMC connected but no temperature readings available. This may happen on some Mac models.";
 
 /* Auto Mode Settings */
+"popover.strategy" = "Strategy";
+"popover.strategy.power_saving" = "Power Saving";
+"popover.strategy.balanced" = "Balanced";
+"popover.strategy.performance" = "Performance";
 "popover.threshold" = "Target Temp";
 "popover.max_speed" = "Max Speed";
 "popover.response" = "Response";

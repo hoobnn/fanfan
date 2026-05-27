@@ -18,6 +18,7 @@ struct ControlsSnapshot: Equatable {
     var autoThreshold: Double
     var autoMaxSpeed: Int
     var autoAggressiveness: Double
+    var powerStrategy: PowerStrategy
     var perFanManualControl: Bool
     var manualSpeed: Int
     var manualSpeeds: [Int]
@@ -134,6 +135,7 @@ struct ControlsCard: View, Equatable {
 
     private var autoSliders: some View {
         VStack(alignment: .leading, spacing: 8) {
+            strategyPicker
             LabeledSlider(
                 label: NSLocalizedString("popover.threshold", comment: ""),
                 value: Binding(
@@ -163,6 +165,34 @@ struct ControlsCard: View, Equatable {
                 range: 0...Double(responseSteps.count - 1), step: 1,
                 format: { responseLabel(for: responseStep($0)) }
             )
+        }
+    }
+
+    /// One-tap efficiency strategy over the three auto sliders. Hand-tuning any / 中文：覆盖三个自动滑杆的一键能效策略。手动调过任一
+    /// slider flips the strategy to `.custom`, which matches no segment — so the / 中文：滑杆会把策略切到 `.custom`，它不匹配任何分段——
+    /// segmented control then reads as "no preset selected". / 中文：于是分段控件显示为“未选中预设”。
+    private var strategyPicker: some View {
+        HStack {
+            Text(NSLocalizedString("popover.strategy", comment: ""))
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundColor(Theme.text1(scheme))
+            Spacer()
+            Picker("", selection: Binding(
+                get: { snapshot.powerStrategy },
+                set: { newStrategy in
+                    guard newStrategy != snapshot.powerStrategy else { return }
+                    DispatchQueue.main.async {
+                        viewModel.setPowerStrategy(newStrategy)
+                    }
+                }
+            )) {
+                Text(NSLocalizedString("popover.strategy.power_saving", comment: "")).tag(PowerStrategy.powerSaving)
+                Text(NSLocalizedString("popover.strategy.balanced",     comment: "")).tag(PowerStrategy.balanced)
+                Text(NSLocalizedString("popover.strategy.performance",  comment: "")).tag(PowerStrategy.performance)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 168)
+            .labelsHidden()
         }
     }
 

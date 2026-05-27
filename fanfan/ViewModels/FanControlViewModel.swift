@@ -37,6 +37,9 @@ class FanControlViewModel: ObservableObject {
     @Published var autoMaxSpeed: Int = 4500
     @Published var autoAggressiveness: Double = 1.5
 
+    // Power-strategy mirror (see FanController). / 中文：能效策略镜像（详见 FanController）。
+    @Published var powerStrategy: PowerStrategy = .balanced
+
     // PID gain overrides (nil = use the formula derived from aggressiveness). / 中文：PID 增益覆盖值（nil 表示使用由响应强度推导的公式）。
     @Published var pidKpCustom: Double? = nil
     @Published var pidKiCustom: Double? = nil
@@ -230,6 +233,11 @@ class FanControlViewModel: ObservableObject {
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .assign(to: &$autoAggressiveness)
+
+        fanController.$powerStrategy
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$powerStrategy)
 
         fanController.$pidKpCustom
             .receive(on: DispatchQueue.main)
@@ -434,6 +442,10 @@ class FanControlViewModel: ObservableObject {
     
     func setAutoAggressiveness(_ value: Double) {
         fanController.setAutoAggressiveness(value)
+    }
+
+    func setPowerStrategy(_ strategy: PowerStrategy) {
+        fanController.setPowerStrategy(strategy)
     }
 
     /// Override individual PID gains (pass nil to fall back to the formula). / 中文：覆盖单个 PID 增益（传入 nil 时回退到公式值）。
