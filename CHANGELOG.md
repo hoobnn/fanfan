@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.1.0] - 2026-05-27
+
+### Added
+- **Power-strategy presets.** A segmented picker above the automatic sliders offers Power Saving / Balanced / Performance / Custom; each preset carries its own target temperature, response notch, and RPM-span fraction. Power Saving suppresses the load-aware feedforward entirely. Hand-tuning any slider flips to Custom so no segment appears selected, and the choice persists across launches. SMC writes now dispatch on a serial background queue and coalesce pending targets, so the 2 s auto timer can no longer pile up requests during the ~8 s Ftst unlock window.
+
+### Fixed
+- **Apple Silicon (M3/M4) fan control now actually engages.** The daemon previously mistook firmware `0x82` rejections for success, so mode writes silently failed while the fan stayed system-locked. It now performs the Ftst unlock (write `Ftst=1`, wait up to 12 s for `thermalmonitord` to yield, retry `F<n>Md=1` until it sticks), probes mode-key casing (`F%dMd` vs `F%dmd`) at startup for M4/M5 portability, and clears `Ftst=0` when the last manual fan reverts to AUTO so firmware can idle fans back to 0 RPM. The socket receive timeout was raised from 250 ms to 15 s to cover the unlock window.
+- Fans could stay stuck at their last manual RPM after quitting the app. `applicationWillTerminate` now hands control back to firmware before monitoring stops.
+
 ## [1.0.9] - 2026-05-21
 
 ### Changed
