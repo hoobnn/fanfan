@@ -67,8 +67,11 @@ class PermissionsManager: ObservableObject {
         
         // 2. Construct the installation script / 中文：2. 构造安装脚本
         // We handle everything in one sudo shell script for atomicity / 中文：通过一个 sudo shell 脚本完成全部操作以保证原子性
+        // NOTE: rm the daemon before cp so the new binary lands on a fresh inode. / 中文：注意：cp 前先 rm，让新二进制落在全新 inode 上。
+        // Overwriting in place reuses the vnode and its cached code signature, so / 中文：原地覆盖会复用 vnode 及其缓存的代码签名，
+        // on upgrade AMFI SIGKILLs the new content (OS_REASON_CODESIGNING). / 中文：升级时 AMFI 会以签名违规 SIGKILL 新内容。
         let script = """
-        do shell script "mkdir -p /usr/local/libexec /Library/LaunchDaemons && cp -f '\(bundledDaemonPath)' '\(daemonPath)' && chown root:wheel '\(daemonPath)' && chmod 755 '\(daemonPath)' && cp -f '\(bundledPlistPath)' '\(daemonPlistPath)' && chown root:wheel '\(daemonPlistPath)' && chmod 644 '\(daemonPlistPath)' && (/bin/launchctl bootout system '\(daemonPlistPath)' >/dev/null 2>&1 || true) && /bin/launchctl bootstrap system '\(daemonPlistPath)' && /bin/launchctl kickstart -k system/com.hoobnn.fanfan.smcd" with administrator privileges
+        do shell script "mkdir -p /usr/local/libexec /Library/LaunchDaemons && rm -f '\(daemonPath)' && cp '\(bundledDaemonPath)' '\(daemonPath)' && chown root:wheel '\(daemonPath)' && chmod 755 '\(daemonPath)' && cp -f '\(bundledPlistPath)' '\(daemonPlistPath)' && chown root:wheel '\(daemonPlistPath)' && chmod 644 '\(daemonPlistPath)' && (/bin/launchctl bootout system '\(daemonPlistPath)' >/dev/null 2>&1 || true) && /bin/launchctl bootstrap system '\(daemonPlistPath)' && /bin/launchctl kickstart -k system/com.hoobnn.fanfan.smcd" with administrator privileges
         """
         
         // 3. Execute / 中文：3. 执行
