@@ -85,30 +85,40 @@ class FanControlViewModel: ObservableObject {
         setupSleepWakeNotifications()
     }
     
+    /// Re-arm hysteresis: after a high-temp notification, the temperature must / 中文：重新武装回滞：发出高温通知后，温度需降到
+    /// fall this far below the alert threshold before another can fire — / 中文：警报线以下这么多度才允许再次通知——
+    /// otherwise a reading hovering at the line would notify on every tick. / 中文：否则在警报线附近徘徊的读数会每个 tick 都通知。
+    private static let highTempRearmDelta: Double = 5.0
+    private var hasNotifiedHighTemp = false
+
     private func setupSettingsObservers() {
-        // Observe high temp alert for notifications / 中文：监听高温警报以发送通知
-        $highTempAlert
-            .sink { [weak self] temp in
-                guard let self = self else { return }
-                if self.enableNotifications, let cpuTemp = self.cpuTemperature, cpuTemp > temp {
-                    self.showHighTempNotification(cpuTemp)
-                }
-            }
-            .store(in: &cancellables)
-        
-        // Observe auto switch mode for automatic mode activation / 中文：监听自动切换模式以启用自动控制
+        // High-temp alert and auto mode switch, both driven by the live CPU / 中文：高温警报与自动切换均由实时 CPU 温度驱动。
+        // temperature. (Previously the alert observed `$highTempAlert` — the / 中文：（此前警报监听的是 `$highTempAlert` 这个设置项本身，
+        // *setting* — so it only fired if the user dragged the threshold / 中文：因此只有用户在温度已超标时拖动阈值滑杆
+        // slider while already over temperature.) / 中文：才会触发。）
         $cpuTemperature
+            .compactMap { $0 }
             .sink { [weak self] temp in
                 guard let self = self else { return }
-                if self.autoSwitchMode, let cpuTemp = temp, cpuTemp > self.highTempAlert {
-                    guard self.controlMode != .system else { return }
-                    if self.controlMode != .automatic {
-                        print("Auto-switching to automatic mode due to high temperature: \(cpuTemp)°C")
-                        self.setControlMode(.automatic)
-                    }
+                self.handleHighTemperature(temp)
+                if self.autoSwitchMode, temp > self.highTempAlert,
+                   self.controlMode != .system, self.controlMode != .automatic {
+                    print("Auto-switching to automatic mode due to high temperature: \(temp)°C")
+                    self.setControlMode(.automatic)
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Edge-triggered high-temp notification with re-arm hysteresis. / 中文：带重新武装回滞的边沿触发高温通知。
+    private func handleHighTemperature(_ temp: Double) {
+        if temp > highTempAlert {
+            guard enableNotifications, !hasNotifiedHighTemp else { return }
+            hasNotifiedHighTemp = true
+            showHighTempNotification(temp)
+        } else if temp < highTempAlert - Self.highTempRearmDelta {
+            hasNotifiedHighTemp = false
+        }
     }
     
     private func showHighTempNotification(_ temperature: Double) {
