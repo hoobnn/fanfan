@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.1.1] - 2026-06-10
+
+### Fixed
+- **The high-temperature notification never fired.** It observed the alert-threshold *setting* instead of the live temperature, so it could only trigger if the user dragged the threshold slider while already over temperature. It now follows the live CPU temperature, edge-triggered with a 5 °C re-arm hysteresis so a reading hovering at the alert line doesn't notify on every sample.
+
+### Performance
+- All six repeating timers (monitoring, auto control loop, battery, icon refresh, temperature history, fallback animation) now declare a timer tolerance, letting the kernel coalesce wakeups and cut idle CPU/power draw. Control loops measure real elapsed time, so the added jitter has no behavioral effect.
+- Fanless Macs (e.g. MacBook Air) no longer re-probe `F0Ac` over IOKit on every 2 s tick; the zero-fan probe is throttled to once per 30 s and still self-heals after transient SMC failures.
+- The status-bar title is deduplicated by rendered text — battery-power jitter no longer forces a status-item relayout when the displayed string is unchanged.
+- The popover fan-blade animation is capped at 60 fps; on 120 Hz ProMotion panels this halves rotor redraw cost with no perceptible difference.
+
 ## [1.1.0] - 2026-05-27
 
 ### Added
