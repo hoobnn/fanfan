@@ -264,6 +264,13 @@ class SystemMonitor: ObservableObject {
     /// round-trips of the scan are skipped. Accessed only on `readingsQueue`. / 中文：约 30 次 IOKit 往返的扫描被跳过。仅在 `readingsQueue` 访问。
     private var sensorScanActive = false
 
+    /// Fanless Macs (e.g. some MacBook Airs) report zero fans; without a / 中文：无风扇 Mac（如部分 MacBook Air）报告 0 个风扇；
+    /// throttle the `F0Ac` probe would re-run on every tick forever. Re-probe / 中文：不节流的话 `F0Ac` 探测会每个 tick 永远重跑。
+    /// at most every `zeroFanReprobeInterval` so transient SMC failures still / 中文：改为最多每 `zeroFanReprobeInterval` 重探一次，
+    /// self-heal. Accessed only on `readingsQueue`. / 中文：瞬时 SMC 失败仍能自愈。仅在 `readingsQueue` 访问。
+    private var lastZeroFanProbeTime: Date?
+    private let zeroFanReprobeInterval: TimeInterval = 30
+
     /// Fan `Mn` / `Mx` SMC keys are hardware-fixed limits; reading them every / 中文：风扇 `Mn` / `Mx` SMC 键是硬件固化上下限；每个 tick 重读
     /// tick wastes IOKit traffic. Cache once per fan-count and invalidate only / 中文：浪费 IOKit。按风扇数缓存一次，只有风扇数变化时
     /// when the fan count changes (e.g. hot-pluggable behavior on some chassis). / 中文：才失效（例如某些机型支持热插拔风扇）。
@@ -418,6 +425,10 @@ class SystemMonitor: ObservableObject {
             let timer = Timer.scheduledTimer(withTimeInterval: self.monitoringInterval, repeats: true) { [weak self] _ in
                 self?.updateReadings()
             }
+            // Tolerance lets the kernel coalesce this wake with the app's other / 中文：tolerance 允许内核把该唤醒与应用的其他定时器合并，
+            // timers, cutting idle CPU wakeups. Control loops downstream measure / 中文：减少空闲 CPU 唤醒。下游控制环用真实 dt 计算，
+            // real dt, so ±15% sampling jitter is harmless. / 中文：±15% 的采样抖动无影响。
+            timer.tolerance = self.monitoringInterval * 0.15
             RunLoop.current.add(timer, forMode: .common)
             self.monitoringTimer = timer
         }
@@ -490,13 +501,13 @@ class SystemMonitor: ObservableObject {
             let cpuTemp = self.smoothTemperature(raw: rawCpuTemp, smoothed: &self.smoothedCpuTemp)
             let gpuTemp = self.smoothTemperature(raw: rawGpuTemp, smoothed: &self.smoothedGpuTemp)
 
-            let detectedFanCount = self.numberOfFans > 0 ? self.numberOfFans : self.detectFanCount()
+            let now = Date()
+            let detectedFanCount = self.resolveFanCount(now: now)
             let (speeds, minSpeeds, maxSpeeds) = self.readFanData(fanCount: detectedFanCount)
 
             // Slow tier: full sensor list. `scanAllSensors` does up to ~30 IOKit / 中文：慢速档：完整传感器列表。`scanAllSensors` 要做 ~30 次
             // round-trips on rich-catalogue Macs, so cap it to `slowSensorScan- / 中文：IOKit 往返（在传感器丰富的机型上），因此最多每
             // Interval`. Intervening ticks keep the previously published list. / 中文：`slowSensorScanInterval` 跑一次；中间 tick 沿用上一份。
-            let now = Date()
             let needsSensorScan: Bool = {
                 // Skip entirely while the popover (the only consumer) is closed. / 中文：唯一消费方 popover 关闭时整段跳过。
                 guard self.sensorScanActive else { return false }
@@ -522,6 +533,18 @@ class SystemMonitor: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Known fan count, or a throttled re-probe when none were found yet. / 中文：已知风扇数；尚未发现风扇时做节流后的重探测。
+    private func resolveFanCount(now: Date) -> Int {
+        if numberOfFans > 0 { return numberOfFans }
+        if let last = lastZeroFanProbeTime,
+           now.timeIntervalSince(last) < zeroFanReprobeInterval {
+            return 0
+        }
+        let count = detectFanCount()
+        lastZeroFanProbeTime = count == 0 ? now : nil
+        return count
     }
 
     /// Reads actual/target RPM every tick; `Mn` / `Mx` come from [[cachedFanLimits]]. / 中文：每个 tick 读 actual/target RPM；`Mn` / `Mx` 走 [[cachedFanLimits]] 缓存。

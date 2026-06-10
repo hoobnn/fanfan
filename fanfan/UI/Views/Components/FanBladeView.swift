@@ -49,7 +49,10 @@ struct FanBladeView: View {
                 if visualRps > 0 {
                     // Drive rotation off the display's vsync so step sizes stay even at low RPM. / 中文：跟随显示器 vsync 驱动旋转，
                     // The static bloom / inner dot stay outside this subtree so they don't re-evaluate per frame. / 中文：低速下步进才不会忽长忽短。静态光晕和内圆点放在子树外，避免每帧重新求值。
-                    TimelineView(.animation) { timeline in
+                    // Capped at 60 fps: on 120 Hz ProMotion panels an uncapped / 中文：限频 60 fps：在 120 Hz ProMotion 屏上不限频的
+                    // `.animation` ticks every refresh, doubling the rotor's / 中文：`.animation` 每次刷新都 tick，让转子重绘开销翻倍，
+                    // re-render cost for no perceptible smoothness gain. / 中文：而流畅度并无可感知提升。
+                    TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
                         let t = timeline.date.timeIntervalSinceReferenceDate
                         let degrees = (anchorAngle + (t - anchorTime) * visualRps * 360)
                             .truncatingRemainder(dividingBy: 360)

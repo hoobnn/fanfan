@@ -303,11 +303,19 @@ class StatusBarManager: NSObject, ObservableObject {
         }
     }
     
+    /// Title text currently on the status button — dedupes `attributedTitle` / 中文：状态按钮当前显示的标题文本——用于去重 `attributedTitle`
+    /// assignments. E.g. in temperature mode a battery-power jitter passes / 中文：赋值。例如温度模式下电池功率抖动会通过
+    /// `shouldApplyIconUpdate` but renders the exact same string; setting the / 中文：`shouldApplyIconUpdate`，但渲染出的字符串完全相同；
+    /// title anyway forces a status-item relayout for nothing. / 中文：重设标题只会白白触发一次状态栏重排。
+    private var lastDisplayedText: String?
+
     private func updateDisplay() {
         guard let button = statusItem?.button else { return }
-        
+
         // Update button title based on display mode / 中文：Update button title based on display 模式
         let text = getDisplayText()
+        guard text != lastDisplayedText else { return }
+        lastDisplayedText = text
         // Use a compact font for the title to reduce visual length / 中文：标题使用紧凑字体以减少视觉长度。
         if text.isEmpty {
             button.title = ""
@@ -409,6 +417,9 @@ class StatusBarManager: NSObject, ObservableObject {
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / framesPerSecond, repeats: true) { [weak self] _ in
             self?.advanceAnimationFrame()
         }
+        // Rotation integrates real elapsed time, so coalesced wakeups shift / 中文：旋转按真实流逝时间积分，合并唤醒只会
+        // frame timing without changing the spin rate. / 中文：移动帧时刻，不会改变转速。
+        timer.tolerance = (1.0 / framesPerSecond) * 0.2
         RunLoop.current.add(timer, forMode: .common)
         fallbackAnimationTimer = timer
     }

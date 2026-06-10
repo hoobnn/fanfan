@@ -97,10 +97,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func startIconUpdateTimer() {
         iconUpdateTimer?.invalidate()
-        iconUpdateTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.updateStatusBarIcon()
         }
-        RunLoop.current.add(iconUpdateTimer!, forMode: .common)
+        // The icon refresh is purely cosmetic — let the kernel coalesce it. / 中文：图标刷新纯属外观——允许内核合并唤醒。
+        timer.tolerance = 0.5
+        RunLoop.current.add(timer, forMode: .common)
+        iconUpdateTimer = timer
         
         // Initial update / 中文：初始更新
         updateStatusBarIcon()

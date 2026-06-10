@@ -71,10 +71,14 @@ class BatteryMonitor: ObservableObject {
     func startMonitoring() {
         timer?.invalidate()
         updateBatteryInfo()
-        timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             self?.updateBatteryInfo()
         }
-        RunLoop.current.add(timer!, forMode: .common)
+        // Battery data drifts slowly; a generous tolerance lets the kernel / 中文：电池数据变化缓慢；宽松的 tolerance 让内核
+        // batch this wake with other work. / 中文：把该唤醒与其他工作合并。
+        timer.tolerance = 2.0
+        RunLoop.current.add(timer, forMode: .common)
+        self.timer = timer
     }
     
     func stopMonitoring() {

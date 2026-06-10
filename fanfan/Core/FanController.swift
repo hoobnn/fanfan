@@ -571,10 +571,13 @@ class FanController: ObservableObject {
             }
             self.resetPIDState()
             self.updateAutoControl()
-            self.autoControlTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
                 self?.updateAutoControl()
             }
-            RunLoop.current.add(self.autoControlTimer!, forMode: .common)
+            // Coalesceable wakeups; the PID computes real dt so jitter is safe. / 中文：可合并唤醒；PID 用真实 dt 计算，抖动无影响。
+            timer.tolerance = 0.3
+            RunLoop.current.add(timer, forMode: .common)
+            self.autoControlTimer = timer
         }
     }
 

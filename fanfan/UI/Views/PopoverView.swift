@@ -406,7 +406,7 @@ struct PopoverView: View {
         historyTimer?.invalidate()
         let seed = viewModel.maxTemperature
         tempHistory = Array(repeating: max(40, seed), count: 60)
-        historyTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
                 let t = viewModel.maxTemperature
                 guard t > 0 else { return }
@@ -416,6 +416,9 @@ struct PopoverView: View {
                 }
             }
         }
+        // Chart sampling at 1 Hz; ±0.2 s jitter is invisible in a 60 s window. / 中文：曲线按 1 Hz 采样；60 秒窗口里 ±0.2 秒抖动不可见。
+        timer.tolerance = 0.2
+        historyTimer = timer
     }
 
     private func installHelper() {
