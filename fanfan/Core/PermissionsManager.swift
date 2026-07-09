@@ -28,27 +28,19 @@ class PermissionsManager: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            let fileManager = FileManager.default
             let daemonReady = SMCDaemonClient.ping()
-            let daemonInstalled = fileManager.fileExists(atPath: self.daemonPath)
-                && fileManager.fileExists(atPath: self.daemonPlistPath)
-            
-            if !daemonReady && !daemonInstalled {
-                DispatchQueue.main.async { self.isHelperInstalled = false }
-                return
-            }
-            
-            // If the daemon is still booting, the first write path will retry the / 中文：If the 守护进程 is still booting, the first 写入 path will retry the
-            // socket and then fall back to the legacy helper. / 中文：socket and then fall back to the legacy 辅助工具.
+
+            // Treat "files exist but launchd cannot run them" as not installed. / 中文：把“文件存在但 launchd 无法运行”的状态视为未安装。
+            // A quarantined or stale helper otherwise hides the repair button / 中文：否则被 quarantine 或过期的 helper 会隐藏修复按钮，
+            // while every SET/AUTO command still fails because the socket is absent. / 中文：但 socket 不存在时每次 SET/AUTO 仍会失败。
             DispatchQueue.main.async {
-                self.isHelperInstalled = true
+                self.isHelperInstalled = daemonReady
             }
         }
     }
     
     private func verifySudoAccess() -> Bool {
         return SMCDaemonClient.ping()
-            || FileManager.default.fileExists(atPath: daemonPath)
     }
     
     func installHelper(completion: @escaping (Bool, String?) -> Void) {
@@ -71,7 +63,7 @@ class PermissionsManager: ObservableObject {
         // Overwriting in place reuses the vnode and its cached code signature, so / 中文：原地覆盖会复用 vnode 及其缓存的代码签名，
         // on upgrade AMFI SIGKILLs the new content (OS_REASON_CODESIGNING). / 中文：升级时 AMFI 会以签名违规 SIGKILL 新内容。
         let script = """
-        do shell script "mkdir -p /usr/local/libexec /Library/LaunchDaemons && rm -f '\(daemonPath)' && cp '\(bundledDaemonPath)' '\(daemonPath)' && chown root:wheel '\(daemonPath)' && chmod 755 '\(daemonPath)' && cp -f '\(bundledPlistPath)' '\(daemonPlistPath)' && chown root:wheel '\(daemonPlistPath)' && chmod 644 '\(daemonPlistPath)' && (/bin/launchctl bootout system '\(daemonPlistPath)' >/dev/null 2>&1 || true) && /bin/launchctl bootstrap system '\(daemonPlistPath)' && /bin/launchctl kickstart -k system/com.hoobnn.fanfan.smcd" with administrator privileges
+        do shell script "mkdir -p /usr/local/libexec /Library/LaunchDaemons && rm -f '\(daemonPath)' && cp '\(bundledDaemonPath)' '\(daemonPath)' && chown root:wheel '\(daemonPath)' && chmod 755 '\(daemonPath)' && cp -f '\(bundledPlistPath)' '\(daemonPlistPath)' && chown root:wheel '\(daemonPlistPath)' && chmod 644 '\(daemonPlistPath)' && (/usr/bin/xattr -d com.apple.quarantine '\(daemonPath)' >/dev/null 2>&1 || true) && (/usr/bin/xattr -d com.apple.quarantine '\(daemonPlistPath)' >/dev/null 2>&1 || true) && (/bin/launchctl bootout system '\(daemonPlistPath)' >/dev/null 2>&1 || true) && /bin/launchctl bootstrap system '\(daemonPlistPath)' && /bin/launchctl kickstart -k system/com.hoobnn.fanfan.smcd" with administrator privileges
         """
         
         // 3. Execute / 中文：3. 执行

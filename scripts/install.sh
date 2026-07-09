@@ -35,6 +35,8 @@ sudo chmod 755 /usr/local/libexec/fanfan-smcd
 sudo cp /Applications/fanfan.app/Contents/Resources/com.hoobnn.fanfan.smcd.plist /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
 sudo chown root:wheel /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
 sudo chmod 644 /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
+sudo xattr -d com.apple.quarantine /usr/local/libexec/fanfan-smcd >/dev/null 2>&1 || true
+sudo xattr -d com.apple.quarantine /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist >/dev/null 2>&1 || true
 sudo launchctl bootout system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist >/dev/null 2>&1 || true
 sudo launchctl bootstrap system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
 sudo launchctl kickstart -k system/com.hoobnn.fanfan.smcd

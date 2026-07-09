@@ -114,6 +114,14 @@ Example from this repo: `🐛 bug(ui): close popover when app loses focus`.
 
 If a commit-msg hook fails, fix the message — do not bypass with `--no-verify`.
 
+### AI signature preference
+
+AI-assisted commits in this project should include an AI `Co-Authored-By` trailer. For Codex work, use:
+
+```
+Co-Authored-By: Codex <noreply@openai.com>
+```
+
 ## Conventions worth remembering
 
 - **macOS 26 + Swift 6** — you can use the newest APIs without back-deployment shims.

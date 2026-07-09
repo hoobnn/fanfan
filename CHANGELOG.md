@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.1.2] - 2026-07-09
+
+### Fixed
+- **Fan control could appear installed but have no effect after installing the latest release.** macOS could preserve the quarantine attribute on the privileged `fanfan-smcd` LaunchDaemon binary and plist when installing from the downloaded app bundle, causing `launchd` to refuse the daemon with `Refusing to execute/trust quarantined program/file`. The installer and in-app helper repair flow now remove quarantine from the installed daemon files before bootstrapping the service.
+- The helper status check no longer treats "files exist on disk" as enough. The UI now requires a live `PING` response from `/var/run/fanfan-smcd.sock`, so a quarantined or stale helper surfaces the repair flow instead of hiding behind a false installed state.
+
 ## [1.1.1] - 2026-06-10
 
 ### Fixed
