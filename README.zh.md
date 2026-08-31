@@ -34,7 +34,8 @@ curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.
 
 写入风扇转速需要 root 权限。fanfan 不让整个应用以 root 运行，
 而是安装一个极简的 C LaunchDaemon，由它持有 SMC 句柄，
-通过 Unix socket 只接收三条指令：`PING`、`SET`、`AUTO`。
+通过带版本的精简 Unix socket 协议完成健康检查、租约续期、转速写入和
+固件控制恢复。若应用崩溃或失去响应，10 秒租约到期后会自动交还固件控制。
 
 ```
 fanfan.app  ──Unix socket──▶  fanfan-smcd（root）  ──IOKit──▶  SMC

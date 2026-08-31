@@ -172,8 +172,9 @@
 
 /* 警报 */
 "alert.high_temp.title" = "高温警报";
-"alert.high_temp.subtitle" = "CPU 温度: %.1f°C";
+"alert.high_temp.subtitle" = "最高温度：%.1f°C";
 "alert.high_temp.message" = "考虑切换到自动风扇控制或检查您的系统。";
+"controls.apply_failed" = "风扇设置未能生效，请检查辅助程序后重试。";
 
 /* 应用 */
 "app.title" = "fanfan - 风扇控制";

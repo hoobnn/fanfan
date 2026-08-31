@@ -40,6 +40,17 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: 🔎 Verify tagged app version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          PROJECT_VERSION=$(xcodebuild \
+            -project fanfan.xcodeproj \
+            -scheme fanfan \
+            -configuration Release \
+            -showBuildSettings | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+          test "$PROJECT_VERSION" = "${{ steps.version.outputs.version }}"
+
       - name: 🔑 Import signing certificate
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
@@ -77,8 +88,20 @@ jobs:
           set -euo pipefail
           make -C tools/fanfan-smcd clean
           make -C tools/fanfan-smcd
+          lipo tools/fanfan-smcd/fanfan-smcd -verify_arch arm64
+          lipo tools/fanfan-smcd/fanfan-smcd -verify_arch x86_64
+          test "$(xcrun vtool -show-build tools/fanfan-smcd/fanfan-smcd | awk '$1 == "minos" { print $2 }' | sort -u)" = "26.0"
           # Refresh the bundled copy that Xcode picks up as a Resources file.
           cp tools/fanfan-smcd/fanfan-smcd fanfan/Resources/fanfan-smcd
+
+      - name: 🧪 Run unit tests
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project fanfan.xcodeproj \
+            -scheme fanfan \
+            -destination 'platform=macOS' \
+            test
 
       - name: 🔨 Build fanfan
         run: |
@@ -122,6 +145,7 @@ jobs:
 
           # Inner-most first.
           codesign --force --timestamp --options runtime \
+            --identifier fanfan-smcd \
             --sign "$SIGN_IDENTITY" \
             "$DAEMON"
 

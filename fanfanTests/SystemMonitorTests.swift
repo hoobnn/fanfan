@@ -72,4 +72,26 @@ final class SystemMonitorTests: XCTestCase {
         XCTAssertEqual(sections.first?.sensors.map(\.id), ["TC0P", "TC1C"])
         XCTAssertEqual(sections.first?.maxTemperature, 63.0)
     }
+
+    func testEveryKnownTemperatureSourceMustRemainFresh() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let fresh = now.addingTimeInterval(-2)
+        let stale = now.addingTimeInterval(-12)
+
+        XCTAssertFalse(SystemMonitor.temperatureSourcesAreFresh(
+            cpuLastValidAt: nil, gpuLastValidAt: nil, now: now, timeout: 10
+        ))
+        XCTAssertTrue(SystemMonitor.temperatureSourcesAreFresh(
+            cpuLastValidAt: fresh, gpuLastValidAt: nil, now: now, timeout: 10
+        ))
+        XCTAssertTrue(SystemMonitor.temperatureSourcesAreFresh(
+            cpuLastValidAt: fresh, gpuLastValidAt: fresh, now: now, timeout: 10
+        ))
+        XCTAssertFalse(SystemMonitor.temperatureSourcesAreFresh(
+            cpuLastValidAt: fresh, gpuLastValidAt: stale, now: now, timeout: 10
+        ))
+        XCTAssertFalse(SystemMonitor.temperatureSourcesAreFresh(
+            cpuLastValidAt: stale, gpuLastValidAt: fresh, now: now, timeout: 10
+        ))
+    }
 }

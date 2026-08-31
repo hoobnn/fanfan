@@ -172,8 +172,9 @@
 
 /* Alerts */
 "alert.high_temp.title" = "High Temperature Alert";
-"alert.high_temp.subtitle" = "CPU temperature: %.1f°C";
+"alert.high_temp.subtitle" = "Highest temperature: %.1f°C";
 "alert.high_temp.message" = "Consider switching to automatic fan control or check your system.";
+"controls.apply_failed" = "Could not apply the fan setting. Check the helper and try again.";
 
 /* App */
 "app.title" = "fanfan - Fan Control";

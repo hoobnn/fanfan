@@ -34,7 +34,9 @@ Requires macOS 26+ (Apple Silicon or Intel). One password prompt on first launch
 
 Writing fan speeds requires root. Instead of running the whole app as root,
 fanfan installs a tiny C LaunchDaemon that owns the SMC handle and accepts
-exactly three commands over a Unix socket: `PING`, `SET`, `AUTO`.
+a small versioned Unix-socket protocol for health checks, lease renewal,
+fan targets, and returning control to firmware. A 10-second lease restores
+firmware control automatically if the app crashes or stops responding.
 
 ```
 fanfan.app  ──unix socket──▶  fanfan-smcd (root)  ──IOKit──▶  SMC

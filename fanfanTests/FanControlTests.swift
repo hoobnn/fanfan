@@ -205,4 +205,80 @@ final class FanControlTests: XCTestCase {
         viewModel.gpuTemperature = 65.0
         XCTAssertEqual(viewModel.getMaxTemperature(), 70.0)
     }
+
+    func testBatteryAmperageNormalizationHandlesTwosComplement() {
+        XCTAssertEqual(BatteryMonitor.normalizedAmperage(-2_000), -2_000)
+        XCTAssertEqual(
+            BatteryMonitor.normalizedAmperage(Int(0xFFFF_F830)),
+            -2_000
+        )
+        XCTAssertEqual(
+            BatteryMonitor.normalizedAmperage(UInt64(bitPattern: Int64(-2_000))),
+            -2_000
+        )
+    }
+
+    func testDaemonPingRequiresMatchingProtocolVersion() {
+        XCTAssertEqual(SMCDaemonClient.pingVersion(from: "OK pong 2 idle"), 2)
+        XCTAssertEqual(SMCDaemonClient.pingVersion(from: "OK pong 2 active"), 2)
+        XCTAssertEqual(SMCDaemonClient.pingVersion(from: "OK pong 2 restoring"), 2)
+        XCTAssertNil(SMCDaemonClient.pingVersion(from: "OK pong"))
+        XCTAssertNil(SMCDaemonClient.pingVersion(from: "OK pong 2 trailing"))
+        XCTAssertNil(SMCDaemonClient.pingVersion(from: "OKAY pong 2 idle"))
+    }
+
+    func testVersionComparisonHandlesUnevenComponents() {
+        XCTAssertTrue(UpdateChecker.isVersion("1.2.1", newerThan: "1.2"))
+        XCTAssertFalse(UpdateChecker.isVersion("1.2.0", newerThan: "1.2"))
+        XCTAssertFalse(UpdateChecker.isVersion("1.1.9", newerThan: "1.2.0"))
+    }
+
+    func testPrivilegedInstallerEscaping() {
+        let path = "/tmp/fan fan's \\\"bundle\\\""
+        XCTAssertEqual(
+            PermissionsManager.shellQuoted(path),
+            "'/tmp/fan fan'\\''s \\\"bundle\\\"'"
+        )
+        XCTAssertEqual(
+            PermissionsManager.appleScriptEscaped("a\\b\"c"),
+            "a\\\\b\\\"c"
+        )
+    }
+
+    func testUnifiedFanRangeUsesIntersection() {
+        let viewModel = FanControlViewModel()
+        viewModel.fanMinSpeeds = [1_000, 1_400]
+        viewModel.fanMaxSpeeds = [5_500, 4_800]
+
+        XCTAssertEqual(viewModel.effectiveUnifiedMinRPM, 1_400)
+        XCTAssertEqual(viewModel.effectiveUnifiedMaxRPM, 4_800)
+    }
+
+    func testSensorSummaryPrefersHottestExplicitDevice() {
+        let sensors = [
+            SensorReading(id: "TH0P", name: "HDD Proximity", temperature: 35, category: .storage),
+            SensorReading(id: "TN0D", name: "SSD Diode", temperature: 65, category: .storage),
+            SensorReading(id: "TN1P", name: "NAND", temperature: 58, category: .storage),
+            SensorReading(id: "TB0T", name: "Battery 1", temperature: 34, category: .battery),
+            SensorReading(id: "TB1T", name: "Battery 2", temperature: 39, category: .battery)
+        ]
+
+        XCTAssertEqual(FanControlViewModel.ssdTemperature(in: sensors), 65)
+        XCTAssertEqual(FanControlViewModel.batterySensorTemperature(in: sensors), 39)
+    }
+
+    func testPIDOverrideStartsFromExactEffectiveGains() {
+        let controller = FanController(systemMonitor: SystemMonitor())
+        let gains = (
+            controller.effectivePIDKp,
+            controller.effectivePIDKi,
+            controller.effectivePIDKd
+        )
+
+        controller.setPIDGains(kp: gains.0, ki: gains.1, kd: gains.2)
+
+        XCTAssertEqual(controller.effectivePIDKp, gains.0)
+        XCTAssertEqual(controller.effectivePIDKi, gains.1)
+        XCTAssertEqual(controller.effectivePIDKd, gains.2)
+    }
 }

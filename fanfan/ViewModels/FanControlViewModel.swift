@@ -66,6 +66,7 @@ class FanControlViewModel: ObservableObject {
     private let systemMonitor = SystemMonitor()
     let fanController: FanController
     private var cancellables = Set<AnyCancellable>()
+    private var wakeReapplyGeneration = 0
     
     init() {
         self.fanController = FanController(systemMonitor: systemMonitor)
@@ -92,17 +93,21 @@ class FanControlViewModel: ObservableObject {
     private var hasNotifiedHighTemp = false
 
     private func setupSettingsObservers() {
-        // High-temp alert and auto mode switch, both driven by the live CPU / 中文：高温警报与自动切换均由实时 CPU 温度驱动。
-        // temperature. (Previously the alert observed `$highTempAlert` — the / 中文：（此前警报监听的是 `$highTempAlert` 这个设置项本身，
+        // High-temp alert and auto mode switch are driven by the unsmoothed
+        // maximum of live CPU/GPU telemetry, so GPU-only overheating is covered
+        // and the safety notification is not delayed by display smoothing.
+        // 中文：高温警报与自动切换由 CPU/GPU 原始实时最高温度驱动，既覆盖 GPU
+        // 单独过热，也不会被界面平滑延迟。（此前警报监听的是 `$highTempAlert` 设置项，
         // *setting* — so it only fired if the user dragged the threshold / 中文：因此只有用户在温度已超标时拖动阈值滑杆
         // slider while already over temperature.) / 中文：才会触发。）
-        $cpuTemperature
+        systemMonitor.$rawMaxTemperature
             .compactMap { $0 }
             .sink { [weak self] temp in
                 guard let self = self else { return }
                 self.handleHighTemperature(temp)
-                if self.autoSwitchMode, temp > self.highTempAlert,
-                   self.controlMode != .system, self.controlMode != .automatic {
+                let criticalSafetyOverride = temp >= 90
+                if (criticalSafetyOverride || (self.autoSwitchMode && temp > self.highTempAlert)),
+                   self.controlMode == .manual {
                     print("Auto-switching to automatic mode due to high temperature: \(temp)°C")
                     self.setControlMode(.automatic)
                 }
@@ -271,6 +276,13 @@ class FanControlViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$lastWriteSuccess)
 
+        LaunchAtLoginManager.shared.$registrationStatus
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.launchAtLogin = LaunchAtLoginManager.shared.isEnabled
+            }
+            .store(in: &cancellables)
+
         // Average reported RPM across detected fans with debounce / 中文：Average reported RPM across detected 风扇s with debounce
         Publishers.CombineLatest($fanSpeeds, $numberOfFans)
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
@@ -300,20 +312,24 @@ class FanControlViewModel: ObservableObject {
         }
     }
 
-    private static func ssdTemperature(in sensors: [SensorReading]) -> Double? {
-        sensors.first(where: {
-            $0.category == .storage ||
+    static func ssdTemperature(in sensors: [SensorReading]) -> Double? {
+        let explicitSSD = sensors.filter {
             $0.name.localizedCaseInsensitiveContains("ssd") ||
             $0.name.localizedCaseInsensitiveContains("nand") ||
             $0.id.hasPrefix("TN")
-        })?.temperature
+        }
+        return (explicitSSD.isEmpty ? sensors.filter { $0.category == .storage } : explicitSSD)
+            .map(\.temperature)
+            .max()
     }
 
-    private static func batterySensorTemperature(in sensors: [SensorReading]) -> Double? {
-        sensors.first(where: {
+    static func batterySensorTemperature(in sensors: [SensorReading]) -> Double? {
+        sensors.filter {
             $0.category == .battery ||
             $0.name.localizedCaseInsensitiveContains("battery")
-        })?.temperature
+        }
+        .map(\.temperature)
+        .max()
     }
     
     // MARK: - Monitoring Control / 中文：监控控制
@@ -368,23 +384,19 @@ class FanControlViewModel: ObservableObject {
         )
     }
     
-    private func removeSleepWakeNotifications() {
-        NSWorkspace.shared.notificationCenter.removeObserver(self)
-    }
-    
     @objc private func systemWillSleep() {
-        DispatchQueue.main.async { [weak self] in
-            print("FanControl: System going to sleep/lock - restoring system control")
-            self?.fanController.restoreAutomaticControl()
-        }
+        wakeReapplyGeneration &+= 1
+        print("FanControl: System going to sleep/lock - restoring system control")
+        fanController.restoreAutomaticControl()
     }
 
     @objc private func systemDidWake() {
-        DispatchQueue.main.async { [weak self] in
-            print("FanControl: System woke up - reapplying user settings")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                self?.fanController.reapplySettings()
-            }
+        wakeReapplyGeneration &+= 1
+        let generation = wakeReapplyGeneration
+        print("FanControl: System woke up - scheduling settings reapply")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self, self.wakeReapplyGeneration == generation else { return }
+            self.fanController.reapplySettings()
         }
     }
     
@@ -404,6 +416,10 @@ class FanControlViewModel: ObservableObject {
         systemMonitor.setSensorScanActive(active)
     }
 
+    func setMonitoringInterval(_ interval: TimeInterval) {
+        systemMonitor.setMonitoringInterval(interval)
+    }
+
     // MARK: - Fan Control / 中文：Fan Control 分区
     
     func setManualSpeed(_ speed: Int) {
@@ -421,13 +437,16 @@ class FanControlViewModel: ObservableObject {
     /// Lower bound for unified sliders when SMC minima are known. / 中文：Lower bound for unified 滑杆s when SMC minima are known.
     var effectiveUnifiedMinRPM: Int {
         guard !fanMinSpeeds.isEmpty else { return FanRPMBounds.fallbackMinWhenSMCUnreadable }
-        return fanMinSpeeds.min() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+        return fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
     }
 
     /// Upper bound for unified sliders when SMC maxima are known. / 中文：Upper bound for unified 滑杆s when SMC maxima are known.
     var effectiveUnifiedMaxRPM: Int {
         guard !fanMaxSpeeds.isEmpty else { return FanRPMBounds.fallbackMaxWhenSMCUnreadable }
-        return fanMaxSpeeds.max() ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
+        return max(
+            effectiveUnifiedMinRPM,
+            fanMaxSpeeds.min() ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
+        )
     }
 
     func minRPM(atFan index: Int) -> Int {
@@ -476,17 +495,13 @@ class FanControlViewModel: ObservableObject {
 
     /// Read the gain currently in effect (custom override or formula default). / 中文：读取 the gain currently in effect (custom override or formula default).
     var effectivePIDKp: Double {
-        if let v = pidKpCustom { return v }
-        let range = Double(max(0, autoMaxSpeed - 1200))  // approx, just for UI default display
-        return range * autoAggressiveness / 10.0
+        fanController.effectivePIDKp
     }
     var effectivePIDKi: Double {
-        if let v = pidKiCustom { return v }
-        return effectivePIDKp / 60.0
+        fanController.effectivePIDKi
     }
     var effectivePIDKd: Double {
-        if let v = pidKdCustom { return v }
-        return effectivePIDKp * 2.0
+        fanController.effectivePIDKd
     }
     
     // MARK: - Access Control / 中文：访问控制
@@ -526,5 +541,10 @@ class FanControlViewModel: ObservableObject {
         let avg = sum / Double(count)
         if avg.isNaN || avg.isInfinite { return 0 }
         return min(1.0, max(0.0, avg))
+    }
+
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+        DistributedNotificationCenter.default().removeObserver(self)
     }
 }

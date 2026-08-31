@@ -7,7 +7,7 @@
   <string>com.hoobnn.fanfan.smcd</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/libexec/fanfan-smcd</string>
+		<string>/Library/PrivilegedHelperTools/fanfan-smcd</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

@@ -132,18 +132,13 @@ struct PopoverView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !permissions.isHelperInstalled {
-            InstallHelperStateView(
-                installError: installError,
-                installHelper: installHelper
-            )
-        } else if !viewModel.hasAccess {
+        if !viewModel.hasAccess {
             PopoverMessageStateView(
                 icon: "exclamationmark.triangle",
                 title: NSLocalizedString("popover.system_access_required",   comment: ""),
                 message: NSLocalizedString("popover.system_access_desc",     comment: "")
             )
-        } else if viewModel.cpuTemperature == nil {
+        } else if viewModel.cpuTemperature == nil && viewModel.gpuTemperature == nil {
             PopoverMessageStateView(
                 icon: "thermometer.medium.slash",
                 title: NSLocalizedString("popover.no_temperature_data",       comment: ""),
@@ -245,8 +240,16 @@ struct PopoverView: View {
                 // `EquatableView`-style dedup: ControlsCard re-evaluates only / 中文：`EquatableView` 风格的去重：仅当
                 // when something it actually depends on changes, not on every / 中文：snapshot 真正变化时 ControlsCard 才重算 body，
                 // unrelated `@Published` tick from the view-model. / 中文：与 view-model 上无关的 `@Published` 触发无关。
-                ControlsCard(snapshot: controlsSnapshot, viewModel: viewModel)
-                    .equatable()
+                if permissions.isHelperInstalled {
+                    ControlsCard(snapshot: controlsSnapshot, viewModel: viewModel)
+                        .equatable()
+                } else {
+                        InstallHelperStateView(
+                            installError: installError,
+                            isInstalling: permissions.isInstalling,
+                        installHelper: installHelper
+                    )
+                }
             }
         }
     }
@@ -323,7 +326,7 @@ struct PopoverView: View {
     // MARK: - Derived / 中文：派生值
 
     private var showsTabs: Bool {
-        permissions.isHelperInstalled && viewModel.hasAccess && viewModel.cpuTemperature != nil
+        viewModel.hasAccess && (viewModel.cpuTemperature != nil || viewModel.gpuTemperature != nil)
     }
 
     /// Fixed popover height for the scrollable Sensors tab and the / 中文：Fixed 弹出窗口 height for the scrollable 传感器s tab and the
@@ -369,7 +372,8 @@ struct PopoverView: View {
             fanMinSpeeds: viewModel.fanMinSpeeds,
             fanMaxSpeeds: viewModel.fanMaxSpeeds,
             unifiedMinRPM: viewModel.effectiveUnifiedMinRPM,
-            unifiedMaxRPM: viewModel.effectiveUnifiedMaxRPM
+            unifiedMaxRPM: viewModel.effectiveUnifiedMaxRPM,
+            statusMessage: viewModel.statusMessage
         )
     }
 
@@ -377,7 +381,7 @@ struct PopoverView: View {
 
     private func onAppear() {
         permissions.checkInstallation()
-        if viewModel.hasAccess && !viewModel.isMonitoring {
+        if !viewModel.isMonitoring {
             viewModel.startMonitoring()
         }
         // `BatteryMonitor` already runs app-wide (started in `fanfanApp`) so the / 中文：`BatteryMonitor` 已由 app 全程运行（在 `fanfanApp` 启动），
@@ -422,6 +426,7 @@ struct PopoverView: View {
     }
 
     private func installHelper() {
+        guard !permissions.isInstalling else { return }
         installError = nil
         permissions.installHelper { success, error in
             if !success {
@@ -442,6 +447,7 @@ struct PopoverView: View {
 
 private struct InstallHelperStateView: View {
     let installError: String?
+    let isInstalling: Bool
     let installHelper: () -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -472,21 +478,29 @@ private struct InstallHelperStateView: View {
             }
 
             Button(action: installHelper) {
-                Text(NSLocalizedString("popover.install_helper", comment: ""))
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
-                    .background(Theme.text1(scheme).opacity(0.92))
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    .shadow(color: Theme.cardShadow(scheme), radius: 5, x: 0, y: 2)
+                Group {
+                    if isInstalling {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(NSLocalizedString("popover.install_helper", comment: ""))
+                            .font(.system(size: 11.5, weight: .semibold))
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Theme.text1(scheme).opacity(0.92))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .shadow(color: Theme.cardShadow(scheme), radius: 5, x: 0, y: 2)
             }
             .buttonStyle(.plain)
+            .disabled(isInstalling)
             .padding(.horizontal, 30)
             .padding(.top, 3)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 26)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .themedCard(scheme)
     }
 }
 

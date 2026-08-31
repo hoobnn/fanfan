@@ -96,6 +96,9 @@ class BatteryMonitor: ObservableObject {
                 if self.hasBattery {
                     self.hasBattery = false
                 }
+                if self.batteryInfo != BatteryInfo() {
+                    self.batteryInfo = BatteryInfo()
+                }
             }
             return
         }
@@ -202,24 +205,7 @@ class BatteryMonitor: ObservableObject {
             ?? getIORegistryProperty(service: service, key: "Amperage")
         
         if let amperage = amperageValue {
-            // Try to get the raw value and convert to signed / 中文：尝试获取原始值并转换为有符号整数。
-            if let uint64Val = amperage as? UInt64 {
-                info.amperage = Int(Int64(bitPattern: uint64Val))
-            } else if let int64Val = amperage as? Int64 {
-                info.amperage = Int(int64Val)
-            } else if let intVal = amperage as? Int {
-                // If it's already signed but stored as large positive (overflow) / 中文：如果它本应是有符号值却以较大的正数保存，则按溢出情况处理。
-                if intVal > Int(Int32.max) {
-                    // This shouldn't happen with proper Int, but handle it / 中文：正常 Int 不应出现这种情况，但这里仍做兼容处理。
-                    info.amperage = intVal - Int(UInt64.max) - 1
-                } else {
-                    info.amperage = intVal
-                }
-            } else if let nsNumber = amperage as? NSNumber {
-                // NSNumber fallback - get the int64 value / 中文：NSNumber 回退：获取 int64 值
-                let val = nsNumber.int64Value
-                info.amperage = Int(val)
-            }
+            info.amperage = Self.normalizedAmperage(amperage)
         }
         
         // Battery Condition - matches Apple's System Information criteria / 中文：电池 Condition - matches Apple's System Information criteria
@@ -241,6 +227,33 @@ class BatteryMonitor: ObservableObject {
             return nil
         }
         return value.takeRetainedValue()
+    }
+
+    /// IORegistry has exposed current as signed values, UInt64 two's-complement
+    /// bit patterns, and (on older machines) UInt32 bit patterns bridged to Int.
+    /// Normalize all three without an overflowing `UInt64.max -> Int` conversion.
+    /// 中文：IORegistry 的电流值可能是有符号数、UInt64 补码，或桥接为 Int 的
+    /// UInt32 补码；这里统一安全转换，避免 UInt64.max 转 Int 时触发崩溃。
+    static func normalizedAmperage(_ value: Any) -> Int? {
+        if let unsigned = value as? UInt64 {
+            if unsigned > UInt64(Int32.max), unsigned <= UInt64(UInt32.max) {
+                return Int(Int32(bitPattern: UInt32(unsigned)))
+            }
+            return Int(Int64(bitPattern: unsigned))
+        }
+        if let signed = value as? Int64 {
+            return Int(exactly: signed)
+        }
+        if let signed = value as? Int {
+            if signed > Int(Int32.max), let raw32 = UInt32(exactly: signed) {
+                return Int(Int32(bitPattern: raw32))
+            }
+            return signed
+        }
+        if let number = value as? NSNumber {
+            return Int(exactly: number.int64Value)
+        }
+        return nil
     }
     
     deinit {

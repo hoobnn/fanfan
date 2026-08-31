@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-VERSION=${1:-"0.1.0"}
+VERSION=${1:-}
 APP_NAME="fanfan"
 TARGET_NAME="fanfan"
 TEAM_ID="8FUPL8QHFH"
@@ -28,6 +28,16 @@ ENTITLEMENTS="$PROJECT_DIR/fanfan/Resources/fanfan.entitlements"
 DAEMON_SRC_DIR="$PROJECT_DIR/tools/fanfan-smcd"
 DAEMON_BUNDLED="$PROJECT_DIR/fanfan/Resources/fanfan-smcd"
 
+PROJECT_VERSION=$(xcodebuild \
+    -project "$PROJECT_DIR/fanfan.xcodeproj" \
+    -scheme "$TARGET_NAME" \
+    -configuration Release \
+    -showBuildSettings 2>/dev/null | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+VERSION=${VERSION:-$PROJECT_VERSION}
+if [ -z "$PROJECT_VERSION" ] || [ "$VERSION" != "$PROJECT_VERSION" ]; then
+    echo "❌ Requested version '$VERSION' does not match app MARKETING_VERSION '$PROJECT_VERSION'"
+    exit 1
+fi
 ARCHIVE_NAME="${APP_NAME}-v${VERSION}-macos"
 
 # --- preflight ---------------------------------------------------------------
@@ -62,6 +72,13 @@ echo ""
 echo "🛠  Rebuilding privileged daemon"
 make -C "$DAEMON_SRC_DIR" clean >/dev/null
 make -C "$DAEMON_SRC_DIR" >/dev/null
+lipo "$DAEMON_SRC_DIR/fanfan-smcd" -verify_arch arm64
+lipo "$DAEMON_SRC_DIR/fanfan-smcd" -verify_arch x86_64
+DAEMON_MIN_OS=$(xcrun vtool -show-build "$DAEMON_SRC_DIR/fanfan-smcd" | awk '$1 == "minos" { print $2 }' | sort -u)
+if [ "$DAEMON_MIN_OS" != "26.0" ]; then
+    echo "❌ daemon deployment target is not macOS 26.0"
+    exit 1
+fi
 
 # Refresh the bundled copy Xcode picks up as a resource.
 cp "$DAEMON_SRC_DIR/fanfan-smcd" "$DAEMON_BUNDLED"
@@ -112,11 +129,13 @@ echo "✍️  Code-signing with Developer ID"
 DAEMON_IN_APP="$RELEASE_APP/Contents/Resources/fanfan-smcd"
 if [ -f "$DAEMON_IN_APP" ]; then
     codesign --force --timestamp --options runtime \
+        --identifier fanfan-smcd \
         --sign "$SIGN_IDENTITY" \
         "$DAEMON_IN_APP"
     echo "   ✓ signed daemon"
 else
-    echo "⚠️  daemon binary not found in app bundle — Xcode resource copy may have changed"
+    echo "❌ daemon binary not found in app bundle — Xcode resource copy may have changed"
+    exit 1
 fi
 
 # Then the app itself with hardened runtime + entitlements.
@@ -129,6 +148,10 @@ echo "   ✓ signed app"
 echo ""
 echo "🔎 Verifying signature"
 codesign --verify --deep --strict --verbose=2 "$RELEASE_APP" 2>&1 | tail -3
+lipo "$DAEMON_IN_APP" -verify_arch arm64
+lipo "$DAEMON_IN_APP" -verify_arch x86_64
+FINAL_DAEMON_MIN_OS=$(xcrun vtool -show-build "$DAEMON_IN_APP" | awk '$1 == "minos" { print $2 }' | sort -u)
+test "$FINAL_DAEMON_MIN_OS" = "26.0"
 
 # --- notarize ----------------------------------------------------------------
 
@@ -171,11 +194,30 @@ hdiutil create -volname "$APP_NAME" \
     -srcfolder "${APP_NAME}.app" \
     -ov -format UDZO \
     "${ARCHIVE_NAME}.dmg" >/dev/null
+
+# The container has an independent Gatekeeper/notarization lifecycle from the
+# already-stapled app inside it.
+codesign --force --timestamp --sign "$SIGN_IDENTITY" "${ARCHIVE_NAME}.dmg"
+xcrun notarytool submit "${ARCHIVE_NAME}.dmg" \
+    --keychain-profile "$NOTARY_PROFILE" \
+    --wait \
+    --timeout 30m
+xcrun stapler staple "${ARCHIVE_NAME}.dmg"
+xcrun stapler validate "${ARCHIVE_NAME}.dmg"
 shasum -a 256 "${ARCHIVE_NAME}.dmg" > "${ARCHIVE_NAME}.dmg.sha256"
 
 echo ""
 echo "✨ Release build complete"
 echo "📍 $RELEASE_DIR"
-ls -lh "$RELEASE_DIR" | grep -E "${ARCHIVE_NAME}\.(zip|dmg|sha256)" | awk '{print "   " $9, "("$5")"}'
+for artifact in \
+    "$RELEASE_DIR/${ARCHIVE_NAME}.zip" \
+    "$RELEASE_DIR/${ARCHIVE_NAME}.zip.sha256" \
+    "$RELEASE_DIR/${ARCHIVE_NAME}.dmg" \
+    "$RELEASE_DIR/${ARCHIVE_NAME}.dmg.sha256"; do
+    if [ -f "$artifact" ]; then
+        size=$(du -h "$artifact" | awk '{ print $1 }')
+        printf '   %s (%s)\n' "$(basename "$artifact")" "$size"
+    fi
+done
 echo ""
 echo "Next: upload zip + dmg + .sha256 files to GitHub Releases."

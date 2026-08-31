@@ -2,6 +2,23 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [Unreleased]
+
+### Security
+- Privileged helper protocol v2 adds explicit health and lease-renewal commands. A 10-second daemon lease now restores firmware fan control after app crashes, stalled clients, failed writes, or daemon shutdown.
+- Helper installation now shell-quotes bundle paths, stages files in root-owned locations, validates the signed helper and fixed LaunchDaemon plist, and installs under `/Library/PrivilegedHelperTools`.
+- The one-line installer now uses a private temporary directory, verifies release checksums and Apple trust, and validates staged privileged files before bootstrap.
+
+### Fixed
+- Stale temperature telemetry now expires after 10 seconds and triggers firmware AUTO; a raw 90°C safety channel bypasses user RPM caps, hold windows, hysteresis, and ramp limits.
+- SET/AUTO ordering now uses command generations and a serialized teardown barrier, so an older pending SET cannot re-enable manual control after sleep, System mode, or app exit.
+- Wake notifications are coalesced, fanless retries are bounded, and Timer creation is synchronous, preventing duplicate or orphaned monitoring/control loops.
+- Fan indices remain stable across partial reads, multi-fan unified ranges use their safe intersection, GPU-only overheating triggers alerts, and battery amperage conversion no longer risks integer traps.
+- Monitoring interval and auto-switch settings take effect immediately; fanless/no-helper Macs retain temperature and sensor views.
+
+### Build
+- The bundled daemon is now a macOS 26.0 universal `arm64 + x86_64` binary, with release-time architecture, deployment-target, version, test, signature, and notarization checks.
+
 ## [1.1.2] - 2026-07-09
 
 ### Fixed

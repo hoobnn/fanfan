@@ -89,6 +89,8 @@ class FanController: ObservableObject {
 
     private weak var systemMonitor: SystemMonitor?
     private var autoControlTimer: Timer?
+    private var controlLeaseTimer: Timer?
+    private var leasePingInFlight = false
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Smart Scheduling State / 中文：Smart Scheduling State 分区
@@ -119,7 +121,14 @@ class FanController: ObservableObject {
     /// catches an abrupt drop in fan noise. / 中文：让耳朵察觉不到风扇噪声的突然回落。
     private let rampUpStep: Int = 800
     private let rampDownStep: Int = 250
-    private var rampTargetSpeed: Int = 0
+    private var temperatureFailsafeRestorePending = false
+    private var temperatureFailsafeRestoreRequired = false
+    private var temperatureFailsafeRetryCount = 0
+    private var nextTemperatureFailsafeRetryAt: Date?
+    private var reapplyGeneration = 0
+    private var commandGeneration = 0
+    private static let maxWakeReapplyAttempts = 5
+    private static let criticalTemperature: Double = 90
 
     // MARK: - PID State / 中文：PID 状态
 
@@ -155,6 +164,10 @@ class FanController: ObservableObject {
         return pidKp * 2.0
     }
 
+    var effectivePIDKp: Double { pidKp }
+    var effectivePIDKi: Double { pidKi }
+    var effectivePIDKd: Double { pidKd }
+
     private func resetPIDState() {
         pidIntegral = 0
         pidLastError = 0
@@ -178,6 +191,7 @@ class FanController: ObservableObject {
 
     init(systemMonitor: SystemMonitor) {
         self.systemMonitor = systemMonitor
+        smcQueue.setSpecific(key: smcQueueKey, value: ())
         loadSettings()
 
         systemMonitor.$fanMaxSpeeds
@@ -202,17 +216,20 @@ class FanController: ObservableObject {
 
     deinit {
         stopAutoControl()
+        controlLeaseTimer?.invalidate()
         restoreAutomaticControlSync()
     }
 
     // MARK: - Hardware-derived clamps / 中文：Hardware-derived clamps 分区
 
     private var unifiedMinClamp: Int {
-        systemMonitor?.fanMinSpeeds.min() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+        systemMonitor?.fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
     }
 
     private var unifiedMaxClamp: Int {
-        systemMonitor?.fanMaxSpeeds.max() ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
+        let hardwareMaximum = systemMonitor?.fanMaxSpeeds.min()
+            ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
+        return max(unifiedMinClamp, hardwareMaximum)
     }
 
     private func minRPM(for index: Int) -> Int {
@@ -251,7 +268,7 @@ class FanController: ObservableObject {
         }
         saveSettings()
 
-        if mode == .manual && isControlEnabled {
+        if mode == .manual {
             applyManualTargets()
         } else if mode == .automatic && isControlEnabled {
             lastAppliedSpeed = 0
@@ -301,11 +318,24 @@ class FanController: ObservableObject {
     }
 
     func reapplySettings() {
+        reapplyGeneration &+= 1
+        reapplySettings(attempt: 0, generation: reapplyGeneration)
+    }
+
+    private func reapplySettings(attempt: Int, generation: Int) {
+        guard generation == reapplyGeneration else { return }
         print("FanController: Reapplying settings after wake - mode: \(mode)")
         guard let monitor = systemMonitor, monitor.numberOfFans > 0 else {
+            guard attempt < Self.maxWakeReapplyAttempts else {
+                // Zero fans is a valid steady state on fanless Macs. Stop after a
+                // bounded startup/wake grace period instead of creating a forever
+                // retry chain for every wake notification.
+                print("FanController: No fans detected after wake grace period; skipping reapply")
+                return
+            }
             print("FanController: No fans detected yet, retrying in 2 seconds...")
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                self?.reapplySettings()
+                self?.reapplySettings(attempt: attempt + 1, generation: generation)
             }
             return
         }
@@ -320,10 +350,7 @@ class FanController: ObservableObject {
             applyManualTargets()
             print("FanController: Manual mode reapplied")
         case .automatic:
-            enableManualMode()
             startAutoControl()
-            lastAppliedSpeed = 0
-            updateAutoControl()
             print("FanController: Auto mode reapplied")
         case .system:
             stopAutoControl()
@@ -345,7 +372,7 @@ class FanController: ObservableObject {
             syncManualSpeedsFromUnified()
         }
         saveSettings()
-        if mode == .manual && isControlEnabled {
+        if mode == .manual {
             applyManualTargets()
         }
     }
@@ -356,9 +383,7 @@ class FanController: ObservableObject {
         if !perFanManualControl {
             syncManualSpeedsFromUnified()
         }
-        if isControlEnabled {
-            applyManualTargets()
-        }
+        applyManualTargets()
         saveSettings()
     }
 
@@ -370,12 +395,13 @@ class FanController: ObservableObject {
         next[fanIndex] = clampToFan(speed, index: fanIndex)
         manualSpeeds = next
         saveSettings()
-        if isControlEnabled {
-            applyManualTargets()
-        }
+        applyManualTargets()
     }
 
     func setMode(_ newMode: ControlMode) {
+        commandGeneration &+= 1
+        pendingFanTargets = nil
+        resetTemperatureFailsafeRestoreState()
         mode = newMode
 
         if newMode == .automatic {
@@ -402,9 +428,10 @@ class FanController: ObservableObject {
             statusMessage = "No system monitor available"
             return
         }
-        isControlEnabled = true
-        statusMessage = "Manual control enabled"
-        print("Fan Control: Manual control enabled")
+        // `SET` is the operation that actually takes manual control. Do not mark
+        // it enabled until the daemon acknowledges a target write.
+        statusMessage = "Enabling manual control"
+        print("Fan Control: Enabling manual control")
     }
 
     // MARK: - Daemon write dispatch / 中文：守护进程写入调度
@@ -412,34 +439,52 @@ class FanController: ObservableObject {
     // thread, because the first manual write triggers an ~8 s Ftst unlock on / 中文：因为 Apple Silicon 上首次手动写入会触发约 8 秒的
     // Apple Silicon (see fanfan-smcd.c). / 中文：Ftst 解锁（见 fanfan-smcd.c）。
     private let smcQueue = DispatchQueue(label: "com.hoobnn.fanfan.smc-write")
+    private let smcQueueKey = DispatchSpecificKey<Void>()
     // Coalesce SET writes so the 2 s auto timer can't pile up a backlog while a / 中文：合并 SET 写入，使 2 秒自动定时器在解锁期间
     // write (possibly the unlock) is in flight: keep only the most recent target / 中文：不会堆积——只保留最新目标，
     // and apply it once free. Both touched on the main thread only. / 中文：空闲后再应用。两者仅在主线程读写。
     private var smcWriteInFlight = false
     private var pendingFanTargets: [Int]? = nil
 
-    func restoreAutomaticControl() {
-        guard let monitor = systemMonitor else { return }
+    func restoreAutomaticControl(completion: ((Bool) -> Void)? = nil) {
+        // AUTO is a write barrier: no target computed before this request may be
+        // dispatched after it and silently re-enter manual mode.
+        pendingFanTargets = nil
+        if completion == nil { resetTemperatureFailsafeRestoreState() }
+        reapplyGeneration &+= 1
+        commandGeneration &+= 1
+        let generation = commandGeneration
+        stopControlLease()
+        guard let monitor = systemMonitor else {
+            completion?(false)
+            return
+        }
         let fanCount = monitor.numberOfFans
-        guard fanCount > 0 else { return }
+        guard fanCount > 0 else {
+            completion?(true)
+            return
+        }
 
         smcQueue.async { [weak self] in
             guard let self = self else { return }
             var allSuccess = true
             for i in 0..<fanCount {
-                if !self.runSmcHelper(args: ["auto", "\(i)"]) {
+                if !Self.runSmcHelper(args: ["auto", "\(i)"]) {
                     allSuccess = false
                 }
             }
             DispatchQueue.main.async {
+                guard generation == self.commandGeneration else { return }
                 if allSuccess {
                     self.isControlEnabled = false
                     self.statusMessage = "Automatic mode restored"
                     print("Fan Control: Automatic mode restored")
                 } else {
+                    self.isControlEnabled = false
                     self.statusMessage = "Failed to restore auto mode"
                     print("Fan Control: Failed to restore auto mode")
                 }
+                completion?(allSuccess)
             }
         }
     }
@@ -449,11 +494,25 @@ class FanController: ObservableObject {
     /// unlock), so sending them inline is fine and leaves the fans with the / 中文：（写 mode 0 + Ftst 0，无需解锁），内联发送即可，
     /// firmware instead of stuck at the last manual target after quit. / 中文：使退出后风扇交还固件，而非卡在最后的手动转速。
     func restoreAutomaticControlSync() {
+        pendingFanTargets = nil
+        resetTemperatureFailsafeRestoreState()
+        reapplyGeneration &+= 1
+        commandGeneration &+= 1
         guard let monitor = systemMonitor else { return }
         let fanCount = monitor.numberOfFans
         guard fanCount > 0 else { return }
-        for i in 0..<fanCount {
-            _ = runSmcHelper(args: ["auto", "\(i)"])
+
+        let restore = {
+            for i in 0..<fanCount {
+                _ = Self.runSmcHelper(args: ["auto", "\(i)"])
+            }
+        }
+        if DispatchQueue.getSpecific(key: smcQueueKey) != nil {
+            restore()
+        } else {
+            // Serialize behind any in-flight SET so AUTO is the final daemon
+            // command before teardown.
+            smcQueue.sync(execute: restore)
         }
     }
 
@@ -502,34 +561,44 @@ class FanController: ObservableObject {
             return
         }
         smcWriteInFlight = true
-        dispatchFanTargets(targets)
+        dispatchFanTargets(targets, generation: commandGeneration)
     }
 
     /// Run a SET batch on the background queue, then apply any target deferred / 中文：在后台队列执行一批 SET，随后应用本次期间
     /// while it was in flight. Must be entered with `smcWriteInFlight == true`. / 中文：被推迟的目标。进入时须满足 `smcWriteInFlight == true`。
-    private func dispatchFanTargets(_ targets: [Int]) {
+    private func dispatchFanTargets(_ targets: [Int], generation: Int) {
         smcQueue.async { [weak self] in
             guard let self = self else { return }
             var allSuccess = true
             for (i, t) in targets.enumerated() {
                 let safe = max(FanRPMBounds.absoluteWriteMinRPM, min(FanRPMBounds.absoluteWriteMaxRPM, t))
-                if !self.runSmcHelper(args: ["set", "\(i)", "\(safe)"]) {
+                if !Self.runSmcHelper(args: ["set", "\(i)", "\(safe)"]) {
                     allSuccess = false
                 }
             }
             DispatchQueue.main.async {
-                if allSuccess {
-                    let parts = targets.enumerated().map { "F\($0.offset): \($0.element)" }.joined(separator: ", ")
-                    self.statusMessage = "Fan targets RPM — \(parts)"
-                    self.lastWriteSuccess = true
-                    print("Fan Control: \(parts)")
-                } else {
-                    self.statusMessage = "Failed to set fan speed"
-                    self.lastWriteSuccess = false
+                if generation == self.commandGeneration {
+                    if allSuccess {
+                        let parts = targets.enumerated().map { "F\($0.offset): \($0.element)" }.joined(separator: ", ")
+                        self.isControlEnabled = true
+                        self.lastAppliedSpeed = targets.max() ?? self.lastAppliedSpeed
+                        self.lastSpeedChangeTime = Date()
+                        self.startControlLeaseIfNeeded()
+                        if self.mode == .automatic {
+                            self.statusMessage = "Auto — \(parts) \(self.tempTrendDescription())"
+                        } else {
+                            self.statusMessage = "Fan targets RPM — \(parts)"
+                        }
+                        self.lastWriteSuccess = true
+                        print("Fan Control: \(parts)")
+                    } else {
+                        self.statusMessage = "Failed to set fan speed"
+                        self.lastWriteSuccess = false
+                    }
                 }
                 if let next = self.pendingFanTargets {
                     self.pendingFanTargets = nil
-                    self.dispatchFanTargets(next)
+                    self.dispatchFanTargets(next, generation: self.commandGeneration)
                 } else {
                     self.smcWriteInFlight = false
                 }
@@ -537,7 +606,7 @@ class FanController: ObservableObject {
         }
     }
 
-    private func runSmcHelper(args: [String]) -> Bool {
+    nonisolated private static func runSmcHelper(args: [String]) -> Bool {
         guard let command = args.first else { return false }
 
         switch command {
@@ -559,26 +628,71 @@ class FanController: ObservableObject {
         }
     }
 
+    private func startControlLeaseIfNeeded() {
+        guard controlLeaseTimer == nil else { return }
+        let timer = Timer(timeInterval: 3.0, repeats: true) { [weak self] _ in
+            guard let self, self.isControlEnabled, !self.leasePingInFlight else { return }
+            self.leasePingInFlight = true
+            let generation = self.commandGeneration
+            self.smcQueue.async { [weak self] in
+                let success = SMCDaemonClient.renewControlLease()
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.leasePingInFlight = false
+                    guard generation == self.commandGeneration else { return }
+                    if !success {
+                        self.isControlEnabled = false
+                        self.stopControlLease()
+                        self.lastAppliedSpeed = 0
+                        self.lastWriteSuccess = false
+                        self.statusMessage = "Failed to renew fan-control lease"
+                        if self.mode == .automatic {
+                            self.updateAutoControl()
+                        } else if self.mode == .manual {
+                            self.applyManualTargets()
+                        }
+                    }
+                }
+            }
+        }
+        timer.tolerance = 0.5
+        RunLoop.main.add(timer, forMode: .common)
+        controlLeaseTimer = timer
+    }
+
+    private func stopControlLease() {
+        controlLeaseTimer?.invalidate()
+        controlLeaseTimer = nil
+        leasePingInFlight = false
+    }
+
+    private func resetTemperatureFailsafeRestoreState() {
+        temperatureFailsafeRestorePending = false
+        temperatureFailsafeRestoreRequired = false
+        temperatureFailsafeRetryCount = 0
+        nextTemperatureFailsafeRetryAt = nil
+    }
+
     func startAutoControl() {
         stopAutoControl()
+        guard mode == .automatic else { return }
 
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            // Seed ramp from the fan's current real RPM so the first cycles / 中文：Seed ramp from the 风扇's current real RPM so the first cycles
-            // don't waste seconds climbing from 0 through the hardware floor. / 中文：避免前几个周期从 0 慢慢爬升到硬件下限而浪费时间。
-            if let currentMax = self.systemMonitor?.fanSpeeds.max(), currentMax > 0 {
-                self.lastAppliedSpeed = currentMax
-            }
-            self.resetPIDState()
-            self.updateAutoControl()
-            let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-                self?.updateAutoControl()
-            }
-            // Coalesceable wakeups; the PID computes real dt so jitter is safe. / 中文：可合并唤醒；PID 用真实 dt 计算，抖动无影响。
-            timer.tolerance = 0.3
-            RunLoop.current.add(timer, forMode: .common)
-            self.autoControlTimer = timer
+        // This method is main-actor isolated. Create the replacement timer in the
+        // same turn as invalidation so stop/mode changes cannot miss a queued
+        // timer that has not been assigned yet.
+        // 中文：该方法受主 actor 隔离；同步完成旧 Timer 失效与新 Timer 创建，
+        // 避免 stop/切模式漏掉尚未赋值的异步“僵尸”Timer。
+        if let currentMax = systemMonitor?.fanSpeeds.max(), currentMax > 0 {
+            lastAppliedSpeed = currentMax
         }
+        resetPIDState()
+        updateAutoControl()
+        let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.updateAutoControl()
+        }
+        timer.tolerance = 0.3
+        RunLoop.main.add(timer, forMode: .common)
+        autoControlTimer = timer
     }
 
     func stopAutoControl() {
@@ -588,6 +702,36 @@ class FanController: ObservableObject {
 
     private func updateAutoControl() {
         guard mode == .automatic, let monitor = systemMonitor else { return }
+
+        guard monitor.temperatureIsFresh() else {
+            if isControlEnabled { temperatureFailsafeRestoreRequired = true }
+            guard temperatureFailsafeRestoreRequired,
+                  !temperatureFailsafeRestorePending else { return }
+            if let nextTemperatureFailsafeRetryAt,
+               Date() < nextTemperatureFailsafeRetryAt {
+                return
+            }
+            temperatureFailsafeRestorePending = true
+            statusMessage = "Temperature data stale — restoring system control"
+            restoreAutomaticControl { [weak self] success in
+                guard let self else { return }
+                self.temperatureFailsafeRestorePending = false
+                if success {
+                    self.temperatureFailsafeRestoreRequired = false
+                    self.temperatureFailsafeRetryCount = 0
+                    self.nextTemperatureFailsafeRetryAt = nil
+                } else {
+                    self.temperatureFailsafeRestoreRequired = true
+                    self.temperatureFailsafeRetryCount += 1
+                    let delay = min(30.0, pow(2.0, Double(self.temperatureFailsafeRetryCount)))
+                    self.nextTemperatureFailsafeRetryAt = Date().addingTimeInterval(delay)
+                }
+            }
+            return
+        }
+        temperatureFailsafeRestoreRequired = false
+        temperatureFailsafeRetryCount = 0
+        nextTemperatureFailsafeRetryAt = nil
 
         let rawTemp = max(
             monitor.cpuTemperature ?? 0,
@@ -604,7 +748,14 @@ class FanController: ObservableObject {
         // Update temperature history (used by the status-message trend label) / 中文：Update 温度 历史记录 (used by the 状态-message trend label)
         updateTempHistory(currentTemp)
 
-        let autoCeiling = min(autoMaxSpeed, unifiedMaxClamp)
+        // Raw, unsmoothed telemetry is a separate safety channel. At a critical
+        // temperature it bypasses the user/strategy ceiling, hold window,
+        // hysteresis, and gradual ramp-up.
+        // 中文：未经平滑的原始温度是独立安全通道；达到临界温度时绕过用户上限、
+        // 保持窗口、滞回和缓升，直接请求每个风扇的硬件最高转速。
+        let safetyTemperature = max(monitor.rawMaxTemperature ?? 0, rawTemp)
+        let isCritical = safetyTemperature >= Self.criticalTemperature
+        let autoCeiling = isCritical ? unifiedMaxClamp : min(autoMaxSpeed, unifiedMaxClamp)
         let autoFloor = unifiedMinClamp
 
         // 1. PID feedback: drives temperature toward autoThreshold (target temp) / 中文：1. PID feedback: drives 温度 toward auto阈值 (目标 temp)
@@ -631,34 +782,34 @@ class FanController: ObservableObject {
         for i in 0..<monitor.numberOfFans {
             let mx = maxRPM(for: i)
             let mn = minRPM(for: i)
-            let cap = min(mx, autoCeiling)
-            targets.append(max(mn, min(unifiedTarget, cap)))
+            if isCritical {
+                targets.append(mx)
+            } else {
+                let cap = min(mx, autoCeiling)
+                targets.append(max(mn, min(unifiedTarget, cap)))
+            }
         }
 
         let representative = targets.max() ?? unifiedTarget
 
         // 5. Apply with hysteresis and minimum hold time / 中文：5. Apply with 滞回 and minimum hold time
-        if shouldApplySpeed(representative) {
+        let requiresEngagement = !isControlEnabled
+        let shouldApply = isCritical
+            ? (requiresEngagement || !lastWriteSuccess || representative != lastAppliedSpeed)
+            : (requiresEngagement || shouldApplySpeed(representative))
+        if shouldApply {
             // Ramp transition to avoid sudden noise changes / 中文：使用渐进过渡，避免噪声突然变化。
-            let ramped = rampTransition(from: lastAppliedSpeed, to: representative)
+            let ramped = isCritical
+                ? representative
+                : rampTransition(from: lastAppliedSpeed, to: representative)
             var rampedTargets: [Int] = []
             for i in 0..<monitor.numberOfFans {
                 let mx = maxRPM(for: i)
                 let mn = minRPM(for: i)
-                rampedTargets.append(max(mn, min(ramped, mx)))
+                rampedTargets.append(isCritical ? mx : max(mn, min(ramped, mx)))
             }
 
             applyFanTargets(rampedTargets)
-            lastAppliedSpeed = ramped
-            lastSpeedChangeTime = Date()
-            rampTargetSpeed = representative
-
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                let parts = rampedTargets.enumerated().map { "F\($0.offset): \($0.element)" }.joined(separator: ", ")
-                let trendStr = self.tempTrendDescription()
-                self.statusMessage = "Auto — \(parts) \(trendStr)"
-            }
         }
     }
 

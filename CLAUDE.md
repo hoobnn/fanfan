@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this project is
 
-`fanfan` is a macOS menu bar app (Swift 6 / SwiftUI on an AppKit menu-bar lifecycle) that controls Mac fan speeds. It targets **macOS 26+**, Apple Silicon or Intel, and has **no third-party Swift dependencies**.
+`fanfan` is a macOS menu bar app (Swift 5 language mode with Swift 6 approachable-concurrency settings / SwiftUI on an AppKit menu-bar lifecycle) that controls Mac fan speeds. It targets **macOS 26+**, Apple Silicon or Intel, and has **no third-party Swift dependencies**.
 
 The repo also contains a small **C daemon** (`fanfan-smcd`) that runs as a root LaunchDaemon. The Swift app is unprivileged; all root-only SMC writes go through the daemon via a Unix socket.
 
@@ -15,12 +15,16 @@ fanfan.app (user)  ──Unix socket──▶  fanfan-smcd (root)  ──IOKit�
 ```
 
 - **Temperature / sensor reads** happen directly from the app via IOKit. No daemon needed, no elevated privileges.
-- **Fan writes** (`SET`, `AUTO`) must go through the daemon. The socket protocol is intentionally tiny — only three commands ever cross it:
-  - `PING` → `OK pong`
-  - `SET <fan> <rpm>` (fan: 0–7; rpm: 500–8000, enforced in daemon)
-  - `AUTO <fan>` (hand control back to firmware)
+- **Fan writes** must go through the daemon. The versioned socket protocol is intentionally tiny:
+  - `PINGV2` → `OK pong 2 <idle|active|restoring>` (health/state query only)
+  - `RENEWV2` → `OK` only while an active control lease exists
+  - `SETV2 <fan> <rpm>` (fan: 0–7; rpm: hardware-clamped in daemon)
+  - `AUTOV2 <fan>` (hand control back to firmware)
+  - Legacy `AUTO <fan>` remains release-only compatibility for safely relinquishing old control; legacy SET/PING are rejected.
 - Socket path: `/var/run/fanfan-smcd.sock` (mode `0660`, owner `root:admin`).
-- Daemon binary lives at `/usr/local/libexec/fanfan-smcd`; LaunchDaemon plist at `/Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist`.
+- Manual control is lease-based: while SET control is active the app renews every
+  3 seconds; after 10 seconds without activity the daemon restores firmware AUTO.
+- Daemon binary lives at `/Library/PrivilegedHelperTools/fanfan-smcd`; LaunchDaemon plist at `/Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist`.
 - Installation is performed by `PermissionsManager.installHelper` via a single `osascript` "with administrator privileges" call — one password prompt, ever. Do not introduce additional sudo prompts or new commands across the socket without strong justification: the small, audited surface is a deliberate security property.
 
 Swift side of the socket: `fanfan/Core/SMCDaemonClient.swift`. Daemon source: `tools/fanfan-smcd/fanfan-smcd.c` (+ `smc.h`). If you change one, the other almost always needs a matching change.
@@ -69,7 +73,7 @@ For interactive development, open `fanfan.xcodeproj` in Xcode and use the `fanfa
 ### Building the daemon standalone
 
 ```bash
-make -C tools/fanfan-smcd            # produces tools/fanfan-smcd/fanfan-smcd
+make -C tools/fanfan-smcd            # produces a macOS 26+ arm64/x86_64 universal binary
 make -C tools/fanfan-smcd clean
 ```
 
@@ -124,7 +128,7 @@ Co-Authored-By: Codex <noreply@openai.com>
 
 ## Conventions worth remembering
 
-- **macOS 26 + Swift 6** — you can use the newest APIs without back-deployment shims.
+- **macOS 26 + Swift 5 language mode** — the project enables approachable-concurrency/upcoming features, but a full strict Swift 6 migration still requires isolating the SMC worker from the main-actor observable facade.
 - **No third-party SDKs.** Don't add SwiftPM dependencies casually; the lean dependency surface is intentional.
 - **Localization is bilingual.** Every user-visible string lives in both `en.lproj/Localizable.strings` and `zh-Hans.lproj/Localizable.strings`.
 - **Fanless Macs are a real case.** Some MacBook Airs report no fans — the UI hides controls entirely instead of showing fake sliders. Don't assume `fanCount > 0`.

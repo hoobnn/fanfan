@@ -45,7 +45,11 @@ class LaunchAtLoginManager: ObservableObject {
             print("LaunchAtLogin: Error - \(error)")
         }
 
-        UserDefaults.standard.set(enable, forKey: "launchAtLogin")
+        // Persist the service's observed state, not the optimistic request. A
+        // registration error must roll both Settings @AppStorage and the popover
+        // toggle back to reality.
+        let actuallyEnabled = SMAppService.mainApp.status == .enabled
+        UserDefaults.standard.set(actuallyEnabled, forKey: "launchAtLogin")
     }
 
     private func updateStatus() {

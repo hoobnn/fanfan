@@ -3,11 +3,33 @@
 # Prerequisites: brew install gh
 # Usage: ./scripts/create-release.sh [version]
 
-set -e
+set -euo pipefail
 
-VERSION=${1:-"1.0.0"}
-REPO="USERNAME/fanfan"  # Replace with your GitHub username
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <version>" >&2
+    exit 2
+fi
+VERSION=$1
+REPO="hoobnn/fanfan"
 TAG="v${VERSION}"
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
+    echo "❌ Invalid semantic version: $VERSION" >&2
+    exit 2
+fi
+PROJECT_VERSION=$(xcodebuild \
+    -project fanfan.xcodeproj \
+    -scheme fanfan \
+    -configuration Release \
+    -showBuildSettings 2>/dev/null | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+if [ "$PROJECT_VERSION" != "$VERSION" ]; then
+    echo "❌ Version $VERSION does not match MARKETING_VERSION $PROJECT_VERSION" >&2
+    exit 1
+fi
+if ! git rev-parse --verify --quiet "refs/tags/${TAG}^{commit}" >/dev/null; then
+    echo "❌ Local tag $TAG does not exist" >&2
+    exit 1
+fi
 
 echo "🚀 Creating GitHub Release: $TAG"
 
@@ -60,7 +82,7 @@ open /Applications/fanfan.app
 4. **Enable fan control**: launch fanfan and click **Install Helper** when prompted.
 
 ### 📋 Requirements
-- macOS 11.0 (Big Sur) or later
+- macOS 26.0 or later
 - Intel or Apple Silicon Mac
 - Admin privileges for fan control
 
@@ -100,9 +122,9 @@ MIT License - see [LICENSE](https://github.com/${REPO}/blob/main/LICENSE)
 EOF
 
 # Replace template variables
-sed -i '' "s/\${VERSION}/$VERSION/g" "$RELEASE_NOTES"
-sed -i '' "s/\${TAG}/$TAG/g" "$RELEASE_NOTES"
-sed -i '' "s/\${REPO}/$REPO/g" "$RELEASE_NOTES"
+sed -i '' "s|\${VERSION}|$VERSION|g" "$RELEASE_NOTES"
+sed -i '' "s|\${TAG}|$TAG|g" "$RELEASE_NOTES"
+sed -i '' "s|\${REPO}|$REPO|g" "$RELEASE_NOTES"
 
 # Calculate and insert checksum
 if [ -f "releases/fanfan-v${VERSION}-macos.zip" ]; then
@@ -114,12 +136,25 @@ echo "📝 Release notes created: $RELEASE_NOTES"
 
 # Create the release
 echo "🎉 Creating release on GitHub..."
+ZIP="releases/fanfan-v${VERSION}-macos.zip"
+DMG="releases/fanfan-v${VERSION}-macos.dmg"
+if [ ! -f "$ZIP" ] || [ ! -f "$DMG" ]; then
+    echo "❌ Missing release artifacts. Run scripts/build-release.sh $VERSION first." >&2
+    exit 1
+fi
+
+ASSETS=("$ZIP" "$DMG")
+for checksum in "$ZIP.sha256" "$DMG.sha256"; do
+    if [ -f "$checksum" ]; then
+        ASSETS+=("$checksum")
+    fi
+done
+
 gh release create "$TAG" \
     --repo "$REPO" \
     --title "fanfan v${VERSION} - macOS Fan Control" \
     --notes-file "$RELEASE_NOTES" \
-    releases/fanfan-v${VERSION}-macos.zip* \
-    releases/fanfan-v${VERSION}-macos.dmg* 2>/dev/null || true
+    "${ASSETS[@]}"
 
 echo ""
 echo "✅ Release created successfully!"

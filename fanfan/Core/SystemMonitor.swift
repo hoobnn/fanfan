@@ -170,6 +170,9 @@ class SystemMonitor: ObservableObject {
     @Published var isMonitoring = false
     @Published var hasAccess = false
     @Published var lastError: String?
+    @Published private(set) var rawMaxTemperature: Double?
+    @Published private(set) var lastValidCpuTemperatureAt: Date?
+    @Published private(set) var lastValidGpuTemperatureAt: Date?
 
     private var smcConnection: io_connect_t = 0
     private var monitoringTimer: Timer?
@@ -179,6 +182,13 @@ class SystemMonitor: ObservableObject {
     }
     private let readingsQueue = DispatchQueue(label: "app.fanfan.smc-readings", qos: .userInitiated)
     private var keyInfoCache: [UInt32: SMCKeyData_keyInfo_t] = [:]
+    private var isReadingUpdateInFlight = false
+    private var knownFanCount = 0
+    private var lastValidCpuTemperatureTime: Date?
+    private var lastValidGpuTemperatureTime: Date?
+    private let temperatureStaleTimeout: TimeInterval = 10
+    private var lastSMCReconnectAttemptTime: Date?
+    private var smcReconnectAttemptCount = 0
 
     // Temperature sensor keys - ordered by priority / 中文：温度传感器键，按优先级排序
     private let cpuTempKeys = ["TC0P", "TCXC", "TC0E", "TC0F", "TC0D", "TC1C", "TC2C", "TC3C", "TC4C"]
@@ -245,8 +255,11 @@ class SystemMonitor: ObservableObject {
 
     // Discovered valid sensor keys (populated on first full scan) / 中文：已发现的有效传感器键（首次完整扫描时填充）
     private var discoveredSensorKeys: [(String, String, SensorCategory)] = []
+    private var discoveredCpuKeys: [String] = []
     private var discoveredGpuKeys: [String] = []
     private var hasDoneFullScan = false
+    private var lastFullScanAttemptTime: Date?
+    private let fullScanRetryInterval: TimeInterval = 30
 
     /// Tiered polling: the full sensor list (`scanAllSensors`) is expensive — / 中文：分级采样：完整传感器列表（`scanAllSensors`）开销较大——
     /// 30+ IOKit round-trips on Macs with rich SMC catalogues. The fast tier / 中文：在 SMC 传感器丰富的机型上要做 30+ 次 IOKit 往返。快速档
@@ -408,30 +421,25 @@ class SystemMonitor: ObservableObject {
     // MARK: - Monitoring Control / 中文：监控控制
     
     func startMonitoring() {
+        stopMonitoring()
         guard openSMCConnection() else {
             print("SMC: Cannot start monitoring - no connection")
             return
         }
-
-        stopMonitoring()
-        DispatchQueue.main.async { self.isMonitoring = true }
+        isMonitoring = true
 
         // Initial read / 中文：初始读取
         updateReadings()
 
-        // Start periodic timer on main thread / 中文：在主线程启动周期性定时器
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            let timer = Timer.scheduledTimer(withTimeInterval: self.monitoringInterval, repeats: true) { [weak self] _ in
-                self?.updateReadings()
-            }
-            // Tolerance lets the kernel coalesce this wake with the app's other / 中文：tolerance 允许内核把该唤醒与应用的其他定时器合并，
-            // timers, cutting idle CPU wakeups. Control loops downstream measure / 中文：减少空闲 CPU 唤醒。下游控制环用真实 dt 计算，
-            // real dt, so ±15% sampling jitter is harmless. / 中文：±15% 的采样抖动无影响。
-            timer.tolerance = self.monitoringInterval * 0.15
-            RunLoop.current.add(timer, forMode: .common)
-            self.monitoringTimer = timer
+        // Callers are main-actor isolated. Create synchronously so a following
+        // stop cannot miss a timer whose creation is still queued.
+        let interval = monitoringInterval
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            self?.updateReadings()
         }
+        timer.tolerance = interval * 0.15
+        RunLoop.main.add(timer, forMode: .common)
+        monitoringTimer = timer
     }
 
     private func detectFanCount() -> Int {
@@ -450,7 +458,13 @@ class SystemMonitor: ObservableObject {
     func stopMonitoring() {
         monitoringTimer?.invalidate()
         monitoringTimer = nil
-        DispatchQueue.main.async { self.isMonitoring = false }
+        isMonitoring = false
+    }
+
+    func setMonitoringInterval(_ interval: TimeInterval) {
+        let clamped = max(0.5, min(5.0, interval))
+        UserDefaults.standard.set(clamped, forKey: "monitoringInterval")
+        if isMonitoring { startMonitoring() }
     }
 
     /// Driven by the popover's appear/disappear so the slow sensor scan only / 中文：由 popover 的 appear/disappear 驱动，使慢档传感器扫描
@@ -488,22 +502,87 @@ class SystemMonitor: ObservableObject {
     // MARK: - Reading Updates / 中文：读数更新
     
     private func updateReadings() {
+        // Slow IOKit calls must not create an ever-growing queue of stale timer
+        // jobs. One fresh snapshot is enough; the next timer tick can try again.
+        guard !isReadingUpdateInFlight else { return }
+        isReadingUpdateInFlight = true
+
         readingsQueue.async { [weak self] in
             guard let self = self else { return }
-
-            // One-time SMC key enumeration so GPU and sensor keys are known / 中文：One-time SMC 键 enumeration so GPU and 传感器 键s are known
-            // before the first temperature read. / 中文：before the first 温度 读取.
-            self.ensureFullScan()
 
             // Fast tier: CPU / GPU temperature + fan RPM, every tick. / 中文：快速档：每个 tick 都读 CPU / GPU 温度 + 风扇转速。
             let rawCpuTemp = self.readCpuTemperature()
             let rawGpuTemp = self.readGpuTemperature()
-            let cpuTemp = self.smoothTemperature(raw: rawCpuTemp, smoothed: &self.smoothedCpuTemp)
-            let gpuTemp = self.smoothTemperature(raw: rawGpuTemp, smoothed: &self.smoothedGpuTemp)
-
             let now = Date()
+            let currentRawMax = [rawCpuTemp, rawGpuTemp]
+                .compactMap { $0 }
+                .filter { $0 > 0 && $0 < 150 }
+                .max()
+            if rawCpuTemp != nil { self.lastValidCpuTemperatureTime = now }
+            if rawGpuTemp != nil { self.lastValidGpuTemperatureTime = now }
+            let cpuIsFresh = self.lastValidCpuTemperatureTime.map {
+                now.timeIntervalSince($0) <= self.temperatureStaleTimeout
+            } ?? false
+            let gpuIsFresh = self.lastValidGpuTemperatureTime.map {
+                now.timeIntervalSince($0) <= self.temperatureStaleTimeout
+            } ?? false
+            var cpuTemp = self.smoothTemperature(raw: rawCpuTemp, smoothed: &self.smoothedCpuTemp)
+            var gpuTemp = self.smoothTemperature(raw: rawGpuTemp, smoothed: &self.smoothedGpuTemp)
+            if !cpuIsFresh {
+                self.smoothedCpuTemp = nil
+                cpuTemp = nil
+            }
+            if !gpuIsFresh {
+                self.smoothedGpuTemp = nil
+                gpuTemp = nil
+            }
+
             let detectedFanCount = self.resolveFanCount(now: now)
             let (speeds, minSpeeds, maxSpeeds) = self.readFanData(fanCount: detectedFanCount)
+            let requiredSourceIsStale: Bool = {
+                (self.lastValidCpuTemperatureTime != nil && !cpuIsFresh) ||
+                (self.lastValidGpuTemperatureTime != nil && !gpuIsFresh)
+            }()
+            if requiredSourceIsStale {
+                let retryExponent = min(self.smcReconnectAttemptCount, 5)
+                let reconnectDelay = min(
+                    300.0,
+                    self.temperatureStaleTimeout * Double(1 << retryExponent)
+                )
+                let reconnectAllowed = self.lastSMCReconnectAttemptTime.map {
+                    now.timeIntervalSince($0) >= reconnectDelay
+                } ?? true
+                if reconnectAllowed {
+                    self.lastSMCReconnectAttemptTime = now
+                    self.smcReconnectAttemptCount += 1
+                    self.reopenSMCConnection()
+                }
+            } else {
+                self.smcReconnectAttemptCount = 0
+            }
+
+            // Publish the safety/control snapshot before the expensive one-time
+            // key discovery, so startup fan control never waits on thousands of
+            // SMC index probes.
+            DispatchQueue.main.async {
+                if self.cpuTemperature != cpuTemp { self.cpuTemperature = cpuTemp }
+                if self.gpuTemperature != gpuTemp { self.gpuTemperature = gpuTemp }
+                if self.rawMaxTemperature != currentRawMax { self.rawMaxTemperature = currentRawMax }
+                if rawCpuTemp != nil { self.lastValidCpuTemperatureAt = now }
+                if rawGpuTemp != nil { self.lastValidGpuTemperatureAt = now }
+                if self.fanSpeeds != speeds { self.fanSpeeds = speeds }
+                if self.fanMinSpeeds != minSpeeds { self.fanMinSpeeds = minSpeeds }
+                if self.fanMaxSpeeds != maxSpeeds { self.fanMaxSpeeds = maxSpeeds }
+
+                let effectiveFanCount = max(detectedFanCount, speeds.count)
+                if self.numberOfFans != effectiveFanCount {
+                    self.numberOfFans = effectiveFanCount
+                }
+            }
+
+            // Discover Apple Silicon GPU keys after the first fast snapshot. Empty
+            // discovery is retried with backoff instead of being cached forever.
+            self.ensureFullScan()
 
             // Slow tier: full sensor list. `scanAllSensors` does up to ~30 IOKit / 中文：慢速档：完整传感器列表。`scanAllSensors` 要做 ~30 次
             // round-trips on rich-catalogue Macs, so cap it to `slowSensorScan- / 中文：IOKit 往返（在传感器丰富的机型上），因此最多每
@@ -518,31 +597,70 @@ class SystemMonitor: ObservableObject {
             if needsSensorScan { self.lastSensorScanTime = now }
 
             DispatchQueue.main.async {
-                if self.cpuTemperature != cpuTemp { self.cpuTemperature = cpuTemp }
-                if self.gpuTemperature != gpuTemp { self.gpuTemperature = gpuTemp }
                 if let scannedSensors, self.allSensors != scannedSensors {
                     self.allSensors = scannedSensors
                 }
-                if self.fanSpeeds != speeds { self.fanSpeeds = speeds }
-                if self.fanMinSpeeds != minSpeeds { self.fanMinSpeeds = minSpeeds }
-                if self.fanMaxSpeeds != maxSpeeds { self.fanMaxSpeeds = maxSpeeds }
-
-                let effectiveFanCount = max(detectedFanCount, speeds.count)
-                if self.numberOfFans != effectiveFanCount {
-                    self.numberOfFans = effectiveFanCount
-                }
+                self.isReadingUpdateInFlight = false
             }
         }
     }
 
+    func temperatureIsFresh(at now: Date = Date()) -> Bool {
+        Self.temperatureSourcesAreFresh(
+            cpuLastValidAt: lastValidCpuTemperatureAt,
+            gpuLastValidAt: lastValidGpuTemperatureAt,
+            now: now,
+            timeout: temperatureStaleTimeout
+        )
+    }
+
+    static func temperatureSourcesAreFresh(
+        cpuLastValidAt: Date?,
+        gpuLastValidAt: Date?,
+        now: Date,
+        timeout: TimeInterval
+    ) -> Bool {
+        var hasKnownSource = false
+        if let cpuLastValidAt {
+            hasKnownSource = true
+            if now.timeIntervalSince(cpuLastValidAt) > timeout {
+                return false
+            }
+        }
+        if let gpuLastValidAt {
+            hasKnownSource = true
+            if now.timeIntervalSince(gpuLastValidAt) > timeout {
+                return false
+            }
+        }
+        return hasKnownSource
+    }
+
+    private func reopenSMCConnection() {
+        closeSMCConnection()
+        keyInfoCache.removeAll()
+        cachedCpuKey = nil
+        cachedGpuKey = nil
+        cpuReadFailures = 0
+        gpuReadFailures = 0
+        cachedFanLimits = nil
+        hasDoneFullScan = false
+        lastFullScanAttemptTime = nil
+        discoveredSensorKeys.removeAll()
+        discoveredCpuKeys.removeAll()
+        discoveredGpuKeys.removeAll()
+        _ = openSMCConnection()
+    }
+
     /// Known fan count, or a throttled re-probe when none were found yet. / 中文：已知风扇数；尚未发现风扇时做节流后的重探测。
     private func resolveFanCount(now: Date) -> Int {
-        if numberOfFans > 0 { return numberOfFans }
+        if knownFanCount > 0 { return knownFanCount }
         if let last = lastZeroFanProbeTime,
            now.timeIntervalSince(last) < zeroFanReprobeInterval {
             return 0
         }
         let count = detectFanCount()
+        knownFanCount = count
         lastZeroFanProbeTime = count == 0 ? now : nil
         return count
     }
@@ -558,6 +676,10 @@ class SystemMonitor: ObservableObject {
                 speeds.append(validateFanRPM(speed))
             } else if let target = readSMCFanSpeed(key: targetKey), target > 0 {
                 speeds.append(validateFanRPM(target))
+            } else {
+                // Preserve fan index identity when one read fails; compacting the
+                // array would mislabel every later fan as the preceding one.
+                speeds.append(0)
             }
         }
 
@@ -585,7 +707,11 @@ class SystemMonitor: ObservableObject {
             }
         }
         let positiveMaxima = maxSpeeds.filter { $0 > 0 }
-        let peerMax = positiveMaxima.max()
+        // If one fan's maximum is temporarily unreadable, use the lowest known
+        // peer ceiling rather than the highest; the latter can overdrive an
+        // asymmetric lower-RPM fan. The daemon independently enforces hardware
+        // bounds as the final safety boundary.
+        let peerMax = positiveMaxima.min()
         for i in maxSpeeds.indices where maxSpeeds[i] <= 0 {
             maxSpeeds[i] = peerMax ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
         }
@@ -606,6 +732,12 @@ class SystemMonitor: ObservableObject {
     /// probing the curated key map if enumeration is unavailable. / 中文：probing the curated 键 map if enumeration is unavailable.
     private func ensureFullScan() {
         guard !hasDoneFullScan else { return }
+        let now = Date()
+        if let lastFullScanAttemptTime,
+           now.timeIntervalSince(lastFullScanAttemptTime) < fullScanRetryInterval {
+            return
+        }
+        lastFullScanAttemptTime = now
 
         var discovered = enumerateTemperatureSensors()
         if discovered.isEmpty {
@@ -619,8 +751,11 @@ class SystemMonitor: ObservableObject {
 
         let filtered = filterSensors(discovered)
         discoveredSensorKeys = filtered
+        discoveredCpuKeys = filtered.filter { $0.2 == .cpu }.map { $0.0 }
         discoveredGpuKeys = filtered.filter { $0.2 == .gpu }.map { $0.0 }
-        hasDoneFullScan = true
+        // Do not permanently cache a transient startup failure. A later tick can
+        // retry after backoff once AppleSMC has recovered.
+        hasDoneFullScan = !discovered.isEmpty
         print("SMC: Discovered \(discovered.count) temperature sensors, kept \(filtered.count) after filtering (\(discoveredGpuKeys.count) GPU)")
     }
 
@@ -765,7 +900,7 @@ class SystemMonitor: ObservableObject {
             smoothed = raw
             return raw
         }
-        // Asymmetric smoothing: fast rise (alpha=0.7), slow fall (alpha=0.3) / 中文：非对称平滑：快速升温（alpha=0.7），缓慢降温（alpha=0.3）
+        // Asymmetric smoothing: faster rise (alpha=0.25), slow fall (alpha=0.1). / 中文：非对称平滑：较快升温（alpha=0.25），缓慢降温（alpha=0.1）。
         let alpha = raw > current ? 0.25 : smoothingAlpha
         let result = alpha * raw + (1 - alpha) * current
         smoothed = result
@@ -790,7 +925,7 @@ class SystemMonitor: ObservableObject {
             cachedCpuKey = nil
         }
         // Full scan to find a new key / 中文：完整扫描以寻找新键
-        let keys = cpuTempKeys + appleChipTempKeys
+        let keys = cpuTempKeys + appleChipTempKeys + discoveredCpuKeys
         for key in keys {
             if let temp = readSMCTemperature(key: key), temp > 0, temp < 150 {
                 cachedCpuKey = key
@@ -798,6 +933,7 @@ class SystemMonitor: ObservableObject {
                 return temp
             }
         }
+        cpuReadFailures += 1
         if cpuReadFailures >= maxConsecutiveFailures {
             DispatchQueue.main.async {
                 self.lastError = "CPU temperature read failed \(self.cpuReadFailures) times"
@@ -825,6 +961,7 @@ class SystemMonitor: ObservableObject {
                 return temp
             }
         }
+        gpuReadFailures += 1
         return nil
     }
 

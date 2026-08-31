@@ -25,12 +25,12 @@ enum SettingsWindowLayout {
 // MARK: - Settings / 中文：设置
 
 struct SettingsView: View {
-    let viewModel: FanControlViewModel
+    @ObservedObject var viewModel: FanControlViewModel
     @Environment(\.colorScheme) private var scheme
 
     @AppStorage("launchAtLogin")          private var launchAtLogin = false
     @AppStorage("statusBarDisplayMode")   private var statusBarDisplayMode = "temperature"
-    @AppStorage("monitoringInterval")     private var monitoringInterval = 1.0
+    @AppStorage("monitoringInterval")     private var monitoringInterval = 2.0
     @AppStorage("enableNotifications")    private var enableNotifications = true
     @AppStorage("highTempAlert")          private var highTempAlert = 85.0
     @AppStorage("autoSwitchMode")         private var autoSwitchMode = false
@@ -124,6 +124,9 @@ struct SettingsView: View {
                     InlineSlider(value: $monitoringInterval, range: 0.5...5.0, step: 0.5,
                                  format: { String(format: "%.1fs", $0) })
                     .frame(width: 152)
+                    .onChange(of: monitoringInterval) { _, newValue in
+                        viewModel.setMonitoringInterval(newValue)
+                    }
                 }
 
                 rowDivider
@@ -166,7 +169,11 @@ struct SettingsView: View {
                     desc: NSLocalizedString("settings.auto_mode_switching_desc", comment: ""),
                     scheme: scheme
                 ) {
-                    Toggle("", isOn: $autoSwitchMode).labelsHidden()
+                    Toggle("", isOn: $autoSwitchMode)
+                        .labelsHidden()
+                        .onChange(of: autoSwitchMode) { _, newValue in
+                            viewModel.autoSwitchMode = newValue
+                        }
                 }
             }
         }

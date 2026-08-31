@@ -26,6 +26,7 @@ struct ControlsSnapshot: Equatable {
     var fanMaxSpeeds: [Int]
     var unifiedMinRPM: Int
     var unifiedMaxRPM: Int
+    var statusMessage: String
 
     func minRPM(atFan index: Int) -> Int {
         guard index >= 0, index < fanMinSpeeds.count else {
@@ -70,6 +71,15 @@ struct ControlsCard: View, Equatable {
                 autoSliders
             } else if selectedMode == .manual {
                 manualSliders
+            }
+
+            if snapshot.statusMessage.hasPrefix("Failed") {
+                Label(
+                    NSLocalizedString("controls.apply_failed", comment: ""),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.system(size: 10.5, weight: .medium))
+                .foregroundColor(Theme.danger(scheme))
             }
         }
         .padding(.horizontal, 12)
