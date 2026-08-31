@@ -787,7 +787,10 @@ static void handle_client(int fd)
             write_response(fd, "ERR trailing-arguments\n");
             return;
         }
-        enforce_control_lease();
+        /* Health checks must stay fast. Lease restoration performs synchronous
+         * IOKit writes and can take longer than the client's one-second health
+         * timeout. The main loop enforces the lease after this client closes and
+         * on every idle poll, so PING only reports the current state. */
         char response[48];
         snprintf(response, sizeof(response), "OK pong %d %s\n",
                  PROTOCOL_VERSION, control_lease_state_name());

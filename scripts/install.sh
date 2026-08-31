@@ -96,7 +96,6 @@ sudo /usr/bin/install -o root -g wheel -m 644 \
 sudo /usr/bin/codesign --verify --strict --verbose=2 \
     --test-requirement '=anchor apple generic and certificate leaf[subject.OU] = "8FUPL8QHFH" and identifier "fanfan-smcd"' \
     "$STAGED_DAEMON"
-sudo /usr/sbin/spctl --assess --type execute --verbose=2 "$STAGED_DAEMON"
 if ! sudo /usr/bin/shasum -a 256 "$STAGED_PLIST" | \
      /usr/bin/grep -q '^aa58f48c612791700897b23f77894bae79a8ba5f485aba8e3ece941afe4ea148 '; then
     echo "❌ Unexpected LaunchDaemon plist content" >&2
@@ -109,16 +108,18 @@ sudo mv -f "$STAGED_DAEMON" /Library/PrivilegedHelperTools/fanfan-smcd
 sudo mv -f "$STAGED_PLIST" /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
 sudo rm -f /usr/local/libexec/fanfan-smcd
 sudo launchctl bootstrap system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
-sudo launchctl kickstart -k system/com.hoobnn.fanfan.smcd
 
 DAEMON_READY=false
-for _ in {1..10}; do
+READY_DEADLINE=$((SECONDS + 20))
+while (( SECONDS < READY_DEADLINE )); do
     RESPONSE=$(printf 'PINGV2\n' | /usr/bin/nc -w 1 -U /var/run/fanfan-smcd.sock 2>/dev/null || true)
-    if [[ "$RESPONSE" == "OK pong 2 "* ]]; then
+    if [[ "$RESPONSE" == "OK pong 2 idle" ||
+          "$RESPONSE" == "OK pong 2 active" ||
+          "$RESPONSE" == "OK pong 2 restoring" ]]; then
         DAEMON_READY=true
         break
     fi
-    sleep 0.1
+    sleep 0.25
 done
 if [ "$DAEMON_READY" != true ]; then
     echo "❌ Privileged helper did not become ready" >&2

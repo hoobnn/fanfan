@@ -16,6 +16,11 @@ class PermissionsManager: ObservableObject {
     
     @Published var isHelperInstalled = false
     @Published private(set) var isInstalling = false
+
+    private var statusGeneration = 0
+    private var isChecking = false
+    private static let helperReadyTimeout: TimeInterval = 20
+    private static let helperPollInterval: TimeInterval = 0.25
     
     private let daemonPath = "/Library/PrivilegedHelperTools/fanfan-smcd"
     private let legacyDaemonPath = "/usr/local/libexec/fanfan-smcd"
@@ -26,25 +31,60 @@ class PermissionsManager: ObservableObject {
     }
     
     func checkInstallation() {
+        // An install owns helper state until it completes. A popover reappearing
+        // during that window must not launch an older check that can overwrite
+        // the install's eventual success.
+        guard !isInstalling, !isChecking else { return }
+        isChecking = true
+        statusGeneration &+= 1
+        let generation = statusGeneration
+
+        guard let bundledURL = Bundle.main.url(forResource: "fanfan-smcd", withExtension: nil) else {
+            isChecking = false
+            isHelperInstalled = false
+            return
+        }
+        let installedPath = daemonPath
+        let timeout = Self.helperReadyTimeout
+        let pollInterval = Self.helperPollInterval
+
         // Run on background thread / 中文：在后台线程运行
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            
-            let daemonReady = SMCDaemonClient.ping() && self.helperBinaryMatchesBundle()
+
+            // A missing or outdated binary is a real install/upgrade request. If
+            // the files already match, tolerate launchd startup throttling and
+            // transient daemon restoration before declaring the helper absent.
+            let daemonReady = Self.helperBinaryMatchesBundle(
+                bundledURL: bundledURL,
+                installedPath: installedPath
+            ) && Self.waitUntil(
+                timeout: timeout,
+                pollInterval: pollInterval,
+                check: SMCDaemonClient.ping
+            )
 
             // Treat "files exist but launchd cannot run them" as not installed. / 中文：把“文件存在但 launchd 无法运行”的状态视为未安装。
             // A quarantined or stale helper otherwise hides the repair button / 中文：否则被 quarantine 或过期的 helper 会隐藏修复按钮，
             // while every SET/AUTO command still fails because the socket is absent. / 中文：但 socket 不存在时每次 SET/AUTO 仍会失败。
             DispatchQueue.main.async {
+                guard Self.shouldApplyStatusResult(
+                    generation: generation,
+                    currentGeneration: self.statusGeneration,
+                    isInstalling: self.isInstalling
+                ) else { return }
+                self.isChecking = false
                 self.isHelperInstalled = daemonReady
             }
         }
     }
 
-    private func helperBinaryMatchesBundle() -> Bool {
-        guard let bundledURL = Bundle.main.url(forResource: "fanfan-smcd", withExtension: nil),
-              let bundled = try? Data(contentsOf: bundledURL),
-              let installed = try? Data(contentsOf: URL(fileURLWithPath: daemonPath)) else {
+    private nonisolated static func helperBinaryMatchesBundle(
+        bundledURL: URL,
+        installedPath: String
+    ) -> Bool {
+        guard let bundled = try? Data(contentsOf: bundledURL),
+              let installed = try? Data(contentsOf: URL(fileURLWithPath: installedPath)) else {
             return false
         }
         return bundled == installed
@@ -56,6 +96,9 @@ class PermissionsManager: ObservableObject {
             return
         }
         isInstalling = true
+        isChecking = false
+        statusGeneration &+= 1
+        let installationGeneration = statusGeneration
 
         // 1. Locate privileged tools in the App Bundle / 中文：1. 在 App Bundle 中定位特权工具
         guard let bundledDaemonURL = Bundle.main.url(forResource: "fanfan-smcd", withExtension: nil) else {
@@ -117,7 +160,7 @@ class PermissionsManager: ObservableObject {
             "(/bin/launchctl bootout system \(qPlist) >/dev/null 2>&1 || true)",
             "/bin/mv -f \(qStagedDaemon) \(qDaemon)",
             "/bin/mv -f \(qStagedPlist) \(qPlist)",
-            "if ! (/bin/launchctl bootstrap system \(qPlist) && /bin/launchctl kickstart -k system/com.hoobnn.fanfan.smcd); then /bin/rm -f \(qDaemon) \(qPlist); [ ! -f \(qDaemonBackup) ] || /bin/mv -f \(qDaemonBackup) \(qDaemon); [ ! -f \(qPlistBackup) ] || /bin/mv -f \(qPlistBackup) \(qPlist); [ ! -f \(qPlist) ] || (/bin/launchctl bootstrap system \(qPlist) >/dev/null 2>&1 || true); exit 1; fi",
+            "if ! /bin/launchctl bootstrap system \(qPlist); then /bin/rm -f \(qDaemon) \(qPlist); [ ! -f \(qDaemonBackup) ] || /bin/mv -f \(qDaemonBackup) \(qDaemon); [ ! -f \(qPlistBackup) ] || /bin/mv -f \(qPlistBackup) \(qPlist); [ ! -f \(qPlist) ] || (/bin/launchctl bootstrap system \(qPlist) >/dev/null 2>&1 || true); exit 1; fi",
             "/bin/rm -f \(qDaemonBackup) \(qPlistBackup) \(qLegacyDaemon)"
         ])
         let command = commands.joined(separator: " && ")
@@ -131,6 +174,7 @@ class PermissionsManager: ObservableObject {
                  
                  DispatchQueue.main.async {
                      if let error = error {
+                         guard self.statusGeneration == installationGeneration else { return }
                          self.isInstalling = false
                          let msg = error["NSAppleScriptErrorMessage"] as? String ?? "Unknown error"
                          completion(false, msg)
@@ -138,16 +182,21 @@ class PermissionsManager: ObservableObject {
                          // launchd bootstrap returning does not guarantee that the
                          // versioned socket is accepting requests yet. Verify the
                          // actual protocol before reporting success.
+                         let installedPath = self.daemonPath
+                         let timeout = Self.helperReadyTimeout
+                         let pollInterval = Self.helperPollInterval
                          DispatchQueue.global(qos: .userInitiated).async {
-                             var daemonReady = false
-                             for _ in 0..<10 {
-                                 if SMCDaemonClient.ping() && self.helperBinaryMatchesBundle() {
-                                     daemonReady = true
-                                     break
-                                 }
-                                 Thread.sleep(forTimeInterval: 0.1)
-                             }
+                             let helperMatches = Self.helperBinaryMatchesBundle(
+                                 bundledURL: bundledDaemonURL,
+                                 installedPath: installedPath
+                             )
+                             let daemonReady = helperMatches && Self.waitUntil(
+                                 timeout: timeout,
+                                 pollInterval: pollInterval,
+                                 check: SMCDaemonClient.ping
+                             )
                              DispatchQueue.main.async {
+                                 guard self.statusGeneration == installationGeneration else { return }
                                  self.isInstalling = false
                                  self.isHelperInstalled = daemonReady
                                  completion(
@@ -160,6 +209,7 @@ class PermissionsManager: ObservableObject {
                  }
              } else {
                  DispatchQueue.main.async {
+                     guard self.statusGeneration == installationGeneration else { return }
                      self.isInstalling = false
                      completion(false, "Failed to create installation script")
                  }
@@ -175,5 +225,32 @@ class PermissionsManager: ObservableObject {
         value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    nonisolated static func waitUntil(
+        timeout: TimeInterval,
+        pollInterval: TimeInterval,
+        now: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+        sleep: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        check: () -> Bool
+    ) -> Bool {
+        guard timeout > 0, pollInterval > 0 else { return check() }
+
+        let deadline = now() + timeout
+        while true {
+            if check() { return true }
+
+            let remaining = deadline - now()
+            if remaining <= 0 { return false }
+            sleep(min(pollInterval, remaining))
+        }
+    }
+
+    nonisolated static func shouldApplyStatusResult(
+        generation: Int,
+        currentGeneration: Int,
+        isInstalling: Bool
+    ) -> Bool {
+        generation == currentGeneration && !isInstalling
     }
 }

@@ -245,6 +245,58 @@ final class FanControlTests: XCTestCase {
         )
     }
 
+    func testHelperReadinessPollingCoversLaunchdThrottle() {
+        var elapsed = 0.0
+        var checks = 0
+
+        let ready = PermissionsManager.waitUntil(
+            timeout: 20,
+            pollInterval: 0.25,
+            now: { elapsed },
+            sleep: { elapsed += $0 }
+        ) {
+            checks += 1
+            return elapsed >= 10
+        }
+
+        XCTAssertTrue(ready)
+        XCTAssertEqual(elapsed, 10, accuracy: 0.001)
+        XCTAssertEqual(checks, 41)
+    }
+
+    func testHelperReadinessPollingStopsAtDeadline() {
+        var elapsed = 0.0
+
+        let ready = PermissionsManager.waitUntil(
+            timeout: 2,
+            pollInterval: 0.25,
+            now: { elapsed },
+            sleep: { elapsed += $0 },
+            check: { false }
+        )
+
+        XCTAssertFalse(ready)
+        XCTAssertEqual(elapsed, 2, accuracy: 0.001)
+    }
+
+    func testStaleHelperCheckCannotOverwriteInstallResult() {
+        XCTAssertTrue(PermissionsManager.shouldApplyStatusResult(
+            generation: 4,
+            currentGeneration: 4,
+            isInstalling: false
+        ))
+        XCTAssertFalse(PermissionsManager.shouldApplyStatusResult(
+            generation: 3,
+            currentGeneration: 4,
+            isInstalling: false
+        ))
+        XCTAssertFalse(PermissionsManager.shouldApplyStatusResult(
+            generation: 4,
+            currentGeneration: 4,
+            isInstalling: true
+        ))
+    }
+
     func testUnifiedFanRangeUsesIntersection() {
         let viewModel = FanControlViewModel()
         viewModel.fanMinSpeeds = [1_000, 1_400]
