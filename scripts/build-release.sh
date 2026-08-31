@@ -98,10 +98,16 @@ xcodebuild \
     -scheme "$TARGET_NAME" \
     -configuration Release \
     -derivedDataPath "$BUILD_DIR" \
-    -destination 'platform=macOS' \
+    -destination 'generic/platform=macOS' \
     CODE_SIGN_STYLE=Manual \
     CODE_SIGN_IDENTITY="-" \
     DEVELOPMENT_TEAM="$TEAM_ID" \
+    ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
+    ENABLE_CODE_COVERAGE=NO \
+    CLANG_COVERAGE_MAPPING=NO \
+    GCC_GENERATE_TEST_COVERAGE_FILES=NO \
+    GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=NO \
     clean build \
     > "$BUILD_DIR/xcodebuild.log" 2>&1 || {
         echo "❌ xcodebuild failed. Last 30 lines of log:"
@@ -112,6 +118,24 @@ xcodebuild \
 BUILT_APP=$(find "$BUILD_DIR/Build/Products/Release" -maxdepth 2 -name "${TARGET_NAME}.app" -type d | head -n 1)
 if [ ! -d "$BUILT_APP" ]; then
     echo "❌ Built app not found under $BUILD_DIR"
+    exit 1
+fi
+APP_EXECUTABLE="$BUILT_APP/Contents/MacOS/$TARGET_NAME"
+lipo "$APP_EXECUTABLE" -verify_arch arm64
+lipo "$APP_EXECUTABLE" -verify_arch x86_64
+APP_MIN_OS=$(xcrun vtool -show-build "$APP_EXECUTABLE" | awk '$1 == "minos" { print $2 }' | sort -u)
+if [ "$APP_MIN_OS" != "26.0" ]; then
+    echo "❌ app deployment target is not macOS 26.0"
+    exit 1
+fi
+DSYM="${BUILT_APP}.dSYM"
+if [ ! -d "$DSYM" ]; then
+    echo "❌ app dSYM was not generated"
+    exit 1
+fi
+DSYM_UUIDS=$(xcrun dwarfdump --uuid "$DSYM")
+if [[ "$DSYM_UUIDS" != *"(arm64)"* || "$DSYM_UUIDS" != *"(x86_64)"* ]]; then
+    echo "❌ app dSYM is missing an arm64 or x86_64 UUID"
     exit 1
 fi
 
@@ -148,6 +172,8 @@ echo "   ✓ signed app"
 echo ""
 echo "🔎 Verifying signature"
 codesign --verify --deep --strict --verbose=2 "$RELEASE_APP" 2>&1 | tail -3
+lipo "$RELEASE_APP/Contents/MacOS/$TARGET_NAME" -verify_arch arm64
+lipo "$RELEASE_APP/Contents/MacOS/$TARGET_NAME" -verify_arch x86_64
 lipo "$DAEMON_IN_APP" -verify_arch arm64
 lipo "$DAEMON_IN_APP" -verify_arch x86_64
 FINAL_DAEMON_MIN_OS=$(xcrun vtool -show-build "$DAEMON_IN_APP" | awk '$1 == "minos" { print $2 }' | sort -u)

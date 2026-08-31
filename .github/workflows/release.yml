@@ -114,10 +114,16 @@ jobs:
             -scheme fanfan \
             -configuration Release \
             -derivedDataPath build \
-            -destination 'platform=macOS' \
+            -destination 'generic/platform=macOS' \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="-" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            ENABLE_CODE_COVERAGE=NO \
+            CLANG_COVERAGE_MAPPING=NO \
+            GCC_GENERATE_TEST_COVERAGE_FILES=NO \
+            GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=NO \
             clean build
 
           BUILT_APP="build/Build/Products/Release/fanfan.app"
@@ -126,6 +132,16 @@ jobs:
             find build -name "*.app" -type d
             exit 1
           fi
+
+          APP_EXECUTABLE="$BUILT_APP/Contents/MacOS/fanfan"
+          lipo "$APP_EXECUTABLE" -verify_arch arm64
+          lipo "$APP_EXECUTABLE" -verify_arch x86_64
+          test "$(xcrun vtool -show-build "$APP_EXECUTABLE" | awk '$1 == "minos" { print $2 }' | sort -u)" = "26.0"
+          DSYM="${BUILT_APP}.dSYM"
+          test -d "$DSYM"
+          DSYM_UUIDS=$(xcrun dwarfdump --uuid "$DSYM")
+          [[ "$DSYM_UUIDS" == *"(arm64)"* ]]
+          [[ "$DSYM_UUIDS" == *"(x86_64)"* ]]
 
           mkdir -p release
           rm -rf release/fanfan.app
@@ -157,6 +173,10 @@ jobs:
             "$APP"
 
           codesign --verify --deep --strict --verbose=2 "$APP"
+          lipo "$APP/Contents/MacOS/fanfan" -verify_arch arm64
+          lipo "$APP/Contents/MacOS/fanfan" -verify_arch x86_64
+          lipo "$DAEMON" -verify_arch arm64
+          lipo "$DAEMON" -verify_arch x86_64
 
       - name: 📜 Notarize and staple app
         env:
