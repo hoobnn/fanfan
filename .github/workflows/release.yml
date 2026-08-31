@@ -101,6 +101,7 @@ jobs:
             -project fanfan.xcodeproj \
             -scheme fanfan \
             -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
             test
 
       - name: 🔨 Build fanfan
