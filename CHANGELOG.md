@@ -2,7 +2,7 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
-## [Unreleased]
+## [1.2.0] - 2026-08-31
 
 ### Security
 - Privileged helper protocol v2 adds explicit health and lease-renewal commands. A 10-second daemon lease now restores firmware fan control after app crashes, stalled clients, failed writes, or daemon shutdown.
