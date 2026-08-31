@@ -2,6 +2,19 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.2.1] - 2026-08-31
+
+### Fixed
+- Helper installation no longer restarts a freshly bootstrapped LaunchDaemon and trips launchd's minimum-runtime throttle, which previously caused a repeated “install helper” loop after upgrading.
+- Helper readiness now uses a bounded 20-second retry window, serializes overlapping checks, and rejects stale results so a transient startup delay cannot overwrite a later successful installation.
+- `PINGV2` remains responsive while the daemon restores firmware fan control; lease enforcement still runs immediately after each request and during idle polling.
+- The one-line installer no longer asks Gatekeeper to assess a standalone Mach-O helper as if it were an app bundle, while retaining its strict Developer ID requirement check.
+- Homebrew upgrades now wait for the previous app process to exit, verify the installed helper files, and require a valid versioned health response before reopening fanfan.
+
+### Build
+- Release builds now produce and verify a universal `arm64 + x86_64` main app and dSYM as well as a universal helper, fixing the arm64-only v1.2.0 application artifact.
+- Public artifacts no longer carry test code-coverage instrumentation.
+
 ## [1.2.0] - 2026-08-31
 
 ### Security
