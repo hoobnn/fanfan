@@ -514,6 +514,77 @@ final class FanControlTests: XCTestCase {
         )
     }
 
+    // MARK: - Real hardware / 中文：真实硬件参数
+
+    /// The other cases use a round 6500 that belongs to no particular Mac. These
+    /// pin the behaviour to real SMC values, read off a MacBook Pro Mac16,7
+    /// (M4 Pro, two fans): F0Mn/F1Mn 1350, F0Mx/F1Mx 5777. The fallback constant
+    /// for an unreadable F%dMx is 5200, so a machine-shaped ceiling is not the
+    /// same number as the placeholder and is worth asserting separately.
+    /// 中文：其余用例用的 6500 不属于任何真机。这些用例锁定真实 SMC 值：
+    /// MacBook Pro Mac16,7（M4 Pro，双风扇），Mn 1350 / Mx 5777。
+    private enum M4Pro {
+        static let fanMin = 1_350
+        static let fanMax = 5_777
+        static let userCeiling = 3_600
+    }
+
+    func testSoftCeilingOnRealM4ProLimits() {
+        func ceiling(at temp: Double) -> Int {
+            FanController.softCeiling(
+                userCeiling: M4Pro.userCeiling,
+                hardwareMax: M4Pro.fanMax,
+                safetyTemperature: temp
+            )
+        }
+
+        // Ordinary use must cost nothing: the configured ceiling holds exactly.
+        XCTAssertEqual(ceiling(at: 70), M4Pro.userCeiling)
+        XCTAssertEqual(ceiling(at: 85), M4Pro.userCeiling)
+
+        // Mid-band buys a real intermediate rather than jumping to full speed —
+        // the old binary switch went straight to 5777 at 90 °C.
+        let atNinety = ceiling(at: 90)
+        XCTAssertEqual(atNinety, 4_689)
+        XCTAssertLessThan(atNinety, M4Pro.fanMax)
+
+        // Only the throttle-adjacent end reaches the hardware maximum.
+        XCTAssertEqual(ceiling(at: 95), M4Pro.fanMax)
+    }
+
+    /// End to end on real limits: a spike to the hardware maximum, then a cooled
+    /// descent. This is the bug the user hit — a 3600 ceiling that the fan ran
+    /// past for the whole ramp down.
+    func testDescentOnRealM4ProLimitsStaysAtCeilingOnceCool() {
+        let ceiling = FanController.softCeiling(
+            userCeiling: M4Pro.userCeiling,
+            hardwareMax: M4Pro.fanMax,
+            safetyTemperature: 70          // cooled back to ordinary use
+        )
+        XCTAssertEqual(ceiling, M4Pro.userCeiling)
+
+        var current = M4Pro.fanMax         // parked at full speed by the spike
+        for _ in 0..<200 {
+            let step = FanController.rampStep(
+                from: current, to: ceiling,
+                rampUpStep: 800, rampDownStep: 250
+            )
+            current = FanController.clampFanTarget(
+                step.next,
+                fanMin: M4Pro.fanMin,
+                fanMax: M4Pro.fanMax,
+                autoCeiling: ceiling,
+                isCritical: false
+            )
+            XCTAssertLessThanOrEqual(
+                current, M4Pro.userCeiling,
+                "on real M4 Pro limits no descent step may exceed the 3600 setting"
+            )
+            if current == ceiling { break }
+        }
+        XCTAssertEqual(current, ceiling)
+    }
+
     /// The safety channel is the one sanctioned way past the ceiling, and it
     /// stops at the fan's own hardware maximum.
     func testCriticalTemperatureOverridesCeilingUpToHardwareMax() {
