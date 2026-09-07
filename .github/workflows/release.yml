@@ -3,96 +3,23 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v1.0.0, v2.1.3, etc.
-  workflow_dispatch:  # Allow manual trigger
+      - 'v*'
+  workflow_dispatch:
 
 permissions:
-  contents: write  # Required to create releases and upload assets
-
-env:
-  APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
-  SIGN_IDENTITY: ${{ vars.SIGN_IDENTITY }}
+  contents: write
 
 jobs:
-  build-and-release:
-    name: Build fanfan for macOS
-    runs-on: macos-latest
-    # Avoid running on forks where secrets are unavailable.
-    if: github.repository == 'hoobnn/fanfan'
-
+  # Fast feedback, and it needs no secrets — so it also protects fork PRs.
+  test:
+    name: Test
+    runs-on: macos-15
     steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: 🔍 Get version from tag
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/v}
-          else
-            VERSION="dev-$(git rev-parse --short HEAD)"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📌 Building version: $VERSION"
-
-      - name: ⚙️ Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-
-      - name: 🔎 Verify tagged app version
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          set -euo pipefail
-          PROJECT_VERSION=$(xcodebuild \
-            -project fanfan.xcodeproj \
-            -scheme fanfan \
-            -configuration Release \
-            -showBuildSettings | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
-          test "$PROJECT_VERSION" = "${{ steps.version.outputs.version }}"
-
-      - name: 🔑 Import signing certificate
-        env:
-          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
-          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-        run: |
-          set -euo pipefail
-          CERT_PATH="$RUNNER_TEMP/cert.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-
-          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          security import "$CERT_PATH" \
-            -P "$P12_PASSWORD" \
-            -A -t cert -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" >/dev/null
-
-          # Make the temp keychain searchable alongside the default ones.
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-
-          # Sanity check: identity must be visible to codesign.
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -q "$SIGN_IDENTITY"
-          rm -f "$CERT_PATH"
-
-      - name: 🛠 Build fanfan-smcd
-        run: |
-          set -euo pipefail
-          make -C tools/fanfan-smcd clean
-          make -C tools/fanfan-smcd
-          lipo tools/fanfan-smcd/fanfan-smcd -verify_arch arm64
-          lipo tools/fanfan-smcd/fanfan-smcd -verify_arch x86_64
-          test "$(xcrun vtool -show-build tools/fanfan-smcd/fanfan-smcd | awk '$1 == "minos" { print $2 }' | sort -u)" = "26.0"
-          # Refresh the bundled copy that Xcode picks up as a Resources file.
-          cp tools/fanfan-smcd/fanfan-smcd fanfan/Resources/fanfan-smcd
 
       - name: 🧪 Run unit tests
         run: |
@@ -104,225 +31,54 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             test
 
-      - name: 🔨 Build fanfan
-        run: |
-          set -euo pipefail
-          # Ad-hoc build first; we re-sign properly below to control ordering
-          # (inner daemon binary must be signed before the outer .app).
-          xcodebuild \
-            -project fanfan.xcodeproj \
-            -scheme fanfan \
-            -configuration Release \
-            -derivedDataPath build \
-            -destination 'generic/platform=macOS' \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="-" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            ARCHS="arm64 x86_64" \
-            ONLY_ACTIVE_ARCH=NO \
-            ENABLE_CODE_COVERAGE=NO \
-            CLANG_COVERAGE_MAPPING=NO \
-            GCC_GENERATE_TEST_COVERAGE_FILES=NO \
-            GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=NO \
-            clean build
+  release:
+    name: Build, sign, notarize and release
+    needs: test
+    uses: hoobnn/ci-workflows/.github/workflows/macos-release.yml@v1
+    with:
+      app-path: release/fanfan.app
+      build-command: ./scripts/ci-build.sh && ./scripts/release-notes.sh
+      artifact-basename: fanfan
+      # The daemon must carry its own signature before the outer bundle is sealed.
+      inner-binaries: Contents/Resources/fanfan-smcd
+      entitlements: fanfan/Resources/fanfan.entitlements
+      make-dmg: true
+      dmg-volume-name: fanfan
+      release-notes-file: release_notes.md
+    secrets: inherit
 
-          BUILT_APP="build/Build/Products/Release/fanfan.app"
-          if [ ! -d "$BUILT_APP" ]; then
-            echo "❌ Built app not found at $BUILT_APP"
-            find build -name "*.app" -type d
-            exit 1
-          fi
+  homebrew:
+    name: Update Homebrew tap
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
 
-          APP_EXECUTABLE="$BUILT_APP/Contents/MacOS/fanfan"
-          lipo "$APP_EXECUTABLE" -verify_arch arm64
-          lipo "$APP_EXECUTABLE" -verify_arch x86_64
-          test "$(xcrun vtool -show-build "$APP_EXECUTABLE" | awk '$1 == "minos" { print $2 }' | sort -u)" = "26.0"
-          DSYM="${BUILT_APP}.dSYM"
-          test -d "$DSYM"
-          DSYM_UUIDS=$(xcrun dwarfdump --uuid "$DSYM")
-          [[ "$DSYM_UUIDS" == *"(arm64)"* ]]
-          [[ "$DSYM_UUIDS" == *"(x86_64)"* ]]
-
-          mkdir -p release
-          rm -rf release/fanfan.app
-          cp -R "$BUILT_APP" release/fanfan.app
-          echo "✅ Staged: release/fanfan.app"
-
-      - name: ✍️ Code-sign with Developer ID
-        run: |
-          set -euo pipefail
-          APP="release/fanfan.app"
-          DAEMON="$APP/Contents/Resources/fanfan-smcd"
-          ENTITLEMENTS="fanfan/Resources/fanfan.entitlements"
-
-          if [ ! -f "$DAEMON" ]; then
-            echo "❌ Daemon binary missing inside app bundle: $DAEMON"
-            exit 1
-          fi
-
-          # Inner-most first.
-          codesign --force --timestamp --options runtime \
-            --identifier fanfan-smcd \
-            --sign "$SIGN_IDENTITY" \
-            "$DAEMON"
-
-          # Then the app, with hardened runtime + entitlements.
-          codesign --force --timestamp --options runtime \
-            --entitlements "$ENTITLEMENTS" \
-            --sign "$SIGN_IDENTITY" \
-            "$APP"
-
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          lipo "$APP/Contents/MacOS/fanfan" -verify_arch arm64
-          lipo "$APP/Contents/MacOS/fanfan" -verify_arch x86_64
-          lipo "$DAEMON" -verify_arch arm64
-          lipo "$DAEMON" -verify_arch x86_64
-
-      - name: 📜 Notarize and staple app
+      - name: 📥 Fetch released dmg checksum
+        id: checksum
         env:
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
         run: |
           set -euo pipefail
-          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          echo -n "$APPLE_API_KEY_BASE64" | base64 --decode -o "$KEY_PATH"
+          gh release download "$GITHUB_REF_NAME" \
+            --pattern "fanfan-${VERSION}-macOS.dmg.sha256" \
+            --dir "$RUNNER_TEMP"
+          SHA=$(awk '{print $1}' "$RUNNER_TEMP/fanfan-${VERSION}-macOS.dmg.sha256")
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
-          NOTARIZE_ZIP="$RUNNER_TEMP/fanfan-notarize.zip"
-          ditto -c -k --keepParent release/fanfan.app "$NOTARIZE_ZIP"
-
-          xcrun notarytool submit "$NOTARIZE_ZIP" \
-            --key "$KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --wait \
-            --timeout 30m
-
-          xcrun stapler staple release/fanfan.app
-          xcrun stapler validate release/fanfan.app
-          spctl --assess --type execute --verbose=2 release/fanfan.app
-
-          rm -f "$KEY_PATH" "$NOTARIZE_ZIP"
-
-      - name: 📦 Create ZIP archive
-        run: |
-          set -euo pipefail
-          # ditto preserves xattrs (incl. the stapled ticket) across the round-trip.
-          ditto -c -k --keepParent release/fanfan.app \
-            "fanfan-v${{ steps.version.outputs.version }}-macos.zip"
-
-          shasum -a 256 "fanfan-v${{ steps.version.outputs.version }}-macos.zip" \
-            > "fanfan-v${{ steps.version.outputs.version }}-macos.zip.sha256"
-
-          ls -lh "fanfan-v${{ steps.version.outputs.version }}-macos.zip"
-
-      - name: 💿 Create, notarize and staple DMG
-        env:
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
-        run: |
-          set -euo pipefail
-          mkdir -p dmg_source
-          cp -R release/fanfan.app dmg_source/
-          ln -s /Applications dmg_source/Applications
-
-          DMG="fanfan-v${{ steps.version.outputs.version }}-macos.dmg"
-
-          hdiutil create -volname "fanfan" \
-            -srcfolder dmg_source \
-            -ov -format UDZO \
-            -imagekey zlib-level=9 \
-            "$DMG"
-
-          # The DMG container itself needs its own notarization + staple.
-          codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
-
-          KEY_PATH="$RUNNER_TEMP/AuthKey.p8"
-          echo -n "$APPLE_API_KEY_BASE64" | base64 --decode -o "$KEY_PATH"
-
-          xcrun notarytool submit "$DMG" \
-            --key "$KEY_PATH" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER_ID" \
-            --wait \
-            --timeout 30m
-
-          xcrun stapler staple "$DMG"
-          xcrun stapler validate "$DMG"
-
-          shasum -a 256 "$DMG" > "$DMG.sha256"
-
-          rm -f "$KEY_PATH"
-
-      - name: 📝 Generate release notes
-        id: notes
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ZIP_SHA=$(cat "fanfan-v${VERSION}-macos.zip.sha256")
-          DMG_SHA=$(cat "fanfan-v${VERSION}-macos.dmg.sha256")
-
-          # Extract the changelog section for this version (between its heading and the next).
-          CHANGELOG=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
-
-          cat > release_notes.md << EOF
-          ${CHANGELOG}
-
-          ---
-
-          ### Installation
-
-          **Option 1: DMG (Recommended)**
-          1. Download and open \`fanfan-v${VERSION}-macos.dmg\`
-          2. Drag **fanfan.app** to /Applications/
-          3. Launch — it will prompt once to install the helper tool
-
-          **Option 2: One-liner**
-          \`\`\`bash
-          curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
-          \`\`\`
-
-          ### Requirements
-          - macOS 26.0 or later · Apple Silicon or Intel
-
-          ### SHA256 Checksums
-          \`\`\`
-          ${ZIP_SHA}
-          ${DMG_SHA}
-          \`\`\`
-          EOF
-
-          echo "notes_file=release_notes.md" >> $GITHUB_OUTPUT
-
-      - name: 🚀 Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          name: fanfan v${{ steps.version.outputs.version }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-          files: |
-            fanfan-v${{ steps.version.outputs.version }}-macos.zip
-            fanfan-v${{ steps.version.outputs.version }}-macos.zip.sha256
-            fanfan-v${{ steps.version.outputs.version }}-macos.dmg
-            fanfan-v${{ steps.version.outputs.version }}-macos.dmg.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🍺 Update Homebrew tap
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: 🍺 Sync cask
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.release.outputs.version }}
+          DMG_SHA: ${{ steps.checksum.outputs.sha }}
         run: |
           set -euo pipefail
           if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
             echo "⚠️  HOMEBREW_TAP_TOKEN not set; skipping tap sync."
             exit 0
           fi
-
-          VERSION="${{ steps.version.outputs.version }}"
-          DMG_SHA=$(awk '{print $1}' "fanfan-v${VERSION}-macos.dmg.sha256")
 
           TAP_DIR="$RUNNER_TEMP/homebrew-tap"
           git clone --depth 1 \
@@ -349,28 +105,3 @@ jobs:
           git commit -m "⬆️ arrow-up(fanfan): bump cask to ${VERSION}"
           git push origin HEAD
           echo "✅ Tap synced to ${VERSION}"
-
-      - name: 📤 Upload artifacts (for non-tag builds)
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        uses: actions/upload-artifact@v7
-        with:
-          name: fanfan-dev-build
-          path: |
-            fanfan-v${{ steps.version.outputs.version }}-macos.zip
-            fanfan-v${{ steps.version.outputs.version }}-macos.dmg
-          retention-days: 30
-
-      - name: 🧹 Cleanup keychain
-        if: always()
-        run: |
-          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" || true
-
-      - name: ✅ Done!
-        run: |
-          echo "✨ Build complete!"
-          echo "📍 Version: ${{ steps.version.outputs.version }}"
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "🔗 Release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
-          else
-            echo "💾 Artifacts uploaded for manual testing"
-          fi
