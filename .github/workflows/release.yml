@@ -13,7 +13,7 @@ jobs:
   # Fast feedback, and it needs no secrets — so it also protects fork PRs.
   test:
     name: Test
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -45,13 +45,15 @@ jobs:
       make-dmg: true
       dmg-volume-name: fanfan
       release-notes-file: release_notes.md
+      # fanfan targets macOS 26.0; the default macos-15 runner cannot build it.
+      runs-on: macos-26
     secrets: inherit
 
   homebrew:
     name: Update Homebrew tap
     needs: release
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
