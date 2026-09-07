@@ -83,6 +83,10 @@ class FanController: ObservableObject {
 
     @Published var isControlEnabled = false
     @Published var lastWriteSuccess = false
+    /// Whether the most recent apply attempt failed, for the UI warning banner. / 中文：最近一次应用尝试是否失败，供 UI 警告横幅使用。
+    /// Tracked explicitly instead of matching `statusMessage` against an English / 中文：显式跟踪而不是用英文前缀匹配 `statusMessage`，
+    /// prefix, which silently stops working the moment a message is reworded. / 中文：后者在任何一条消息被改写时都会悄悄失效。
+    @Published var applyDidFail = false
     @Published var statusMessage: String = ""
     /// Largest target RPM last applied (used for auto-mode hysteresis). / 中文：Largest 目标 RPM last applied (used for auto-模式 滞回).
     @Published var lastAppliedSpeed: Int = 0
@@ -410,6 +414,15 @@ class FanController: ObservableObject {
         commandGeneration &+= 1
         pendingFanTargets = nil
         resetTemperatureFailsafeRestoreState()
+        // Bumping the generation retires every in-flight result, so the status / 中文：递增 generation 会作废所有在途结果，
+        // it produced is stale too. Clear it here rather than waiting for the / 中文：它留下的状态同样过期。在这里立即清除，
+        // new command to land: switching *into* automatic writes no status until / 中文：而不是等新命令返回——切到自动模式在守护进程
+        // the daemon round-trip completes, which on Apple Silicon can be the / 中文：往返完成前不会写入任何状态，而在 Apple Silicon 上
+        // ~8 s Ftst unlock, leaving a previous "Failed …" banner on screen for / 中文：这可能是约 8 秒的 Ftst 解锁，导致上一次的
+        // that whole window. / 中文：「Failed …」横幅在整个窗口期内滞留。
+        statusMessage = ""
+        lastWriteSuccess = false
+        applyDidFail = false
         mode = newMode
 
         if newMode == .automatic {
@@ -485,10 +498,12 @@ class FanController: ObservableObject {
                 guard generation == self.commandGeneration else { return }
                 if allSuccess {
                     self.isControlEnabled = false
+                    self.applyDidFail = false
                     self.statusMessage = "Automatic mode restored"
                     print("Fan Control: Automatic mode restored")
                 } else {
                     self.isControlEnabled = false
+                    self.applyDidFail = true
                     self.statusMessage = "Failed to restore auto mode"
                     print("Fan Control: Failed to restore auto mode")
                 }
@@ -528,11 +543,13 @@ class FanController: ObservableObject {
         guard let monitor = systemMonitor else {
             statusMessage = "No system monitor"
             lastWriteSuccess = false
+            applyDidFail = true
             return
         }
         guard monitor.numberOfFans > 0 else {
             statusMessage = "No fans detected"
             lastWriteSuccess = false
+            applyDidFail = true
             return
         }
 
@@ -554,11 +571,13 @@ class FanController: ObservableObject {
         guard let monitor = systemMonitor else {
             statusMessage = "No system monitor"
             lastWriteSuccess = false
+            applyDidFail = true
             return
         }
         guard monitor.numberOfFans > 0, targets.count == monitor.numberOfFans else {
             statusMessage = "Fan target mismatch"
             lastWriteSuccess = false
+            applyDidFail = true
             return
         }
 
@@ -598,10 +617,12 @@ class FanController: ObservableObject {
                             self.statusMessage = "Fan targets RPM — \(parts)"
                         }
                         self.lastWriteSuccess = true
+                        self.applyDidFail = false
                         print("Fan Control: \(parts)")
                     } else {
                         self.statusMessage = "Failed to set fan speed"
                         self.lastWriteSuccess = false
+                        self.applyDidFail = true
                     }
                 }
                 if let next = self.pendingFanTargets {
@@ -653,6 +674,7 @@ class FanController: ObservableObject {
                         self.stopControlLease()
                         self.lastAppliedSpeed = 0
                         self.lastWriteSuccess = false
+                        self.applyDidFail = true
                         self.statusMessage = "Failed to renew fan-control lease"
                         if self.mode == .automatic {
                             self.updateAutoControl()

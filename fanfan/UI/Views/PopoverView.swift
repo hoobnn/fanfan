@@ -373,7 +373,8 @@ struct PopoverView: View {
             fanMaxSpeeds: viewModel.fanMaxSpeeds,
             unifiedMinRPM: viewModel.effectiveUnifiedMinRPM,
             unifiedMaxRPM: viewModel.effectiveUnifiedMaxRPM,
-            statusMessage: viewModel.statusMessage
+            statusMessage: viewModel.statusMessage,
+            applyDidFail: viewModel.applyDidFail
         )
     }
 

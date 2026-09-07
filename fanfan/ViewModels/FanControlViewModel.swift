@@ -56,6 +56,7 @@ class FanControlViewModel: ObservableObject {
     @Published var statusMessage: String = ""
     @Published var launchAtLogin = false
     @Published var lastWriteSuccess = false
+    @Published var applyDidFail = false
     
     // Settings / 中文：设置
     @Published var statusBarDisplayMode: String = "temperature"
@@ -275,6 +276,11 @@ class FanControlViewModel: ObservableObject {
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .assign(to: &$lastWriteSuccess)
+
+        fanController.$applyDidFail
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$applyDidFail)
 
         LaunchAtLoginManager.shared.$registrationStatus
             .receive(on: DispatchQueue.main)
