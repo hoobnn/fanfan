@@ -162,5 +162,26 @@ final class SystemMonitorTests: XCTestCase {
         wait(for: [done], timeout: 60)
         XCTAssertFalse(monitor.isMonitoring)
     }
-}
 
+    // MARK: - Die-sensor placeholder filtering / 中文：裸片传感器占位值过滤
+
+    /// Apple Silicon parks inactive die sensors at exactly 40.00 °C rather than
+    /// omitting them. Measured on an M4 Pro: at idle all six curated
+    /// `appleChipTempKeys` sit at that constant while 53 other `Tp**`/`TC**`
+    /// sensors report real values up to ~77 °C. Letting the constant through
+    /// pins the control input at 40 °C; a too-loose epsilon would instead throw
+    /// away genuine readings that happen to land near 40 °C.
+    func testPlaceholderReadingFiltersOnlyTheExactConstant() {
+        // The inactive-sensor constant is rejected.
+        XCTAssertTrue(SystemMonitor.isPlaceholderReading(40.0))
+
+        // Real readings near 40 °C still count — they carry fractional jitter.
+        XCTAssertFalse(SystemMonitor.isPlaceholderReading(40.01))
+        XCTAssertFalse(SystemMonitor.isPlaceholderReading(39.98))
+        XCTAssertFalse(SystemMonitor.isPlaceholderReading(41.0))
+
+        // Values elsewhere in the plausible band are untouched.
+        XCTAssertFalse(SystemMonitor.isPlaceholderReading(3.40))
+        XCTAssertFalse(SystemMonitor.isPlaceholderReading(76.94))
+    }
+}
