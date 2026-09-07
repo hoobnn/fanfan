@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.2.3] - 2026-09-07
+
+### Fixed
+- Automatic mode now steers on the real die temperature. CPU/GPU readings took the first SMC sensor that parsed, which on Apple Silicon is not the hot one — on an M4 Pro that read 60.8 °C against a true 80.0 °C under load, and 3.4 °C against a true 77.3 °C at idle, so the fan curve ran far below where it should have. The hottest live sensor is used instead, inactive sensors parked at exactly 40.00 °C are ignored, and the control loop now sees every discovered die sensor rather than the short display list.
+- Switching control strategy no longer leaves "风扇设置未能生效" on screen for several seconds; the warning is cleared when the mode changes and is now driven by the actual apply result instead of matching an English message prefix.
+
 ## [1.2.2] - 2026-09-07
 
 ### Fixed
