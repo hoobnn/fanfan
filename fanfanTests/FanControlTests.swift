@@ -319,6 +319,62 @@ final class FanControlTests: XCTestCase {
         XCTAssertEqual(FanControlViewModel.batterySensorTemperature(in: sensors), 39)
     }
 
+    // MARK: - Spin-down convergence / 中文：降速收敛
+
+    /// Replays a full descent. The dead-band (450) is wider than one ramp step
+    /// (250), so gating every step on the band stranded the fan above target
+    /// once the remaining gap fell into the 250..<450 window.
+    func testSpinDownReachesTargetInsteadOfStallingInsideDeadBand() {
+        let spinUp = 200, spinDown = 450, rampUp = 800, rampDown = 250
+        var current = 3000
+        let target = 2000
+        var underWay = false
+
+        for _ in 0..<40 {
+            let decision = FanController.deadBandDecision(
+                delta: target - current,
+                spinDownUnderWay: underWay,
+                spinUpHysteresisRPM: spinUp,
+                spinDownHysteresisRPM: spinDown
+            )
+            underWay = decision.spinDownUnderWay
+            guard decision.apply else { break }
+            let step = FanController.rampStep(
+                from: current, to: target,
+                rampUpStep: rampUp, rampDownStep: rampDown
+            )
+            current = step.next
+            underWay = step.spinDownUnderWay
+        }
+
+        XCTAssertEqual(current, target, "spin-down must converge, not stall above target")
+        XCTAssertFalse(underWay, "reaching the target ends the descent")
+    }
+
+    /// The band must still absorb small dips, or the anti-pumping design is lost.
+    func testSmallDipDoesNotStartSpinDown() {
+        let decision = FanController.deadBandDecision(
+            delta: -300,                 // below the 450 band
+            spinDownUnderWay: false,
+            spinUpHysteresisRPM: 200,
+            spinDownHysteresisRPM: 450
+        )
+        XCTAssertFalse(decision.apply)
+        XCTAssertFalse(decision.spinDownUnderWay)
+    }
+
+    /// A spin-up cancels an in-flight descent so the next dip is gated again.
+    func testSpinUpClearsInFlightSpinDown() {
+        let decision = FanController.deadBandDecision(
+            delta: 250,
+            spinDownUnderWay: true,
+            spinUpHysteresisRPM: 200,
+            spinDownHysteresisRPM: 450
+        )
+        XCTAssertTrue(decision.apply)
+        XCTAssertFalse(decision.spinDownUnderWay)
+    }
+
     func testPIDOverrideStartsFromExactEffectiveGains() {
         let controller = FanController(systemMonitor: SystemMonitor())
         let gains = (

@@ -121,6 +121,13 @@ class FanController: ObservableObject {
     /// catches an abrupt drop in fan noise. / 中文：让耳朵察觉不到风扇噪声的突然回落。
     private let rampUpStep: Int = 800
     private let rampDownStep: Int = 250
+    /// True while a spin-down is stepping toward its target. The dead-band gates
+    /// the *start* of a spin-down; once under way the ramp must be allowed to
+    /// finish. Re-testing the dead-band on every step stalled the fan for good
+    /// whenever the remaining gap fell between `rampDownStep` (250) and
+    /// `spinDownHysteresisRPM` (450) — too small to clear the band, so no
+    /// further step ever ran and the fan sat up to 449 RPM above target.
+    private var spinDownInProgress = false
     private var temperatureFailsafeRestorePending = false
     private var temperatureFailsafeRestoreRequired = false
     private var temperatureFailsafeRetryCount = 0
@@ -173,6 +180,7 @@ class FanController: ObservableObject {
         pidLastError = 0
         pidLastUpdateTime = Date()
         smoothedTemp = nil  // re-seed the EMA on the next sample / 中文：下次采样时重新播种 EMA
+        spinDownInProgress = false
     }
 
     /// Response curve presets / 中文：响应曲线预设。
@@ -923,22 +931,70 @@ class FanController: ObservableObject {
         }
 
         // Asymmetric dead-band: spin up readily, resist spinning back down. / 中文：非对称死区：升速容易，降速迟缓。
+        let decision = Self.deadBandDecision(
+            delta: delta,
+            spinDownUnderWay: spinDownInProgress,
+            spinUpHysteresisRPM: spinUpHysteresisRPM,
+            spinDownHysteresisRPM: spinDownHysteresisRPM
+        )
+        spinDownInProgress = decision.spinDownUnderWay
+        return decision.apply
+    }
+
+    /// Dead-band rule, split out so the spin-down convergence is testable.
+    ///
+    /// The band gates whether a spin-down may *begin*. Once one is under way the
+    /// ramp is allowed to finish: re-testing the band on every step stranded the
+    /// fan permanently when the remaining gap fell between `rampDownStep` and
+    /// `spinDownHysteresisRPM` — too small to clear the band, so no later step
+    /// ever ran.
+    nonisolated static func deadBandDecision(
+        delta: Int,
+        spinDownUnderWay: Bool,
+        spinUpHysteresisRPM: Int,
+        spinDownHysteresisRPM: Int
+    ) -> (apply: Bool, spinDownUnderWay: Bool) {
         if delta >= 0 {
-            return delta >= spinUpHysteresisRPM
-        } else {
-            return -delta >= spinDownHysteresisRPM
+            return (delta >= spinUpHysteresisRPM, false)
         }
+        if spinDownUnderWay {
+            return (true, true)
+        }
+        let starts = -delta >= spinDownHysteresisRPM
+        return (starts, starts)
     }
 
     /// Gradual ramp to avoid sudden RPM jumps. Asymmetric: spin up briskly so / 中文：使用渐进过渡，避免转速突变。非对称：升速干脆，
     /// the machine cools, glide down slowly so the noise drop is inaudible. / 中文：让机器及时降温；降速缓慢，使噪声回落不易被察觉。
     private func rampTransition(from current: Int, to target: Int) -> Int {
+        let step = Self.rampStep(
+            from: current,
+            to: target,
+            rampUpStep: rampUpStep,
+            rampDownStep: rampDownStep
+        )
+        spinDownInProgress = step.spinDownUnderWay
+        return step.next
+    }
+
+    /// One ramp step, split out alongside `deadBandDecision` so a full descent
+    /// can be replayed in tests. Reaching the target ends the descent so the
+    /// dead-band guards the next one again; keeping the flag set would let every
+    /// later dip straight through and bring the pumping back.
+    nonisolated static func rampStep(
+        from current: Int,
+        to target: Int,
+        rampUpStep: Int,
+        rampDownStep: Int
+    ) -> (next: Int, spinDownUnderWay: Bool) {
         let diff = target - current
         if diff > 0 {
-            return diff <= rampUpStep ? target : current + rampUpStep
-        } else {
-            return -diff <= rampDownStep ? target : current - rampDownStep
+            return (diff <= rampUpStep ? target : current + rampUpStep, false)
         }
+        if -diff <= rampDownStep {
+            return (target, false)
+        }
+        return (current - rampDownStep, true)
     }
 
     private func loadSettings() {
