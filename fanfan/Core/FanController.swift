@@ -88,6 +88,12 @@ class FanController: ObservableObject {
     /// prefix, which silently stops working the moment a message is reworded. / 中文：后者在任何一条消息被改写时都会悄悄失效。
     @Published var applyDidFail = false
     @Published var statusMessage: String = ""
+    /// The raised ceiling while thermal protection is lifting it, else nil. Makes
+    /// the one sanctioned way past the user's ceiling explainable instead of
+    /// looking like the app ignoring its own setting.
+    /// 中文：高温保护抬升上限期间的实际上限，否则为 nil。让唯一一处合法越过用户
+    /// 上限的行为可解释，而不是看起来像 App 无视自己的设置。
+    @Published var thermalProtectionCeiling: Int?
     /// Largest target RPM last applied (used for auto-mode hysteresis). / 中文：Largest 目标 RPM last applied (used for auto-模式 滞回).
     @Published var lastAppliedSpeed: Int = 0
 
@@ -139,7 +145,19 @@ class FanController: ObservableObject {
     private var reapplyGeneration = 0
     private var commandGeneration = 0
     private static let maxWakeReapplyAttempts = 5
-    private static let criticalTemperature: Double = 90
+
+    /// Thermal-protection band. Below `protectionOnsetTemperature` the user's
+    /// ceiling is absolute. Across the band it is raised smoothly toward the
+    /// hardware maximum, so protection buys exactly the RPM the temperature
+    /// calls for instead of jumping straight to full speed. At
+    /// `criticalTemperature` — close to where the SoC throttles — the ceiling is
+    /// the hardware maximum and the ramp is bypassed, because at that point
+    /// noise has stopped being the thing worth optimising.
+    /// 中文：高温保护带。低于 `protectionOnsetTemperature` 时用户上限绝对生效；
+    /// 在保护带内上限平滑抬升至硬件上限，按温度取所需转速，而非一步拉满。
+    /// 到 `criticalTemperature`（接近降频点）才用满硬件上限并跳过缓升。
+    private static let protectionOnsetTemperature: Double = 85
+    private static let criticalTemperature: Double = 95
 
     // MARK: - PID State / 中文：PID 状态
 
@@ -612,7 +630,11 @@ class FanController: ObservableObject {
                         self.lastSpeedChangeTime = Date()
                         self.startControlLeaseIfNeeded()
                         if self.mode == .automatic {
-                            self.statusMessage = "Auto — \(parts) \(self.tempTrendDescription())"
+                            if let lifted = self.thermalProtectionCeiling {
+                                self.statusMessage = "Auto — thermal protection, ceiling raised to \(lifted) — \(parts) \(self.tempTrendDescription())"
+                            } else {
+                                self.statusMessage = "Auto — \(parts) \(self.tempTrendDescription())"
+                            }
                         } else {
                             self.statusMessage = "Fan targets RPM — \(parts)"
                         }
@@ -728,6 +750,7 @@ class FanController: ObservableObject {
     func stopAutoControl() {
         autoControlTimer?.invalidate()
         autoControlTimer = nil
+        thermalProtectionCeiling = nil
     }
 
     private func updateAutoControl() {
@@ -778,14 +801,20 @@ class FanController: ObservableObject {
         // Update temperature history (used by the status-message trend label) / 中文：Update 温度 历史记录 (used by the 状态-message trend label)
         updateTempHistory(currentTemp)
 
-        // Raw, unsmoothed telemetry is a separate safety channel. At a critical
-        // temperature it bypasses the user/strategy ceiling, hold window,
-        // hysteresis, and gradual ramp-up.
-        // 中文：未经平滑的原始温度是独立安全通道；达到临界温度时绕过用户上限、
-        // 保持窗口、滞回和缓升，直接请求每个风扇的硬件最高转速。
+        // Raw, unsmoothed telemetry is a separate safety channel. Across the
+        // protection band it lifts the ceiling smoothly; only a critical
+        // temperature also bypasses the hold window, hysteresis and ramp-up.
+        // 中文：未经平滑的原始温度是独立安全通道；保护带内平滑抬升上限，
+        // 只有到临界温度才同时绕过保持窗口、滞回和缓升。
         let safetyTemperature = max(monitor.rawMaxTemperature ?? 0, rawTemp)
         let isCritical = safetyTemperature >= Self.criticalTemperature
-        let autoCeiling = isCritical ? unifiedMaxClamp : min(autoMaxSpeed, unifiedMaxClamp)
+        let userCeiling = min(autoMaxSpeed, unifiedMaxClamp)
+        let autoCeiling = Self.softCeiling(
+            userCeiling: autoMaxSpeed,
+            hardwareMax: unifiedMaxClamp,
+            safetyTemperature: safetyTemperature
+        )
+        thermalProtectionCeiling = autoCeiling > userCeiling ? autoCeiling : nil
         let autoFloor = unifiedMinClamp
 
         // 1. PID feedback: drives temperature toward autoThreshold (target temp) / 中文：1. PID feedback: drives 温度 toward auto阈值 (目标 temp)
@@ -831,11 +860,11 @@ class FanController: ObservableObject {
             let ramped = isCritical
                 ? representative
                 : rampTransition(from: lastAppliedSpeed, to: representative)
-            // Ramping down out of a critical spike walks through RPMs above the
-            // user ceiling, so this clamp has to be the same one used when the
-            // targets were built — the hardware maximum alone let every
-            // intermediate step run over the ceiling for the whole descent.
-            // 中文：从临界高转速回落时会途经高于用户上限的转速，故此处夹取必须
+            // Ramping down out of a protection spike walks through RPMs above
+            // the ceiling of the moment, so this clamp has to be the same one
+            // used when the targets were built — the hardware maximum alone let
+            // every intermediate step run over the ceiling for the whole descent.
+            // 中文：从保护高转速回落时会途经高于当前上限的转速，故此处夹取必须
             // 与上面构建目标时一致；只用硬件上限会让整段降速过程持续超限。
             var rampedTargets: [Int] = []
             for i in 0..<monitor.numberOfFans {
@@ -1006,6 +1035,35 @@ class FanController: ObservableObject {
         )
         spinDownInProgress = step.spinDownUnderWay
         return step.next
+    }
+
+    /// The auto ceiling for a given safety temperature.
+    ///
+    /// Below the onset the user's ceiling holds exactly. Across the protection
+    /// band it grows toward `hardwareMax` on a smoothstep curve, so the ceiling
+    /// has no corner to snap at and, as the temperature falls back, retreats
+    /// along the same curve — the descent needs no special case. A user ceiling
+    /// already at or above `hardwareMax` is simply unchanged.
+    /// 中文：按安全温度计算自动上限。低于起始温度时严格等于用户上限；保护带内沿
+    /// smoothstep 曲线抬升至硬件上限，无拐点，降温时沿同一曲线收回。
+    nonisolated static func softCeiling(
+        userCeiling: Int,
+        hardwareMax: Int,
+        safetyTemperature: Double,
+        onset: Double = protectionOnsetTemperature,
+        critical: Double = criticalTemperature
+    ) -> Int {
+        let ceiling = min(userCeiling, hardwareMax)
+        guard hardwareMax > ceiling, critical > onset else { return ceiling }
+        if safetyTemperature <= onset { return ceiling }
+        if safetyTemperature >= critical { return hardwareMax }
+
+        // smoothstep: zero slope at both ends, so the ceiling eases in at the
+        // onset and settles into the hardware maximum instead of cornering.
+        let t = (safetyTemperature - onset) / (critical - onset)
+        let eased = t * t * (3 - 2 * t)
+        let lifted = Double(ceiling) + eased * Double(hardwareMax - ceiling)
+        return max(ceiling, min(hardwareMax, Int(lifted.rounded())))
     }
 
     /// The per-fan target clamp, shared by the pre-ramp and post-ramp loops so

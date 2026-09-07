@@ -408,6 +408,112 @@ final class FanControlTests: XCTestCase {
         XCTAssertEqual(current, target, "the descent must still reach the ceiling")
     }
 
+    // MARK: - Thermal-protection soft ceiling / 中文：高温保护软上限
+
+    /// Below the onset the user's ceiling is absolute — protection must never
+    /// cost RPM headroom during ordinary use.
+    func testCeilingIsAbsoluteBelowProtectionOnset() {
+        for temp in [40.0, 70.0, 84.9, 85.0] {
+            XCTAssertEqual(
+                FanController.softCeiling(
+                    userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: temp
+                ),
+                3_600,
+                "\(temp) °C is below the band; the user ceiling must hold exactly"
+            )
+        }
+    }
+
+    /// Inside the band the ceiling rises monotonically and stays bounded, so
+    /// protection buys the RPM the temperature calls for — not full speed.
+    func testCeilingRisesMonotonicallyAcrossProtectionBand() {
+        let userCeiling = 3_600, hardwareMax = 6_500
+        var previous = userCeiling
+
+        for tenth in 850...950 {
+            let ceiling = FanController.softCeiling(
+                userCeiling: userCeiling,
+                hardwareMax: hardwareMax,
+                safetyTemperature: Double(tenth) / 10
+            )
+            XCTAssertGreaterThanOrEqual(ceiling, previous, "the ceiling must never dip")
+            XCTAssertLessThanOrEqual(ceiling, hardwareMax)
+            previous = ceiling
+        }
+
+        XCTAssertEqual(previous, hardwareMax, "the band must end at the hardware maximum")
+    }
+
+    /// The midpoint must be a genuine intermediate, not a disguised jump to full
+    /// speed — that gradation is the whole point of the band.
+    func testCeilingMidBandIsIntermediateNotFullSpeed() {
+        let ceiling = FanController.softCeiling(
+            userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: 90
+        )
+        XCTAssertGreaterThan(ceiling, 3_600)
+        XCTAssertLessThan(ceiling, 6_500)
+        // smoothstep is symmetric, so the midpoint sits halfway up the span.
+        XCTAssertEqual(ceiling, 5_050)
+    }
+
+    /// At and above critical the ceiling is the hardware maximum.
+    func testCeilingReachesHardwareMaxAtCritical() {
+        XCTAssertEqual(
+            FanController.softCeiling(
+                userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: 95
+            ),
+            6_500
+        )
+        XCTAssertEqual(
+            FanController.softCeiling(
+                userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: 110
+            ),
+            6_500
+        )
+    }
+
+    /// A ceiling already at or above the hardware maximum has nothing to lift,
+    /// and protection must not somehow push past the hardware.
+    func testCeilingAtHardwareMaxIsUnchangedByProtection() {
+        XCTAssertEqual(
+            FanController.softCeiling(
+                userCeiling: 6_500, hardwareMax: 6_500, safetyTemperature: 92
+            ),
+            6_500
+        )
+        XCTAssertEqual(
+            FanController.softCeiling(
+                userCeiling: 9_000, hardwareMax: 6_500, safetyTemperature: 92
+            ),
+            6_500
+        )
+    }
+
+    /// Cooling retraces the same curve, so the ceiling comes back down on its
+    /// own — the descent needs no special case.
+    func testCeilingRetractsSymmetricallyOnCooling() {
+        // The ceiling is a function of temperature alone, so cooling back
+        // through the band returns the same ceilings the heating pass produced.
+        let ascending = stride(from: 86.0, through: 94.0, by: 1.0).map {
+            FanController.softCeiling(
+                userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: $0
+            )
+        }
+        let descending = stride(from: 94.0, through: 86.0, by: -1.0).map {
+            FanController.softCeiling(
+                userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: $0
+            )
+        }
+        XCTAssertEqual(ascending, descending.reversed(), "no hysteresis in the ceiling itself")
+        XCTAssertEqual(
+            FanController.softCeiling(
+                userCeiling: 3_600, hardwareMax: 6_500, safetyTemperature: 84
+            ),
+            3_600,
+            "back below the onset the user ceiling is absolute again"
+        )
+    }
+
     /// The safety channel is the one sanctioned way past the ceiling, and it
     /// stops at the fan's own hardware maximum.
     func testCriticalTemperatureOverridesCeilingUpToHardwareMax() {
