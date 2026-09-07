@@ -375,6 +375,77 @@ final class FanControlTests: XCTestCase {
         XCTAssertFalse(decision.spinDownUnderWay)
     }
 
+    // MARK: - Critical-temperature ceiling / 中文：临界温度上限
+
+    /// Replays the descent out of a critical spike. The ramp-down clamp used to
+    /// cap on the hardware maximum alone, so every intermediate step ran above
+    /// the user ceiling for the whole descent — minutes of over-ceiling RPM.
+    func testDescentFromCriticalNeverExceedsUserCeiling() {
+        let fanMin = 1_200, fanMax = 6_500
+        let autoCeiling = 3_600          // the user's configured maximum
+        var current = fanMax             // parked at full speed by the spike
+        let target = autoCeiling
+
+        for _ in 0..<200 {
+            let step = FanController.rampStep(
+                from: current, to: target,
+                rampUpStep: 800, rampDownStep: 250
+            )
+            current = FanController.clampFanTarget(
+                step.next,
+                fanMin: fanMin,
+                fanMax: fanMax,
+                autoCeiling: autoCeiling,
+                isCritical: false        // the spike is over
+            )
+            XCTAssertLessThanOrEqual(
+                current, autoCeiling,
+                "no step of the descent may run above the user ceiling"
+            )
+            if current == target { break }
+        }
+
+        XCTAssertEqual(current, target, "the descent must still reach the ceiling")
+    }
+
+    /// The safety channel is the one sanctioned way past the ceiling, and it
+    /// stops at the fan's own hardware maximum.
+    func testCriticalTemperatureOverridesCeilingUpToHardwareMax() {
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                3_600, fanMin: 1_200, fanMax: 6_500,
+                autoCeiling: 3_600, isCritical: true
+            ),
+            6_500
+        )
+    }
+
+    /// Below the ceiling nothing changes, and the fan floor still wins.
+    func testClampFanTargetHonoursFloorAndCeiling() {
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                2_000, fanMin: 1_200, fanMax: 6_500,
+                autoCeiling: 3_600, isCritical: false
+            ),
+            2_000
+        )
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                800, fanMin: 1_200, fanMax: 6_500,
+                autoCeiling: 3_600, isCritical: false
+            ),
+            1_200
+        )
+        // A ceiling above this fan's hardware maximum cannot lift it.
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                9_000, fanMin: 1_200, fanMax: 4_800,
+                autoCeiling: 6_000, isCritical: false
+            ),
+            4_800
+        )
+    }
+
     func testPIDOverrideStartsFromExactEffectiveGains() {
         let controller = FanController(systemMonitor: SystemMonitor())
         let gains = (

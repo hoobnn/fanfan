@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [Unreleased]
+
+### Fixed
+- Automatic mode no longer runs above the configured maximum RPM while spinning down from a high-temperature spike. The post-ramp clamp capped on the hardware maximum instead of the active ceiling, so every intermediate step of the descent stayed over the user's limit — with a 3600 RPM ceiling falling back from full speed, 11 consecutive steps (~22 s) ran over it. Both clamps now share one helper so the rule cannot diverge again.
+
 ## [1.2.3] - 2026-09-07
 
 ### Fixed

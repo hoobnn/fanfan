@@ -810,14 +810,13 @@ class FanController: ObservableObject {
         // Build per-fan targets / 中文：Build per-风扇 目标s
         var targets: [Int] = []
         for i in 0..<monitor.numberOfFans {
-            let mx = maxRPM(for: i)
-            let mn = minRPM(for: i)
-            if isCritical {
-                targets.append(mx)
-            } else {
-                let cap = min(mx, autoCeiling)
-                targets.append(max(mn, min(unifiedTarget, cap)))
-            }
+            targets.append(Self.clampFanTarget(
+                unifiedTarget,
+                fanMin: minRPM(for: i),
+                fanMax: maxRPM(for: i),
+                autoCeiling: autoCeiling,
+                isCritical: isCritical
+            ))
         }
 
         let representative = targets.max() ?? unifiedTarget
@@ -832,11 +831,21 @@ class FanController: ObservableObject {
             let ramped = isCritical
                 ? representative
                 : rampTransition(from: lastAppliedSpeed, to: representative)
+            // Ramping down out of a critical spike walks through RPMs above the
+            // user ceiling, so this clamp has to be the same one used when the
+            // targets were built — the hardware maximum alone let every
+            // intermediate step run over the ceiling for the whole descent.
+            // 中文：从临界高转速回落时会途经高于用户上限的转速，故此处夹取必须
+            // 与上面构建目标时一致；只用硬件上限会让整段降速过程持续超限。
             var rampedTargets: [Int] = []
             for i in 0..<monitor.numberOfFans {
-                let mx = maxRPM(for: i)
-                let mn = minRPM(for: i)
-                rampedTargets.append(isCritical ? mx : max(mn, min(ramped, mx)))
+                rampedTargets.append(Self.clampFanTarget(
+                    ramped,
+                    fanMin: minRPM(for: i),
+                    fanMax: maxRPM(for: i),
+                    autoCeiling: autoCeiling,
+                    isCritical: isCritical
+                ))
             }
 
             applyFanTargets(rampedTargets)
@@ -997,6 +1006,24 @@ class FanController: ObservableObject {
         )
         spinDownInProgress = step.spinDownUnderWay
         return step.next
+    }
+
+    /// The per-fan target clamp, shared by the pre-ramp and post-ramp loops so
+    /// the ceiling rule cannot drift apart between them again. Only a critical
+    /// temperature may exceed the user ceiling, and then only up to the fan's
+    /// own hardware maximum.
+    /// 中文：per-fan 目标夹取，供缓升前后两处共用，避免上限规则再次分叉。
+    /// 只有临界温度可以超越用户上限，且最高只到该风扇的硬件上限。
+    nonisolated static func clampFanTarget(
+        _ speed: Int,
+        fanMin: Int,
+        fanMax: Int,
+        autoCeiling: Int,
+        isCritical: Bool
+    ) -> Int {
+        if isCritical { return fanMax }
+        let cap = min(fanMax, autoCeiling)
+        return max(fanMin, min(speed, cap))
     }
 
     /// One ramp step, split out alongside `deadBandDecision` so a full descent
