@@ -449,9 +449,16 @@ struct SettingsWindowView: View {
                     $0.title == NSLocalizedString("app.settings_title", comment: "")
                 }) {
                     window.standardWindowButton(.closeButton)?.isHidden = false
+                    // `.floating` is only a way to surface the window from an
+                    // accessory-policy app; leaving it set pinned Settings above
+                    // every other application for the rest of the session, with
+                    // no way for the user to send it behind anything.
                     window.level = .floating
                     window.makeKeyAndOrderFront(nil)
                     NSApplication.shared.activate(ignoringOtherApps: true)
+                    DispatchQueue.main.async {
+                        window.level = .normal
+                    }
                 }
             }
     }

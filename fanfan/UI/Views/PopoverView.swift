@@ -422,6 +422,10 @@ struct PopoverView: View {
         }
         // Chart sampling at 1 Hz; ±0.2 s jitter is invisible in a 60 s window. / 中文：曲线按 1 Hz 采样；60 秒窗口里 ±0.2 秒抖动不可见。
         timer.tolerance = 0.2
+        // `.common` keeps sampling alive while the run loop is in event-tracking
+        // mode. Without it, dragging a slider or scrolling the sensor list froze
+        // the curve and dropped every sample taken during the gesture.
+        RunLoop.current.add(timer, forMode: .common)
         historyTimer = timer
     }
 
