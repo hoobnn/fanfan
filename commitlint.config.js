@@ -1,92 +1,23 @@
 // 格式：<emoji> type(scope): subject
-// type 与 emoji 均来自 https://github.com/carloscuesta/gitmoji
-// 每个 type 对应唯一 emoji（1:1）
+// type 为标准 Conventional Commits 类型，每个 type 对应唯一 emoji（1:1）。
+// emoji 仅作视觉前缀，校验与 changelog/语义化版本仍以 Conventional type 为准。
 
 const norm = (s) => s?.replace(/️/g, '').trim() ?? '';
 
-// emoji → gitmoji name（即 type）
-const EMOJI_TYPE = {
-  '🎨': 'art',
-  '⚡': 'zap',
-  '🔥': 'fire',
-  '🐛': 'bug',
-  '🚑': 'ambulance',
-  '✨': 'sparkles',
-  '📝': 'memo',
-  '🚀': 'rocket',
-  '💄': 'lipstick',
-  '🎉': 'tada',
-  '✅': 'white-check-mark',
-  '🔒': 'lock',
-  '🔐': 'closed-lock-with-key',
-  '🔖': 'bookmark',
-  '🚨': 'rotating-light',
-  '🚧': 'construction',
-  '💚': 'green-heart',
-  '⬇': 'arrow-down',
-  '⬆': 'arrow-up',
-  '📌': 'pushpin',
-  '👷': 'construction-worker',
-  '📈': 'chart-with-upwards-trend',
-  '♻': 'recycle',
-  '➕': 'heavy-plus-sign',
-  '➖': 'heavy-minus-sign',
-  '🔧': 'wrench',
-  '🔨': 'hammer',
-  '🌐': 'globe-with-meridians',
-  '✏': 'pencil2',
-  '💩': 'poop',
-  '⏪': 'rewind',
-  '🔀': 'twisted-rightwards-arrows',
-  '📦': 'package',
-  '👽': 'alien',
-  '🚚': 'truck',
-  '📄': 'page-facing-up',
-  '💥': 'boom',
-  '🍱': 'bento',
-  '♿': 'wheelchair',
-  '💡': 'bulb',
-  '🍻': 'beers',
-  '💬': 'speech-balloon',
-  '🗃': 'card-file-box',
-  '🔊': 'loud-sound',
-  '🔇': 'mute',
-  '👥': 'busts-in-silhouette',
-  '🚸': 'children-crossing',
-  '🏗': 'building-construction',
-  '📱': 'iphone',
-  '🤡': 'clown-face',
-  '🥚': 'egg',
-  '🙈': 'see-no-evil',
-  '📸': 'camera-flash',
-  '⚗': 'alembic',
-  '🔍': 'mag',
-  '🏷': 'label',
-  '🌱': 'seedling',
-  '🚩': 'triangular-flag-on-post',
-  '🥅': 'goal-net',
-  '💫': 'dizzy',
-  '🗑': 'wastebasket',
-  '🛂': 'passport-control',
-  '🩹': 'adhesive-bandage',
-  '🧐': 'monocle-face',
-  '⚰': 'coffin',
-  '🧪': 'test-tube',
-  '👔': 'necktie',
-  '🩺': 'stethoscope',
-  '🧱': 'bricks',
-  '🧑‍💻': 'technologist',
-  '💸': 'money-with-wings',
-  '🧵': 'thread',
-  '🦺': 'safety-vest',
-  '✈': 'airplane',
-  '🦖': 't-rex',
+// Conventional type → 唯一 emoji（与 cz-conventional-gitmoji 习惯一致）
+const TYPE_EMOJI = {
+  feat: ['✨'],     // 新功能
+  fix: ['🐛'],      // 缺陷修复
+  docs: ['📝'],     // 文档
+  style: ['🎨'],    // 代码风格 / 格式（不改语义）
+  refactor: ['♻️'], // 重构
+  perf: ['⚡️'],    // 性能
+  test: ['✅'],     // 测试
+  build: ['📦️'],   // 构建系统 / 外部依赖
+  ci: ['👷'],       // CI 配置与脚本
+  chore: ['🔧'],    // 杂务 / 工具 / 配置
+  revert: ['⏪️'],  // 回滚提交
 };
-
-// 反转为 type → [emoji]，供 type-enum 和配对校验使用
-const TYPE_EMOJI = Object.fromEntries(
-  Object.entries(EMOJI_TYPE).map(([emoji, type]) => [type, [emoji]])
-);
 
 module.exports = {
   parserPreset: {
