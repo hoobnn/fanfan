@@ -2,13 +2,13 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
-## [Unreleased]
+## [1.3.0] - 2026-09-07
 
 ### Fixed
 - Automatic mode no longer runs above the configured maximum RPM while spinning down from a high-temperature spike. The post-ramp clamp capped on the hardware maximum instead of the active ceiling, so every intermediate step of the descent stayed over the user's limit — with a 3600 RPM ceiling falling back from full speed, 11 consecutive steps (~22 s) ran over it. Both clamps now share one helper so the rule cannot diverge again.
 
 ### Changed
-- High-temperature protection now raises the ceiling smoothly instead of jumping straight to full speed. Below 85 °C the configured maximum is absolute; from 85 °C to 95 °C the ceiling eases toward the hardware maximum on a smoothstep curve, so protection buys the RPM the temperature actually calls for (a 3600 RPM ceiling reaches ~4200 at 88 °C rather than 6500). Only at 95 °C — close to where the SoC throttles — does the fan go to the hardware maximum and bypass the ramp. The status message now names the raised ceiling, so exceeding the setting is explainable rather than looking like the app ignoring it.
+- High-temperature protection now raises the ceiling smoothly instead of jumping straight to full speed. Below 85 °C the configured maximum is absolute; from 85 °C to 95 °C the ceiling eases toward the hardware maximum on a smoothstep curve, so protection buys the RPM the temperature actually calls for (on an M4 Pro, whose fans top out at 5777 RPM, a 3600 RPM ceiling reaches 4001 at 88 °C and 4689 at 90 °C, where it previously jumped straight to 5777). Only at 95 °C — close to where the SoC throttles — does the fan go to the hardware maximum and bypass the ramp. The status message now names the raised ceiling, so exceeding the setting is explainable rather than looking like the app ignoring it.
 
 ## [1.2.3] - 2026-09-07
 
