@@ -174,6 +174,22 @@ class SystemMonitor: ObservableObject {
     @Published private(set) var lastValidCpuTemperatureAt: Date?
     @Published private(set) var lastValidGpuTemperatureAt: Date?
 
+    /// Guards `smcConnection` and `keyInfoCache`, the only state reachable from
+    /// both the main thread (`checkAccess`, `startMonitoring`) and
+    /// `readingsQueue` (every reader, plus `reopenSMCConnection`).
+    ///
+    /// A lock rather than confining the state to `readingsQueue`: a single pass
+    /// on that queue holds it for 30+ IOKit round-trips, so a main-thread
+    /// `sync` would have traded this race for a visible hang. The lock is held
+    /// only to copy the handle out or to touch the cache — never across an
+    /// IOKit call — so the two paths never serialize on real work.
+    ///
+    /// Without it, a main-thread check could race an in-flight
+    /// `reopenSMCConnection`: observing the momentarily-zeroed handle opens a
+    /// second `IOServiceOpen` over the first, leaking a mach port each time,
+    /// and `keyInfoCache` is a plain Dictionary whose concurrent mutation is
+    /// undefined behaviour rather than merely a stale read.
+    private let smcStateLock = NSLock()
     private var smcConnection: io_connect_t = 0
     private var monitoringTimer: Timer?
     private var monitoringInterval: TimeInterval {
@@ -308,18 +324,46 @@ class SystemMonitor: ObservableObject {
     
     init() {
         // Try to connect on init / 中文：初始化时尝试连接
+        // Direct call, not `readingsQueue.sync`: initialization runs before any
+        // other thread can reach this instance, so nothing can race here.
         _ = openSMCConnection()
     }
-    
+
     deinit {
+        // Also direct — `deinit` runs after the last reference is gone, so the
+        // queue holds no further work for this instance. Hopping onto the queue
+        // here would deadlock if the last reference were released from it.
         stopMonitoring()
         closeSMCConnection()
     }
     
     // MARK: - SMC Connection Management / 中文：SMC 连接管理
-    
+
+    /// The current handle, or 0. Copied out under the lock so callers can run
+    /// their IOKit call without holding it.
+    private func currentSMCConnection() -> io_connect_t {
+        smcStateLock.lock()
+        defer { smcStateLock.unlock() }
+        return smcConnection
+    }
+
+    private func cachedKeyInfo(_ keyCode: UInt32) -> SMCKeyData_keyInfo_t? {
+        smcStateLock.lock()
+        defer { smcStateLock.unlock() }
+        return keyInfoCache[keyCode]
+    }
+
+    private func storeKeyInfo(_ info: SMCKeyData_keyInfo_t, for keyCode: UInt32) {
+        smcStateLock.lock()
+        defer { smcStateLock.unlock() }
+        keyInfoCache[keyCode] = info
+    }
+
     private func openSMCConnection() -> Bool {
-        if smcConnection != 0 {
+        smcStateLock.lock()
+        let existing = smcConnection
+        smcStateLock.unlock()
+        if existing != 0 {
             DispatchQueue.main.async { self.hasAccess = true }
             return true
         }
@@ -335,9 +379,20 @@ class SystemMonitor: ObservableObject {
 
         defer { IOObjectRelease(service) }
 
-        let result = IOServiceOpen(service, mach_task_self_, 0, &smcConnection)
+        // Open into a local handle, then publish it under the lock. Two callers
+        // can both pass the "no connection yet" check above; the loser closes
+        // its own handle instead of overwriting the winner's and leaking it.
+        var opened: io_connect_t = 0
+        let result = IOServiceOpen(service, mach_task_self_, 0, &opened)
 
         if result == kIOReturnSuccess {
+            smcStateLock.lock()
+            if smcConnection == 0 {
+                smcConnection = opened
+            } else if opened != smcConnection {
+                IOServiceClose(opened)
+            }
+            smcStateLock.unlock()
             DispatchQueue.main.async {
                 self.hasAccess = true
                 self.lastError = nil
@@ -354,9 +409,15 @@ class SystemMonitor: ObservableObject {
     }
     
     private func closeSMCConnection() {
-        if smcConnection != 0 {
-            IOServiceClose(smcConnection)
-            smcConnection = 0
+        // Detach under the lock, close outside it: once the handle is cleared no
+        // other thread can reach it, and `IOServiceClose` never runs while a
+        // reader could still copy the same handle out.
+        smcStateLock.lock()
+        let handle = smcConnection
+        smcConnection = 0
+        smcStateLock.unlock()
+        if handle != 0 {
+            IOServiceClose(handle)
         }
     }
     
@@ -376,53 +437,29 @@ class SystemMonitor: ObservableObject {
         }
     }
     
+    /// Open the SMC connection if needed and report whether it is usable.
+    ///
+    /// Callable from any thread; `smcStateLock` makes the check-then-open safe
+    /// against a concurrent `reopenSMCConnection` on `readingsQueue`.
+    ///
+    /// Returns the connection state directly rather than reading `hasAccess`,
+    /// which is `@Published` and therefore only updated on the main thread a
+    /// moment later — so a caller acting on the return value would otherwise be
+    /// one run-loop turn behind.
     func checkAccess() -> Bool {
-        if smcConnection == 0 {
-            _ = openSMCConnection()
+        if currentSMCConnection() != 0 {
+            return true
         }
-        return hasAccess
-    }
-    
-    func getDataType(key: String) -> String? {
-        // Ensure connection / 中文：确保连接
-        if smcConnection == 0 { _ = openSMCConnection() }
-        
-        let keyCode = fourCharCodeFrom(key)
-        
-        // Use cached if available / 中文：可用时使用缓存
-        if let info = keyInfoCache[keyCode] {
-            return stringFrom(fourCharCode: info.dataType).trimmingCharacters(in: .whitespaces)
-        }
-        
-        // Otherwise try to fetch it / 中文：否则尝试重新获取
-        var input = SMCParamStruct()
-        input.key = keyCode
-        input.data8 = SMC_CMD_READ_KEYINFO
-        
-        var output = SMCParamStruct()
-        var outputSize = MemoryLayout<SMCParamStruct>.size
-        
-        let result = IOConnectCallStructMethod(smcConnection, KERNEL_INDEX_SMC, &input, MemoryLayout<SMCParamStruct>.size, &output, &outputSize)
-        
-        if result == kIOReturnSuccess && output.result == 0 {
-            // Validate dataSize to avoid corrupt/out-of-range values / 中文：校验 dataSize，避免损坏或越界值
-            let dataSize = output.keyInfo.dataSize
-            if dataSize == 0 || dataSize > 32 {
-                print("SMC: Invalid dataSize (\(dataSize)) for key \(key)")
-                return nil
-            }
-            keyInfoCache[keyCode] = output.keyInfo
-            return stringFrom(fourCharCode: output.keyInfo.dataType).trimmingCharacters(in: .whitespaces)
-        }
-        
-        return nil
+        return openSMCConnection()
     }
     
     // MARK: - Monitoring Control / 中文：监控控制
     
     func startMonitoring() {
         stopMonitoring()
-        guard openSMCConnection() else {
+        // Via `checkAccess` so the connection is opened on `readingsQueue`,
+        // which owns it — see the note on `smcConnection`.
+        guard checkAccess() else {
             print("SMC: Cannot start monitoring - no connection")
             return
         }
@@ -477,25 +514,6 @@ class SystemMonitor: ObservableObject {
                 self.lastSensorScanTime = nil
             }
             self.sensorScanActive = active
-        }
-    }
-    
-    // MARK: - Fan Detection / 中文：风扇检测
-    
-    private func detectFans() {
-        var count = 0
-        for i in 0..<8 {
-            let key = String(format: "F%dAc", i)
-            if let _ = readSMCValue(key: key) {
-                count += 1
-            } else {
-                break
-            }
-        }
-        
-        DispatchQueue.main.async {
-            self.numberOfFans = count
-            print("SMC: Detected \(count) fan(s)")
         }
     }
     
@@ -638,7 +656,11 @@ class SystemMonitor: ObservableObject {
 
     private func reopenSMCConnection() {
         closeSMCConnection()
+        // The cache describes keys as seen through the old handle, so it has to
+        // go with it — under the lock, since readers may be probing it.
+        smcStateLock.lock()
         keyInfoCache.removeAll()
+        smcStateLock.unlock()
         cachedCpuKey = nil
         cachedGpuKey = nil
         cpuReadFailures = 0
@@ -815,7 +837,8 @@ class SystemMonitor: ObservableObject {
 
     /// Read the SMC key name at a given enumeration index. / 中文：读取指定枚举索引上的 SMC 键名。
     private func readSMCKey(atIndex index: Int) -> String? {
-        guard smcConnection != 0 else { return nil }
+        let connection = currentSMCConnection()
+        guard connection != 0 else { return nil }
 
         var input = SMCParamStruct()
         input.data8 = SMC_CMD_READ_INDEX
@@ -825,7 +848,7 @@ class SystemMonitor: ObservableObject {
         var outputSize = MemoryLayout<SMCParamStruct>.size
 
         let result = IOConnectCallStructMethod(
-            smcConnection,
+            connection,
             KERNEL_INDEX_SMC,
             &input,
             MemoryLayout<SMCParamStruct>.size,
@@ -992,7 +1015,12 @@ class SystemMonitor: ObservableObject {
                 // Little-endian on Apple Silicon / Intel: byte 0 is the LSB. / 中文：Apple Silicon / Intel 均小端：字节 0 是最低有效字节。
                 let bits = UInt32(bytes.0) | (UInt32(bytes.1) << 8)
                          | (UInt32(bytes.2) << 16) | (UInt32(bytes.3) << 24)
-                return Double(Float32(bitPattern: bits))
+                let value = Float32(bitPattern: bits)
+                // Firmware can hand back a NaN / infinity bit pattern (wake
+                // races, a dropped SMC link). Downstream `Int(...)` conversions
+                // trap on those, so treat a non-finite payload as a failed read.
+                guard value.isFinite else { return nil }
+                return Double(value)
             }
 
         case DATA_TYPE_SP78:
@@ -1050,13 +1078,17 @@ class SystemMonitor: ObservableObject {
     
     // Generic read that handles types automatically / 中文：自动处理类型的通用读取
     func readSMCValue(key: String) -> Double? {
-        guard smcConnection != 0 else { return nil }
-        
+        // One handle copy for the whole call: if the connection is reopened
+        // mid-read the IOKit call fails on the stale handle and returns nil,
+        // which the callers already treat as a failed read.
+        let connection = currentSMCConnection()
+        guard connection != 0 else { return nil }
+
         let keyCode = fourCharCodeFrom(key)
-        
+
         // 1. Get Key Info / 中文：1. 获取键信息
         var keyInfo: SMCKeyData_keyInfo_t
-        if let cached = keyInfoCache[keyCode] {
+        if let cached = cachedKeyInfo(keyCode) {
             keyInfo = cached
         } else {
             var input = SMCParamStruct()
@@ -1068,7 +1100,7 @@ class SystemMonitor: ObservableObject {
             var outputSize = MemoryLayout<SMCParamStruct>.size
             
             let result = IOConnectCallStructMethod(
-                smcConnection,
+                connection,
                 KERNEL_INDEX_SMC,
                 &input,
                 inputSize,
@@ -1087,7 +1119,7 @@ class SystemMonitor: ObservableObject {
                 print("SMC: Invalid keyInfo.dataSize (\(keyInfo.dataSize)) for key \(key)")
                 return nil
             }
-            keyInfoCache[keyCode] = keyInfo
+            storeKeyInfo(keyInfo, for: keyCode)
         }
         
         // 2. Read Data / 中文：2. 读取数据
@@ -1101,7 +1133,7 @@ class SystemMonitor: ObservableObject {
         var outputSize = MemoryLayout<SMCParamStruct>.size
         
         let result = IOConnectCallStructMethod(
-            smcConnection,
+            connection,
             KERNEL_INDEX_SMC,
             &input,
             inputSize,
@@ -1128,155 +1160,19 @@ class SystemMonitor: ObservableObject {
     }
     
     private func readSMCFanSpeed(key: String) -> Int? {
-        if let val = readSMCValue(key: key) {
-            return Int(val)
-        }
-        return nil
+        guard let val = readSMCValue(key: key) else { return nil }
+        return Self.fanRPM(fromRawValue: val)
+    }
+
+    /// Convert a raw SMC reading to an RPM integer, or nil when it cannot be
+    /// represented. `Int(Double)` traps on NaN / infinity and on magnitudes past
+    /// `Int.max`, and firmware does hand back non-finite `flt ` payloads (wake
+    /// races, a dropped SMC link). `parseSMCBytes` already filters those; this
+    /// is the second line of defence so no SMC reading can crash the app.
+    nonisolated static func fanRPM(fromRawValue value: Double) -> Int? {
+        Int(exactly: value.rounded())
     }
     
-    // MARK: - SMC Write Operations / 中文：SMC 写入操作
-    
-    func writeSMCKey(_ key: String, value: Double) -> Bool {
-        guard smcConnection != 0 else {
-            print("SMC Write: No connection")
-            return false
-        }
-        
-        let keyCode = fourCharCodeFrom(key)
-        
-        // Get key info first / 中文：先获取键信息
-        var input = SMCParamStruct()
-        input.key = keyCode
-        input.data8 = SMC_CMD_READ_KEYINFO
-        
-        var output = SMCParamStruct()
-        var outputSize = MemoryLayout<SMCParamStruct>.size
-        
-        var result = IOConnectCallStructMethod(
-            smcConnection,
-            KERNEL_INDEX_SMC,
-            &input,
-            MemoryLayout<SMCParamStruct>.size,
-            &output,
-            &outputSize
-        )
-        
-        guard result == kIOReturnSuccess && output.result == 0 else {
-            print("SMC Write: Failed to get key info for \(key)")
-            return false
-        }
-        
-        let keyInfo = output.keyInfo
-        keyInfoCache[keyCode] = keyInfo
-        
-        // Prepare write / 中文：准备写入
-        input = SMCParamStruct()
-        input.key = keyCode
-        input.keyInfo = keyInfo
-        input.data8 = SMC_CMD_WRITE_BYTES
-        
-        // Encode value based on type / 中文：按类型编码数值
-        switch keyInfo.dataType {
-        case DATA_TYPE_FLT:
-            if keyInfo.dataSize == 4 {
-                var floatVal = Float32(value)
-                withUnsafeBytes(of: &floatVal) { buffer in
-                    // SMC expects bytes, usually we write them directly / 中文：SMC 需要字节，通常直接写入
-                    // But we might need to handle endianness? / 中文：但可能需要处理字节序？
-                    // Verify: flt on SMC is usually native float? No, usually it's standard IEEE 754 / 中文：确认：SMC 的 flt 通常不是原生 float，而是标准 IEEE 754
-                    // But passing through IOConnectCallStructMethod struct might require specific alignment / 中文：但通过 IOConnectCallStructMethod 结构传递时可能需要特定对齐
-                    // Let's assume standard copy / 中文：这里假设使用标准拷贝
-                    if buffer.count >= 4 {
-                        input.bytes.0 = buffer[0]
-                        input.bytes.1 = buffer[1]
-                        input.bytes.2 = buffer[2]
-                        input.bytes.3 = buffer[3]
-                    }
-                }
-            } else {
-                print("SMC Write: flt type but size is \(keyInfo.dataSize)")
-                return false
-            }
-            
-        case DATA_TYPE_FPE2:
-            // Fixed Point 14.2 (Unsigned) / 中文：14.2 定点数（无符号）
-            // (UInt8(self >> 6), UInt8((self << 2) ^ ((self >> 6) << 8))) / 中文：SMCKit 参考编码表达式。
-            let intVal = Int(value)
-            input.bytes.0 = UInt8(intVal >> 6)
-            input.bytes.1 = UInt8((intVal << 2) & 0xFF) // Simplified from SMCKit logic, verify if needed
-            // SMCKit: UInt8((self << 2) ^ ((self >> 6) << 8)) / 中文：SMCKit 写法：UInt8((self << 2) ^ ((self >> 6) << 8))
-            // Let's use strict SMCKit logic: / 中文：这里采用严格的 SMCKit 逻辑：
-            // byte1 = (self << 2) is the lower 6 bits moved up / 中文：byte1 = (self << 2) 表示低 6 位上移
-            // the XOR part seems complex, let's stick to standard 14.2 encoding: / 中文：XOR 部分较复杂，这里沿用标准 14.2 编码：
-            // High byte: top 8 bits of 14-bit integer / 中文：高字节：14 位整数的高 8 位
-            // Low byte: bottom 6 bits of 14-bit integer << 2 / 中文：低字节：14 位整数的低 6 位左移 2 位
-            
-            // Re-evaluating SMCKit logic: / 中文：重新评估 SMCKit 逻辑：
-            // (self >> 6) is high byte. / 中文：(self >> 6) 是高字节。
-            // (self << 2) puts bottom 6 bits into top of low byte / 中文：(self << 2) 将低 6 位放入低字节的高位
-            // ^ ((self >> 6) << 8) -> this part cancels out high bits if they remained? / 中文：^ ((self >> 6) << 8) -> 这部分可能用于抵消残留高位？
-            // Actually, if we just cast to UInt8, high bits are truncated. / 中文：实际上，如果直接转为 UInt8，高位会被截断。
-            // So input.bytes.0 = UInt8(intVal >> 6) is correct for high byte. / 中文：因此 input.bytes.0 = UInt8(intVal >> 6) 作为高字节是正确的。
-            // For low byte: (intVal & 0x3F) << 2. / 中文：低字节为：(intVal & 0x3F) << 2。
-            input.bytes.1 = UInt8((intVal & 0x3F) << 2)
-            
-        case DATA_TYPE_SP78:
-            // Internal 7.8 -> val * 256 / 中文：内部 7.8 格式 -> val * 256
-            let intVal = Int16(value * 256.0)
-            let uintVal = UInt16(bitPattern: intVal)
-            input.bytes.0 = UInt8((uintVal >> 8) & 0xFF)
-            input.bytes.1 = UInt8(uintVal & 0xFF)
-            
-        case DATA_TYPE_UINT8:
-            input.bytes.0 = UInt8(value)
-            
-        case DATA_TYPE_UINT16:
-            let intVal = UInt16(value)
-            input.bytes.0 = UInt8((intVal >> 8) & 0xFF)
-            input.bytes.1 = UInt8(intVal & 0xFF)
-            
-        case DATA_TYPE_UINT32:
-            let intVal = UInt32(value)
-            input.bytes.0 = UInt8((intVal >> 24) & 0xFF)
-            input.bytes.1 = UInt8((intVal >> 16) & 0xFF)
-            input.bytes.2 = UInt8((intVal >> 8) & 0xFF)
-            input.bytes.3 = UInt8(intVal & 0xFF)
-            
-        default:
-            // Fallback: try as uint16/uint8 based on value / 中文：回退：根据数值尝试 uint16/uint8
-            if keyInfo.dataSize == 1 {
-                input.bytes.0 = UInt8(value)
-            } else if keyInfo.dataSize == 2 {
-                let intVal = UInt16(value)
-                input.bytes.0 = UInt8((intVal >> 8) & 0xFF)
-                input.bytes.1 = UInt8(intVal & 0xFF)
-            } else {
-                print("SMC Write: Unknown type \(stringFrom(fourCharCode: keyInfo.dataType))")
-                return false
-            }
-        }
-        
-        output = SMCParamStruct()
-        outputSize = MemoryLayout<SMCParamStruct>.size
-        
-        result = IOConnectCallStructMethod(
-            smcConnection,
-            KERNEL_INDEX_SMC,
-            &input,
-            MemoryLayout<SMCParamStruct>.size,
-            &output,
-            &outputSize
-        )
-        
-        // Note: result might be kIOReturnNotPrivileged if not root / 中文：注意：非 root 时结果可能是 kIOReturnNotPrivileged
-        if result == kIOReturnSuccess {
-            print("SMC Write: Successfully wrote \(key) = \(value)")
-            return true
-        } else {
-            print("SMC Write: Failed to write \(key): \(describeIOReturn(result))")
-            return false
-        }
-    }
     
     // MARK: - Alternative Methods (for Apple Silicon) / 中文：替代方案（用于 Apple Silicon）
     

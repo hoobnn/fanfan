@@ -94,4 +94,73 @@ final class SystemMonitorTests: XCTestCase {
             cpuLastValidAt: stale, gpuLastValidAt: fresh, now: now, timeout: 10
         ))
     }
+
+    // MARK: - Non-finite SMC payloads / 中文：非有限 SMC 读数
+
+    /// Firmware can return a NaN / infinity `flt ` bit pattern after a wake race
+    /// or a dropped SMC link. `Int(Double)` traps on those, which crashed the
+    /// app outright rather than degrading, so the conversion must reject them.
+    func testFanRPMRejectsNonFiniteReadings() {
+        XCTAssertNil(SystemMonitor.fanRPM(fromRawValue: Double.nan))
+        XCTAssertNil(SystemMonitor.fanRPM(fromRawValue: Double.infinity))
+        XCTAssertNil(SystemMonitor.fanRPM(fromRawValue: -Double.infinity))
+        XCTAssertNil(SystemMonitor.fanRPM(fromRawValue: Double.greatestFiniteMagnitude))
+    }
+
+    func testFanRPMKeepsOrdinaryReadings() {
+        XCTAssertEqual(SystemMonitor.fanRPM(fromRawValue: 0), 0)
+        XCTAssertEqual(SystemMonitor.fanRPM(fromRawValue: 2866), 2866)
+        XCTAssertEqual(SystemMonitor.fanRPM(fromRawValue: 2999.6), 3000)
+    }
+
+    // MARK: - Concurrent SMC state access / 中文：SMC 状态并发访问
+
+    /// `checkAccess` runs on the main thread while every reader runs on
+    /// `readingsQueue`; both reach `smcConnection` and `keyInfoCache`. Hammer
+    /// the two paths together so Thread Sanitizer sees the interleaving — an
+    /// unguarded handle would show up as a race here, and the check-then-open
+    /// could leak a second mach port.
+    func testConcurrentAccessDoesNotRaceOnSMCState() {
+        let monitor = SystemMonitor()
+        let iterations = 200
+        let done = expectation(description: "concurrent access settled")
+        done.expectedFulfillmentCount = 2
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            for _ in 0..<iterations { _ = monitor.checkAccess() }
+            done.fulfill()
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            for _ in 0..<iterations { _ = monitor.readSMCValue(key: "TC0P") }
+            done.fulfill()
+        }
+
+        wait(for: [done], timeout: 60)
+        // Reaching here without a sanitizer abort is the assertion; confirm the
+        // monitor is still usable rather than left with a torn handle.
+        XCTAssertEqual(monitor.checkAccess(), monitor.checkAccess())
+    }
+
+    /// Start/stop cycles reopen the connection while readers are mid-flight.
+    func testMonitoringRestartWhileReadingIsSafe() {
+        let monitor = SystemMonitor()
+        let done = expectation(description: "restart settled")
+        done.expectedFulfillmentCount = 2
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            for _ in 0..<50 { _ = monitor.readSMCValue(key: "TC0P") }
+            done.fulfill()
+        }
+        DispatchQueue.main.async {
+            for _ in 0..<20 {
+                monitor.startMonitoring()
+                monitor.stopMonitoring()
+            }
+            done.fulfill()
+        }
+
+        wait(for: [done], timeout: 60)
+        XCTAssertFalse(monitor.isMonitoring)
+    }
 }
+
