@@ -86,6 +86,7 @@ static uint64_t g_restore_retry_delay_ms = 1000;
 static kern_return_t set_fan_auto(int fan);
 static uint64_t monotonic_milliseconds(void);
 static void restore_owned_control(void);
+static int has_outstanding_manual_control(void);
 
 static UInt32 smc_strtoul(char *str, int size, int base)
 {
@@ -449,10 +450,17 @@ static kern_return_t ensure_manual(int fan)
 
     /* Engage diagnostic mode and wait for thermalmonitord to yield. */
     uint64_t started_at = monotonic_milliseconds();
+    /* Mark the flag engaged *before* the write: a failure return can still mean
+     * the command reached the hardware (transport OK, firmware rejected), and a
+     * silently-set Ftst that nobody clears leaves the machine in diagnostic mode
+     * until reboot. Claiming it early only costs one redundant Ftst=0 on
+     * restore, which is harmless. */
+    if (g_ftst_avail) {
+        g_ftst_engaged = 1;
+    }
     if (smc_write_u8("Ftst", 1, &res) != kIOReturnSuccess) {
         return kIOReturnError;
     }
-    g_ftst_engaged = 1;
     usleep(500 * 1000);
 
     int waited = 0;
@@ -570,15 +578,22 @@ static kern_return_t set_fan_auto(int fan)
     g_restore_pending[fan] = 0;
 
     /* Once no fan is held manual, hand control back so thermalmonitord can idle
-     * fans to 0 RPM. (The firmware otherwise reclaims only when Ftst clears.) */
-    int any_manual = 0;
+     * fans to 0 RPM. (The firmware otherwise reclaims only when Ftst clears.)
+     *
+     * "No fan held" must count fans still awaiting a retry, not just the ones
+     * currently flagged manual: on a multi-fan machine, clearing Ftst while a
+     * peer's restore is still pending drops the unlock that the pending restore
+     * needs, stranding that fan at a fixed RPM until the next daemon start
+     * reconciles it. `has_outstanding_manual_control` is the same predicate
+     * `restore_owned_control` uses, so both paths agree on when it is safe. */
+    int outstanding = 0;
     for (int i = 0; i < MAX_FANS; i++) {
-        if (g_manual[i]) {
-            any_manual = 1;
+        if (g_manual[i] || g_restore_pending[i]) {
+            outstanding = 1;
             break;
         }
     }
-    if (!any_manual && g_ftst_avail) {
+    if (!outstanding && g_ftst_avail) {
         uint8_t r2 = 0;
         kern_return_t result = smc_write_u8("Ftst", 0, &r2);
         if (result != kIOReturnSuccess) {
@@ -589,17 +604,8 @@ static kern_return_t set_fan_auto(int fan)
         g_ftst_engaged = 0;
     }
 
-    if (!any_manual) {
-        int any_pending = 0;
-        for (int i = 0; i < MAX_FANS; i++) {
-            if (g_restore_pending[i]) {
-                any_pending = 1;
-                break;
-            }
-        }
-        if (!any_pending && !g_ftst_engaged) {
-            g_lease_state = LEASE_NONE;
-        }
+    if (!has_outstanding_manual_control()) {
+        g_lease_state = LEASE_NONE;
     }
 
     return kIOReturnSuccess;

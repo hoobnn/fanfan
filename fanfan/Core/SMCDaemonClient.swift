@@ -13,6 +13,14 @@ enum SMCDaemonClient {
     nonisolated private static let socketPath = "/var/run/fanfan-smcd.sock"
     nonisolated static let protocolVersion = 2
 
+    /// PING / RENEW must outlast the daemon's Ftst unlock. The daemon is
+    /// single-threaded: while a first SET waits for thermalmonitord to yield
+    /// (up to `UNLOCK_TIMEOUT_MS` = 12 s) it accepts no other connection. A
+    /// shorter timeout here made every renewal during that window fail, and
+    /// `FanController` reacts to a failed renewal by dropping control outright
+    /// — cancelling a hand-off that was in fact about to succeed.
+    nonisolated static let leaseCommandTimeoutSeconds = 15
+
     enum LeaseState: String {
         case idle
         case active
@@ -24,7 +32,7 @@ enum SMCDaemonClient {
     }
 
     nonisolated static func pingState() -> LeaseState? {
-        guard let response = send("PINGV2", receiveTimeoutSeconds: 1) else { return nil }
+        guard let response = send("PINGV2", receiveTimeoutSeconds: leaseCommandTimeoutSeconds) else { return nil }
         guard let parsed = parsePingResponse(response),
               parsed.version == protocolVersion else {
             return nil
@@ -33,7 +41,7 @@ enum SMCDaemonClient {
     }
 
     nonisolated static func renewControlLease() -> Bool {
-        send("RENEWV2", receiveTimeoutSeconds: 1) == "OK"
+        send("RENEWV2", receiveTimeoutSeconds: leaseCommandTimeoutSeconds) == "OK"
     }
 
     nonisolated static func setFanSpeed(fanIndex: Int, rpm: Int) -> Bool {
