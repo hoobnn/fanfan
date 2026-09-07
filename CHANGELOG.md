@@ -2,6 +2,16 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.2.2] - 2026-09-07
+
+### Fixed
+- Fans no longer stay stranded at a fixed RPM: clearing diagnostic mode now counts pending restores, and `Ftst` is marked engaged before the write so a firmware rejection cannot leave diagnostic mode set until reboot.
+- `PING`/`RENEW` now allow 15 seconds, outlasting the 12-second unlock wait during which the single-threaded daemon refuses connections.
+- Fan spin-down converges instead of stalling permanently when the remaining gap fell between 250 and 450 RPM, while the dead-band still suppresses pumping.
+- The app no longer crashes on non-finite SMC readings, and concurrent access to the SMC connection and key cache is now serialized — previously this leaked a mach port and mutated a Dictionary from several threads.
+- The chart keeps sampling while a slider is dragged or the sensor list is scrolled.
+- The settings window no longer floats above every other app for the rest of the session.
+
 ## [1.2.1] - 2026-08-31
 
 ### Fixed
