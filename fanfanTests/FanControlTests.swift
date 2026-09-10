@@ -54,6 +54,55 @@ final class FanControlTests: XCTestCase {
         XCTAssertEqual(ControlMode.automatic, ControlMode.automatic)
         XCTAssertNotEqual(ControlMode.manual, ControlMode.automatic)
     }
+
+    func testHighTemperatureAllowsManualSelectionDuringExistingEpisode() {
+        for initialMode in [ControlMode.automatic, .system, .manual] {
+            var policy = FanControlViewModel.HighTemperatureModeSwitch()
+            XCTAssertEqual(policy.shouldSwitch(temperature: 92, mode: initialMode,
+                                               enabled: false, alertThreshold: 85),
+                           initialMode == .manual)
+            for temperature in [92.0, 96, 89, 90, 85, 94] {
+                XCTAssertFalse(policy.shouldSwitch(temperature: temperature, mode: .manual,
+                                                   enabled: false, alertThreshold: 85))
+            }
+            XCTAssertFalse(policy.shouldSwitch(temperature: 84, mode: .manual,
+                                               enabled: false, alertThreshold: 85))
+            XCTAssertTrue(policy.shouldSwitch(temperature: 90, mode: .manual,
+                                              enabled: false, alertThreshold: 85))
+        }
+    }
+
+    func testOptionalHighTemperatureSwitchRearmsAndCriticalEscalates() {
+        var policy = FanControlViewModel.HighTemperatureModeSwitch()
+        XCTAssertFalse(policy.shouldSwitch(temperature: 85, mode: .manual,
+                                           enabled: true, alertThreshold: 85))
+        XCTAssertTrue(policy.shouldSwitch(temperature: 86, mode: .manual,
+                                          enabled: true, alertThreshold: 85))
+        XCTAssertFalse(policy.shouldSwitch(temperature: 88, mode: .manual,
+                                           enabled: true, alertThreshold: 85))
+        XCTAssertTrue(policy.shouldSwitch(temperature: 90, mode: .manual,
+                                          enabled: true, alertThreshold: 85))
+        XCTAssertFalse(policy.shouldSwitch(temperature: 95, mode: .manual,
+                                           enabled: true, alertThreshold: 85))
+        XCTAssertFalse(policy.shouldSwitch(temperature: 79, mode: .manual,
+                                           enabled: true, alertThreshold: 85))
+        XCTAssertTrue(policy.shouldSwitch(temperature: 86, mode: .manual,
+                                          enabled: true, alertThreshold: 85))
+    }
+
+    func testDisabledHighTemperatureSwitchAndInvalidSamples() {
+        var policy = FanControlViewModel.HighTemperatureModeSwitch()
+        XCTAssertFalse(policy.shouldSwitch(temperature: 89, mode: .manual,
+                                           enabled: false, alertThreshold: 85))
+        XCTAssertTrue(policy.shouldSwitch(temperature: 90, mode: .manual,
+                                          enabled: false, alertThreshold: 85))
+        for temperature in [Double.nan, .infinity, -.infinity, 0, -10] {
+            XCTAssertFalse(policy.shouldSwitch(temperature: temperature, mode: .manual,
+                                               enabled: false, alertThreshold: 85))
+        }
+        XCTAssertFalse(policy.shouldSwitch(temperature: 92, mode: .manual,
+                                           enabled: false, alertThreshold: 85))
+    }
     
     func testFanControllerInitialization() {
         let monitor = SystemMonitor()

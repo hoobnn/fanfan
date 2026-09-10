@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.3.1] - 2026-09-10
+
+### Fixed
+- High temperatures no longer repeatedly force manual mode back to automatic. Each alert or 90°C threshold triggers once per thermal episode, allowing an explicit return to manual; cooling more than 5°C below the threshold re-arms it. System control remains available, and the 90°C trigger still applies with optional mode switching disabled.
+
 ## [1.3.0] - 2026-09-07
 
 ### Fixed

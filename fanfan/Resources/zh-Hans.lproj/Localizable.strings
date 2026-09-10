@@ -52,7 +52,7 @@
 "settings.notifications" = "通知";
 "settings.notifications_desc" = "显示高温事件警报";
 "settings.auto_mode_switching" = "自动模式切换";
-"settings.auto_mode_switching_desc" = "高温时切换到自动模式";
+"settings.auto_mode_switching_desc" = "每次高温触发一次，可再切回手动；达到 90°C 时，关闭此项也会触发";
 
 /* 显示模式选项 */
 "settings.display_mode.none" = "无";

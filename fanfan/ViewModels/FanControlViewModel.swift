@@ -93,6 +93,31 @@ class FanControlViewModel: ObservableObject {
     private static let highTempRearmDelta: Double = 5.0
     private var hasNotifiedHighTemp = false
 
+    /// Each thermal episode can request a mode change only once. A deliberate
+    /// manual selection remains effective until cooling re-arms the threshold.
+    struct HighTemperatureModeSwitch {
+        private var criticalTriggered = false
+        private var alertTriggered = false
+
+        mutating func shouldSwitch(temperature: Double, mode: ControlMode,
+                                   enabled: Bool, alertThreshold: Double) -> Bool {
+            guard temperature.isFinite, temperature > 0 else { return false }
+            if temperature < 85 { criticalTriggered = false }
+            if temperature < alertThreshold - 5 || !enabled { alertTriggered = false }
+
+            let critical = temperature >= 90
+            let alert = enabled && temperature > alertThreshold
+            let triggered = (critical && !criticalTriggered) || (alert && !alertTriggered)
+            // Consume the event in every mode, including system/automatic, so
+            // selecting manual during an existing hot episode is respected.
+            if critical { criticalTriggered = true }
+            if alert { alertTriggered = true }
+            return mode == .manual && triggered
+        }
+    }
+
+    private var highTemperatureModeSwitch = HighTemperatureModeSwitch()
+
     private func setupSettingsObservers() {
         // High-temp alert and auto mode switch are driven by the unsmoothed
         // maximum of live CPU/GPU telemetry, so GPU-only overheating is covered
@@ -106,9 +131,10 @@ class FanControlViewModel: ObservableObject {
             .sink { [weak self] temp in
                 guard let self = self else { return }
                 self.handleHighTemperature(temp)
-                let criticalSafetyOverride = temp >= 90
-                if (criticalSafetyOverride || (self.autoSwitchMode && temp > self.highTempAlert)),
-                   self.controlMode == .manual {
+                if self.highTemperatureModeSwitch.shouldSwitch(
+                    temperature: temp, mode: self.fanController.mode,
+                    enabled: self.autoSwitchMode, alertThreshold: self.highTempAlert
+                ) {
                     print("Auto-switching to automatic mode due to high temperature: \(temp)°C")
                     self.setControlMode(.automatic)
                 }

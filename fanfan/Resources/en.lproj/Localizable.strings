@@ -52,7 +52,7 @@
 "settings.notifications" = "Notifications";
 "settings.notifications_desc" = "Show alerts for high temperature events";
 "settings.auto_mode_switching" = "Auto Mode Switching";
-"settings.auto_mode_switching_desc" = "Switch to automatic mode on high temps";
+"settings.auto_mode_switching_desc" = "Switch once per high-temp event; you can return to manual. At 90°C, triggers even when off.";
 
 /* Display Mode Options */
 "settings.display_mode.none" = "None";
