@@ -77,9 +77,10 @@ jobs:
           DMG_SHA: ${{ steps.checksum.outputs.sha }}
         run: |
           set -euo pipefail
+          # 发版时缺 token 直接失败，否则 cask 会停在旧版本的 sha256，brew 安装校验失败。
           if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
-            echo "⚠️  HOMEBREW_TAP_TOKEN not set; skipping tap sync."
-            exit 0
+            echo "::error::HOMEBREW_TAP_TOKEN 未设置，无法同步 Homebrew cask。"
+            exit 1
           fi
 
           TAP_DIR="$RUNNER_TEMP/homebrew-tap"
