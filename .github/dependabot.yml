@@ -1,0 +1,14 @@
+# 每周检查一次工作流里 GitHub Actions 的新版本，所有升级合并成一个 PR。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "👷 ci"
+      include: scope
