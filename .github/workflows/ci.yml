@@ -1,0 +1,51 @@
+name: CI
+
+# Unit tests on every push to main and every pull request; release.yml calls
+# this too, so a tag is only released after the same tests pass.
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch supersedes the running one.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Needs no secrets, so it also covers pull requests from forks.
+  test:
+    name: Test
+    # fanfan targets macOS 26.0; macos-15 cannot build it.
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4 # v1
+        with:
+          xcode-version: latest-stable
+
+      - name: 🧪 Run unit tests
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project fanfan.xcodeproj \
+            -scheme fanfan \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            test

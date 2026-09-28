@@ -69,7 +69,7 @@ cp tools/fanfan-smcd/fanfan-smcd fanfan/Resources/fanfan-smcd
 ./scripts/build-release.sh 1.2.3
 ```
 
-需要 `Developer ID Application: HAOBIN WU (8FUPL8QHFH)` 证书和名为 `fanfan-notarize` 的 `notarytool` 钥匙串配置（`NOTARY_PROFILE=…` 可覆盖）。产物在 `releases/`。CI 经 `.github/workflows/release.yml` 在 `v*` tag 上跑同一套流水线。
+需要 `Developer ID Application: HAOBIN WU (8FUPL8QHFH)` 证书和名为 `fanfan-notarize` 的 `notarytool` 钥匙串配置（`NOTARY_PROFILE=…` 可覆盖）。产物在 `releases/`。CI 经 `.github/workflows/release.yml` 在 `v*` tag 上跑同一套流水线（先复用 `ci.yml` 跑单元测试，再签名公证发布，最后经 `ci-workflows` 的 `homebrew-cask.yml` 同步 cask）；平时推送 main 和 PR 只跑 `ci.yml`。
 
 推 tag 前按顺序：
 

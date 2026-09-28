@@ -1,5 +1,8 @@
 name: Build and Release
 
+# v* tag: tests → build, sign, notarize and publish the GitHub Release →
+# update the Homebrew cask. A manual run on a branch builds and notarizes
+# (artifacts on the workflow run) without publishing anything.
 on:
   push:
     tags:
@@ -7,33 +10,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+# Never cancel a release: a notarization cut off halfway is the worst state.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  # Fast feedback, and it needs no secrets — so it also protects fork PRs.
   test:
-    name: Test
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: 🧪 Run unit tests
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project fanfan.xcodeproj \
-            -scheme fanfan \
-            -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO \
-            test
+    uses: ./.github/workflows/ci.yml
 
   release:
     name: Build, sign, notarize and release
     needs: test
+    permissions:
+      contents: write
     uses: hoobnn/ci-workflows/.github/workflows/macos-release.yml@v1
     with:
       app-path: release/fanfan.app
@@ -53,58 +45,9 @@ jobs:
     name: Update Homebrew tap
     needs: release
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 📥 Fetch released dmg checksum
-        id: checksum
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.release.outputs.version }}
-        run: |
-          set -euo pipefail
-          gh release download "$GITHUB_REF_NAME" \
-            --pattern "fanfan-${VERSION}-macOS.dmg.sha256" \
-            --dir "$RUNNER_TEMP"
-          SHA=$(awk '{print $1}' "$RUNNER_TEMP/fanfan-${VERSION}-macOS.dmg.sha256")
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: 🍺 Sync cask
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          VERSION: ${{ needs.release.outputs.version }}
-          DMG_SHA: ${{ steps.checksum.outputs.sha }}
-        run: |
-          set -euo pipefail
-          # 发版时缺 token 直接失败，否则 cask 会停在旧版本的 sha256，brew 安装校验失败。
-          if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
-            echo "::error::HOMEBREW_TAP_TOKEN 未设置，无法同步 Homebrew cask。"
-            exit 1
-          fi
-
-          TAP_DIR="$RUNNER_TEMP/homebrew-tap"
-          git clone --depth 1 \
-            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/hoobnn/homebrew-tap.git" \
-            "$TAP_DIR"
-
-          CASK="$TAP_DIR/Casks/fanfan.rb"
-          # BSD sed (macOS runner) needs the -i suffix arg.
-          sed -i.bak -E \
-            -e "s/^(  version \")[^\"]+(\")/\1${VERSION}\2/" \
-            -e "s/^(  sha256 \")[^\"]+(\")/\1${DMG_SHA}\2/" \
-            "$CASK"
-          rm -f "$CASK.bak"
-
-          cd "$TAP_DIR"
-          if git diff --quiet; then
-            echo "ℹ️  Cask already at ${VERSION}; nothing to do."
-            exit 0
-          fi
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/fanfan.rb
-          git commit -m "⬆️ arrow-up(fanfan): bump cask to ${VERSION}"
-          git push origin HEAD
-          echo "✅ Tap synced to ${VERSION}"
+    uses: hoobnn/ci-workflows/.github/workflows/homebrew-cask.yml@v1
+    with:
+      cask: fanfan
+      artifact-basename: fanfan
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
