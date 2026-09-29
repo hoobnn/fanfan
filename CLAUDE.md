@@ -62,7 +62,7 @@ xcodebuild -project fanfan.xcodeproj -scheme fanfan \
 cp tools/fanfan-smcd/fanfan-smcd fanfan/Resources/fanfan-smcd
 ```
 
-Debug 版（`com.hoobnn.fanfan.debug`）与正式版注册的是同一个 label `com.hoobnn.fanfan.helper`，同一时间只能有一个生效；调试守护进程前先在「登录项与扩展」里关掉正式版的那一项。
+Debug 版（`com.hoobnn.fanfan.debug`）与正式版注册的是同一个 label `com.hoobnn.fanfan.helper`，同一时间只能有一个生效；调试守护进程前先在「登录项与扩展」里关掉正式版的那一项。launchd 对 SMAppService 守护进程施加同团队签名的轻量代码要求（`launchctl print` 显示 `has LWCR`），而 Debug 包里的守护进程是 Makefile ad-hoc 签名，能否被拉起**尚未验证**；端到端验证目前用 Developer ID 签名的 Release 构建（签名方式同 CI）。
 
 `scripts/build-release.sh` 会自动做，手动 debug 构建不会。
 

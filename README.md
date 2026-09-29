@@ -64,7 +64,7 @@ Requires macOS 26+ (Apple Silicon or Intel). On first launch, click **Install He
 
 ### Uninstall
 
-`brew uninstall --cask fanfan` removes the app and the helper (add `--zap` to also remove preferences). For a manual install, quit fanfan and delete it from Applications — the helper lives inside the app bundle and stops with it.
+`brew uninstall --cask fanfan` removes the app and the helper (add `--zap` to also remove preferences). For a manual install, quit fanfan and delete it from Applications — the helper lives inside the app bundle and stops with it. The leftover fanfan entry in Login Items & Extensions can be removed there.
 
 ## FAQ
 

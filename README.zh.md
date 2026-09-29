@@ -64,7 +64,7 @@ curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.
 
 ### 卸载
 
-`brew uninstall --cask fanfan` 会同时移除应用和辅助进程（加 `--zap` 连偏好设置一起清理）。手动安装的话，退出 fanfan 并从「应用程序」删除即可——辅助进程在应用包内，会随之停止。
+`brew uninstall --cask fanfan` 会同时移除应用和辅助进程（加 `--zap` 连偏好设置一起清理）。手动安装的话，退出 fanfan 并从「应用程序」删除即可——辅助进程在应用包内，会随之停止。「登录项与扩展」里残留的 fanfan 条目可在那里手动移除。
 
 ## 常见问题
 

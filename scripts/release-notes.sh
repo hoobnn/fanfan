@@ -33,7 +33,7 @@ ${CHANGELOG}
 **Option 1: DMG (Recommended)**
 1. Download and open \`fanfan-${VERSION}-macOS.dmg\`
 2. Drag **fanfan.app** to /Applications/
-3. Launch — it will prompt once to install the helper tool
+3. Launch, click **Install Helper** and allow fanfan once in System Settings › Login Items & Extensions
 
 **Option 2: One-liner**
 \`\`\`bash
