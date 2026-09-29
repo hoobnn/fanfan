@@ -2,7 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
-## [1.4.0] - 2026-09-29
+## [1.5.0] - 2026-09-29
+
+### Changed
+- The popover now sits on the system's Liquid Glass material instead of an opaque background, with translucent cards, glass header buttons and hierarchical text that stays legible on glass and follows Increase Contrast. On macOS 27 the Overview / Sensors switch uses the native tabs picker.
+- Settings is a native grouped form. Custom PID gains only show their sliders once the override is switched on.
+- Fine-grained sliders (rpm, target temperature, alert threshold, PID gains) no longer draw a dense row of tick marks; they still snap to the same steps.
+- The quit button uses the power symbol, and the icon-only buttons have tooltips and VoiceOver labels.
+- With Reduce Motion on, the popover fan and the menu bar icon stop spinning.
+
 
 ### Changed
 - The fan-control helper is now registered through `SMAppService` and talks to the app over XPC instead of a Unix socket. Setting it up no longer asks for an administrator password: click Install Helper and allow fanfan once in System Settings › General › Login Items & Extensions. The helper runs from inside the app bundle, so app updates update it too, and deleting the app removes it.
