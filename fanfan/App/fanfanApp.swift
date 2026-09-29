@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let viewModel = FanControlViewModel()
     private var iconUpdateTimer: Timer?
     private var displayModeObserver: NSObjectProtocol?
+    private var windowCloseObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
     /// Keeps App Nap from freezing our background timers. / 中文：阻止 App Nap 冻结后台定时器的活动凭证。
     private var backgroundActivity: NSObjectProtocol?
@@ -49,6 +50,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.setFanControlActivityActive(shouldPreventNap)
             }
             .store(in: &cancellables)
+
+        // Opening the Settings `Window` scene promotes the app to `.regular`
+        // (LSUIElement is NO), and nothing demotes it again — the Dock icon
+        // lingered after every window was closed. Drop back to `.accessory`
+        // once the last titled window goes away.
+        // 中文：打开设置窗口会把应用提升为 `.regular`（LSUIElement=NO），之后没有
+        // 任何地方再降回来，导致关闭所有窗口后 Dock 图标仍残留。最后一个带标题
+        // 窗口关闭后恢复为 `.accessory`。
+        windowCloseObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            let closing = notification.object as? NSWindow
+            DispatchQueue.main.async {
+                let hasOpenWindow = NSApp.windows.contains {
+                    $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled)
+                }
+                if !hasOpenWindow, NSApp.activationPolicy() != .accessory {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+        }
 
         // Initialize components immediately / 中文：立即初始化组件
         setupApplication()
@@ -155,6 +179,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if let observer = displayModeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = windowCloseObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
