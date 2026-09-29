@@ -27,7 +27,7 @@ xcodebuild \
   -project fanfan.xcodeproj \
   -scheme fanfan \
   -configuration Release \
-  -derivedDataPath build \
+  -derivedDataPath build.noindex \
   -destination 'generic/platform=macOS' \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="-" \
@@ -40,10 +40,10 @@ xcodebuild \
   GCC_INSTRUMENT_PROGRAM_FLOW_ARCS=NO \
   clean build
 
-BUILT_APP="build/Build/Products/Release/fanfan.app"
+BUILT_APP="build.noindex/Build/Products/Release/fanfan.app"
 if [ ! -d "$BUILT_APP" ]; then
   echo "❌ Built app not found at $BUILT_APP" >&2
-  find build -name "*.app" -type d >&2
+  find build.noindex -name "*.app" -type d >&2
   exit 1
 fi
 

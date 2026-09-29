@@ -22,7 +22,7 @@ SIGN_IDENTITY="Developer ID Application: HAOBIN WU (${TEAM_ID})"
 NOTARY_PROFILE="${NOTARY_PROFILE:-fanfan-notarize}"
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$PROJECT_DIR/release-build"
+BUILD_DIR="$PROJECT_DIR/release-build.noindex"
 RELEASE_DIR="$PROJECT_DIR/releases"
 ENTITLEMENTS="$PROJECT_DIR/fanfan/Resources/fanfan.entitlements"
 DAEMON_SRC_DIR="$PROJECT_DIR/tools/fanfan-smcd"
@@ -120,6 +120,10 @@ if [ ! -d "$BUILT_APP" ]; then
     echo "❌ Built app not found under $BUILD_DIR"
     exit 1
 fi
+# xcodebuild registers the product with Launch Services under the release
+# bundle ID; left registered, brew's post-upgrade `open -b` may launch it.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+    -u "$BUILT_APP" 2>/dev/null || true
 APP_EXECUTABLE="$BUILT_APP/Contents/MacOS/$TARGET_NAME"
 lipo "$APP_EXECUTABLE" -verify_arch arm64
 lipo "$APP_EXECUTABLE" -verify_arch x86_64
