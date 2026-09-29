@@ -113,15 +113,13 @@ struct ControlsCard: View, Equatable {
     // MARK: - Header / 中文：头部
 
     private var header: some View {
-        HStack(spacing: 6) {
+        labeledRow {
             Text(String(format: NSLocalizedString("controls.header", comment: ""),
                         modeLabel(selectedMode).uppercased()))
                 .font(Theme.label(10.5, weight: .semibold))
                 .tracking(0.4)
                 .foregroundStyle(Theme.text3)
-
-            Spacer()
-
+        } control: {
             Picker(NSLocalizedString("popover.mode", comment: ""), selection: Binding(
                 get: { selectedMode },
                 set: { newMode in
@@ -137,8 +135,34 @@ struct ControlsCard: View, Equatable {
                 Text(NSLocalizedString("popover.mode.system", comment: "")).tag(ControlMode.system)
             }
             .pickerStyle(.segmented)
-            .frame(width: 168)
             .labelsHidden()
+        }
+    }
+
+    /// Label and segmented control share one row when both fit; otherwise the / 中文：标签与分段控件放得下时同处一行，否则
+    /// control drops below its label, shrinking to the small control size as a / 中文：控件移到标签下方，最后一档缩成小号控件。
+    /// last resort. Segment widths follow the localized titles and never / 中文：分段宽度随本地化标题变化且不会压缩，
+    /// compress, so a fixed width would clip them or widen the card. / 中文：固定宽度会截断文字或把卡片撑宽。
+    private func labeledRow<Label: View, Control: View>(
+        @ViewBuilder label: () -> Label,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        let label = label().lineLimit(1)
+        let control = control()
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                label.fixedSize()
+                Spacer(minLength: 8)
+                control.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                label
+                control.fixedSize().frame(maxWidth: .infinity)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                label
+                control.controlSize(.small).fixedSize().frame(maxWidth: .infinity)
+            }
         }
     }
 
@@ -184,11 +208,11 @@ struct ControlsCard: View, Equatable {
     /// slider flips the strategy to `.custom`, which matches no segment — so the / 中文：滑杆会把策略切到 `.custom`，它不匹配任何分段——
     /// segmented control then reads as "no preset selected". / 中文：于是分段控件显示为“未选中预设”。
     private var strategyPicker: some View {
-        HStack {
+        labeledRow {
             Text(NSLocalizedString("popover.strategy", comment: ""))
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(Theme.text1)
-            Spacer()
+        } control: {
             Picker(NSLocalizedString("popover.strategy", comment: ""), selection: Binding(
                 get: { snapshot.powerStrategy },
                 set: { newStrategy in
@@ -203,7 +227,6 @@ struct ControlsCard: View, Equatable {
                 Text(NSLocalizedString("popover.strategy.performance",  comment: "")).tag(PowerStrategy.performance)
             }
             .pickerStyle(.segmented)
-            .frame(width: 168)
             .labelsHidden()
         }
     }
