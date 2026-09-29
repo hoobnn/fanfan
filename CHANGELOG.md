@@ -2,6 +2,19 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.4.0] - 2026-09-29
+
+### Changed
+- The fan-control helper is now registered through `SMAppService` and talks to the app over XPC instead of a Unix socket. Setting it up no longer asks for an administrator password: click Install Helper and allow fanfan once in System Settings › General › Login Items & Extensions. The helper runs from inside the app bundle, so app updates update it too, and deleting the app removes it.
+- Only the fanfan app signed by its developer can send commands to the helper. Previously any process of an admin user could connect to the socket.
+- Fans return to firmware control the moment the app quits or crashes, instead of after the 10-second lease. The lease still covers an app that hangs.
+
+### Upgrading
+- After updating, open the popover, click Install Helper and allow fanfan in Login Items & Extensions. The new helper removes the old one (`/Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist`, `/Library/PrivilegedHelperTools/fanfan-smcd`) by itself. Until then, fans stay under macOS control.
+
+### Fixed
+- The install script downloads the correct release archive again.
+
 ## [1.3.3] - 2026-09-29
 
 ### Fixed
