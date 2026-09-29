@@ -62,15 +62,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             forName: NSWindow.willCloseNotification,
             object: nil,
             queue: .main
-        ) { notification in
+        ) { [weak self] notification in
             let closing = notification.object as? NSWindow
-            DispatchQueue.main.async {
-                let hasOpenWindow = NSApp.windows.contains {
-                    $0 !== closing && $0.isVisible && $0.styleMask.contains(.titled)
-                }
-                if !hasOpenWindow, NSApp.activationPolicy() != .accessory {
-                    NSApp.setActivationPolicy(.accessory)
-                }
+            // SwiftUI tears the scene down after willClose and can re-promote
+            // the app on its way out, so check again once it has settled.
+            // 中文：SwiftUI 在 willClose 之后才拆除场景，途中可能再次把应用提升为
+            // `.regular`，因此在其稳定后再核对一次。
+            DispatchQueue.main.async { self?.demoteToMenuBarIfWindowless(ignoring: closing) }
+            // By then the closed window is gone; don't ignore it in case Settings was reopened.
+            // 中文：此时已关闭的窗口不再可见；不再忽略它，以防设置窗口已被重新打开。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self?.demoteToMenuBarIfWindowless(ignoring: nil)
             }
         }
 
@@ -188,6 +190,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    /// Set by the popover's Quit button, the only in-app way to really quit. / 中文：由弹窗的退出按钮设置，这是应用内唯一真正退出的途径。
+    static var isQuitConfirmed = false
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // While Settings is open the app shows in the Dock, and its Dock menu
+        // Quit (or ⌘Q) would kill the fan controller. Treat those two as
+        // "close the windows" and stay in the menu bar. The popover's Quit
+        // button, logout / shutdown and scripted quits (Homebrew's
+        // `uninstall quit:`) still terminate.
+        // 中文：设置窗口打开时应用会出现在 Dock，Dock 菜单的「退出」（或 ⌘Q）会
+        // 直接结束风扇控制。仅把这两种请求当作「关闭窗口」并留在菜单栏；弹窗的
+        // 退出按钮、注销 / 关机以及脚本退出（Homebrew 的 `uninstall quit:`）照常退出。
+        guard !Self.isQuitConfirmed, isQuitFromDockOrMenu() else {
+            return .terminateNow
+        }
+        for window in NSApp.windows where isUserWindow(window) {
+            window.close()
+        }
+        demoteToMenuBarIfWindowless(ignoring: nil)
+        return .terminateCancel
+    }
+
+    private func isQuitFromDockOrMenu() -> Bool {
+        // ⌘Q goes straight to terminate(_:) without an Apple Event.
+        // 中文：⌘Q 直接调用 terminate(_:)，不经 Apple Event。
+        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return true }
+        guard let pid = event.attributeDescriptor(forKeyword: keySenderPIDAttr)?.int32Value else {
+            return false
+        }
+        return NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == "com.apple.dock"
+    }
+
+    private func isUserWindow(_ window: NSWindow) -> Bool {
+        window.styleMask.contains(.titled) && (window.isVisible || window.isMiniaturized)
+    }
+
+    private func demoteToMenuBarIfWindowless(ignoring closing: NSWindow?) {
+        let hasOpenWindow = NSApp.windows.contains { $0 !== closing && isUserWindow($0) }
+        if !hasOpenWindow, NSApp.activationPolicy() != .accessory {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 }
 

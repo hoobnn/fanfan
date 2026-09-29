@@ -445,6 +445,7 @@ struct PopoverView: View {
     private func quit() {
         viewModel.resetToSystemControl()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            AppDelegate.isQuitConfirmed = true
             NSApplication.shared.terminate(nil)
         }
     }
