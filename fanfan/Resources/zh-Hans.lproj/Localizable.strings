@@ -113,6 +113,8 @@
 
 /* 助手 */
 "popover.install_failed" = "安装失败";
+"popover.install_in_progress" = "辅助程序正在安装中";
+"popover.helper_not_ready" = "辅助程序已注册，但未能就绪";
 
 /* 电池信息 */
 "popover.battery" = "电池";

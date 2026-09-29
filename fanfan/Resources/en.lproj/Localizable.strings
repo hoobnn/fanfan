@@ -113,6 +113,8 @@
 
 /* Helper */
 "popover.install_failed" = "Installation failed";
+"popover.install_in_progress" = "Helper installation is already in progress";
+"popover.helper_not_ready" = "Helper registered but did not become ready";
 
 /* Battery Info */
 "popover.battery" = "Battery";

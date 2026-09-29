@@ -1,0 +1,263 @@
+/* Settings View */
+"settings.title" = "Einstellungen";
+"settings.close" = "Einstellungen schließen";
+"settings.changes_apply" = "Änderungen gelten sofort";
+"settings.fanfan_title" = "fanfan-Einstellungen";
+"settings.customize" = "Passe die Lüftersteuerung an deine Wünsche an";
+"settings.close_shortcut" = "Schließen (Cmd+W)";
+"settings.all_changes_apply" = "Alle Änderungen gelten sofort, ohne Neustart der App";
+
+/* Settings Sections */
+"settings.section.menu_bar" = "Menüleiste";
+"settings.section.monitoring" = "Überwachung & Warnungen";
+"settings.section.general" = "Allgemein";
+"settings.section.advanced_pid" = "Erweiterte PID-Abstimmung";
+"settings.section.about" = "Über";
+
+/* About / Updates */
+"settings.version" = "Version";
+"settings.version_desc" = "Installierte App-Version und Build";
+"settings.check_updates" = "Nach Updates suchen";
+"settings.check_updates_desc" = "Mit dem neuesten Release auf GitHub vergleichen";
+"settings.check_updates.button" = "Prüfen";
+"settings.check_updates.checking" = "Wird geprüft …";
+"settings.check_updates.up_to_date" = "Du verwendest die neueste Version";
+"settings.check_updates.failed_format" = "Prüfung fehlgeschlagen: %@";
+
+"update.alert.title" = "Update verfügbar";
+"update.alert.message_header_format" = "Version %@ ist verfügbar (installiert: %@).";
+"update.alert.download" = "Herunterladen";
+"update.alert.later" = "Später";
+"update.error.network" = "Netzwerkfehler";
+
+"settings.pid_override" = "Eigene Verstärkung";
+"settings.pid_override_desc" = "Aus: Werte werden aus der Reaktionsstufe berechnet";
+"settings.pid_kp" = "Kp Proportional";
+"settings.pid_kp_desc" = "RPM-Beitrag pro °C Abweichung";
+"settings.pid_ki" = "Ki Integral";
+"settings.pid_ki_desc" = "Wie schnell bleibende Abweichungen abgebaut werden";
+"settings.pid_kd" = "Kd Differenzial";
+"settings.pid_kd_desc" = "Vorausschauende Reaktion auf den Temperaturtrend";
+"settings.pid_reset" = "Standardwerte";
+
+/* Settings Items */
+"settings.launch_at_login" = "Beim Anmelden öffnen";
+"settings.launch_at_login_desc" = "App automatisch starten, wenn du dich anmeldest";
+"settings.menu_bar_display" = "Anzeige in der Menüleiste";
+"settings.menu_bar_display_desc" = "Welche Informationen in der Menüleiste erscheinen";
+"settings.monitoring_interval" = "Messintervall";
+"settings.monitoring_interval_desc" = "Wie oft Temperaturen geprüft werden (Sekunden)";
+"settings.high_temp_alert" = "Hitzewarnung";
+"settings.high_temp_alert_desc" = "Schwellenwert für die Warnung (°C)";
+"settings.notifications" = "Mitteilungen";
+"settings.notifications_desc" = "Bei hohen Temperaturen warnen";
+"settings.auto_mode_switching" = "Automatisch umschalten";
+"settings.auto_mode_switching_desc" = "Schaltet einmal pro Hitzeereignis um; du kannst zu Manuell zurückkehren. Bei 90°C auch, wenn deaktiviert.";
+
+/* Display Mode Options */
+"settings.display_mode.none" = "Keine";
+"settings.display_mode.temperature" = "Temperatur";
+"settings.display_mode.power" = "Leistungsaufnahme";
+"settings.display_mode.fan_speed" = "Lüfterdrehzahl %";
+
+/* Popover View */
+"popover.title" = "Lüftersteuerung";
+"popover.settings" = "Einstellungen";
+"popover.quit_app" = "App beenden";
+"popover.tabs" = "Ansicht";
+"popover.mode" = "Steuermodus";
+
+/* Quit Confirmation */
+"popover.quit_confirm.title" = "Lüftersteuerung beenden?";
+"popover.quit_confirm.cancel" = "Abbrechen";
+"popover.quit_confirm.quit" = "Beenden";
+"popover.quit_confirm.message" = "Die Lüfter werden vor dem Beenden auf automatisch gestellt.";
+
+/* Helper Installation */
+"popover.helper_required" = "Hilfsprogramm erforderlich";
+"popover.helper_required_desc" = "Die Lüftersteuerung benötigt ein Hilfsprogramm im Hintergrund. Erlaube es einmal in den Systemeinstellungen – kein Passwort nötig.";
+"popover.helper_approval_desc" = "Aktiviere fanfan unter „Systemeinstellungen › Allgemein › Anmeldeobjekte & Erweiterungen“, um die Einrichtung abzuschließen.";
+"popover.install_helper" = "Hilfsprogramm installieren";
+"popover.open_login_items" = "Systemeinstellungen öffnen";
+
+/* Access Permissions */
+"popover.system_access_required" = "Systemzugriff erforderlich";
+"popover.system_access_desc" = "Die App benötigt Zugriff auf den System Management Controller (SMC), um Temperaturen zu lesen.";
+"popover.no_temperature_data" = "Keine Temperaturdaten";
+"popover.no_temperature_data_desc" = "SMC verbunden, aber keine Temperaturwerte verfügbar. Das kann bei manchen Mac-Modellen vorkommen.";
+
+/* Auto Mode Settings */
+"popover.strategy" = "Strategie";
+"popover.strategy.power_saving" = "Sparen";
+"popover.strategy.balanced" = "Mittel";
+"popover.strategy.performance" = "Leistung";
+"popover.threshold" = "Zieltemperatur";
+"popover.max_speed" = "Max. Drehzahl";
+"popover.response" = "Reaktion";
+
+/* Response Levels */
+"popover.response.min_override" = "Min.";
+"popover.response.quiet" = "Leise";
+"popover.response.balanced" = "Mittel";
+"popover.response.auto" = "Auto";
+"popover.response.performance" = "Leistung";
+"popover.response.aggressive" = "Stark";
+"popover.response.max_override" = "Max.";
+
+/* Control Modes */
+"popover.mode.manual" = "Manuell";
+"popover.mode.auto" = "Auto";
+"popover.mode.system" = "System";
+"popover.startup" = "Autostart?";
+"popover.startup_help" = "Beim Anmelden öffnen";
+
+/* Helper */
+"popover.install_failed" = "Installation fehlgeschlagen";
+"popover.install_in_progress" = "Das Hilfsprogramm wird bereits installiert";
+"popover.helper_not_ready" = "Hilfsprogramm registriert, aber nicht bereit";
+
+/* Battery Info */
+"popover.battery" = "Batterie";
+"popover.battery.health" = "Zustand";
+"popover.battery.cycles" = "Zyklen";
+"popover.battery.status" = "Status";
+"popover.battery.temp" = "Temp.";
+"popover.battery.voltage" = "Spannung";
+"popover.battery.power" = "Leistung";
+"popover.battery.capacity" = "Kapazität";
+"popover.battery.source" = "Quelle";
+"popover.battery.full_in" = "Voll in";
+"popover.battery.left" = "Restzeit";
+
+/* System Info */
+"popover.system" = "System";
+"popover.system.cpu" = "CPU";
+"popover.system.gpu" = "GPU";
+"popover.system.fans" = "Lüfter";
+"popover.system.rpm" = "RPM";
+"popover.system.fan_limits" = "Lüftergrenzen";
+"popover.system.fan_range" = "Lüfter %d: %d–%d RPM";
+"popover.system.mode" = "Modus";
+
+/* Power Status */
+"popover.power" = "Leistung";
+"popover.power.charging" = "Wird geladen";
+"popover.power.plugged_in" = "Netzbetrieb";
+"popover.power.battery" = "Batterie";
+
+/* Fan Speed View */
+"fan.avg_rpm" = "avg RPM";
+"fan.speed" = "Lüfterdrehzahl";
+"fan.count_singular" = "%d Lüfter";
+"fan.count_plural" = "%d Lüfter";
+"fan.separate_targets" = "Eigenes Ziel pro Lüfter";
+"fan.target" = "Ziel: %d RPM";
+"fan.number" = "Lüfter %d";
+"fan.current_rpm" = "%d RPM";
+"fan.automatic_control" = "Automatische Steuerung";
+"fan.automatic_desc" = "Drehzahl folgt der Temperatur";
+
+/* Tab Bar */
+"tab.overview" = "Übersicht";
+"tab.sensors" = "Sensoren";
+"tab.fans" = "Lüfter";
+
+/* Sensors */
+"sensors.none" = "Keine Sensoren erkannt";
+"sensors.fan_details" = "Lüfterdetails";
+"sensors.fan" = "Lüfter";
+"sensors.show_all" = "Alle %d anzeigen";
+"sensors.show_less" = "Weniger anzeigen";
+"metric.hottest_core.help" = "Temperatur des heißesten Kerns";
+
+/* Temperature Status */
+"temperature.cool" = "Kühl";
+"temperature.normal" = "Normal";
+"temperature.warm" = "Warm";
+"temperature.hot" = "Heiß!";
+"temperature.critical" = "Kritisch!";
+"temperature.no_data" = "Keine Daten";
+
+/* Alerts */
+"alert.high_temp.title" = "Hitzewarnung";
+"alert.high_temp.subtitle" = "Höchste Temperatur: %.0f°C";
+"alert.high_temp.message" = "Wechsle zur automatischen Lüftersteuerung oder überprüfe dein System.";
+"controls.apply_failed" = "Die Lüftereinstellung konnte nicht angewendet werden. Prüfe das Hilfsprogramm und versuche es erneut.";
+
+/* App */
+"app.title" = "fanfan – Lüftersteuerung";
+"app.settings_title" = "fanfan-Einstellungen";
+
+/* Hero Card: units kept in English for the monospace readout style */
+"hero.max_temp" = "MAX. TEMP";
+"hero.unit.load" = "% load";
+"hero.unit.battery" = "% bat";
+
+/* Temperature Curve */
+"curve.title" = "TEMPERATUR · 60 S";
+
+/* Micro Metric Cards: aligned with CPU / GPU / SSD on the same row */
+"metric.battery" = "BAT";
+
+/* Controls Card */
+"controls.header" = "%@  STEUERUNG";
+
+/* Sensor Categories */
+"sensor.category.cpu" = "CPU";
+"sensor.category.gpu" = "GPU";
+"sensor.category.memory" = "Speicher";
+"sensor.category.storage" = "Massenspeicher";
+"sensor.category.battery" = "Batterie";
+"sensor.category.system" = "System";
+"sensor.category.ambient" = "Umgebung";
+"sensor.generic" = "%@-Sensor";
+
+/* Sensor Names */
+"sensor.TC0P" = "CPU-Umgebung";
+"sensor.TC0E" = "CPU-Die";
+"sensor.TC0F" = "CPU-Die";
+"sensor.TC0D" = "CPU-Diode";
+"sensor.TCXC" = "CPU-Kern";
+"sensor.TC1C" = "CPU-Kern 1";
+"sensor.TC2C" = "CPU-Kern 2";
+"sensor.TC3C" = "CPU-Kern 3";
+"sensor.TC4C" = "CPU-Kern 4";
+"sensor.TC5C" = "CPU-Kern 5";
+"sensor.TC6C" = "CPU-Kern 6";
+"sensor.TC7C" = "CPU-Kern 7";
+"sensor.TC8C" = "CPU-Kern 8";
+"sensor.Tp01" = "CPU-P-Cluster";
+"sensor.Tp05" = "CPU-E-Cluster";
+"sensor.Tp09" = "CPU-Umgebung";
+"sensor.Tp0D" = "CPU";
+"sensor.Tp0b" = "CPU";
+"sensor.Tp0T" = "CPU";
+"sensor.TGDD" = "GPU-Die";
+"sensor.TG0P" = "GPU-Umgebung";
+"sensor.TG0D" = "GPU-Diode";
+"sensor.TG0E" = "GPU";
+"sensor.TG0F" = "GPU";
+"sensor.TG1D" = "GPU-Die 2";
+"sensor.TM0P" = "Arbeitsspeicher-Umgebung";
+"sensor.TM00" = "DIMM 1";
+"sensor.TM01" = "DIMM 2";
+"sensor.TM02" = "DIMM 3";
+"sensor.TM03" = "DIMM 4";
+"sensor.TM08" = "Arbeitsspeicher";
+"sensor.TH0P" = "Festplatten-Umgebung";
+"sensor.TH1P" = "Festplatte 2";
+"sensor.TN0D" = "SSD-Diode";
+"sensor.TN0P" = "SSD-Umgebung";
+"sensor.TN1P" = "NAND";
+"sensor.TB0T" = "Batteriesensor 1";
+"sensor.TB1T" = "Batteriesensor 2";
+"sensor.TB2T" = "Batteriesensor 3";
+"sensor.TB3T" = "Batterie";
+"sensor.TA0P" = "Umgebung";
+"sensor.TA1P" = "Umgebung 2";
+"sensor.Ts0P" = "Handballenauflage";
+"sensor.Ts1P" = "Handballenauflage 2";
+"sensor.Ts2P" = "Gehäuseunterseite";
+"sensor.TI0P" = "Thunderbolt";
+"sensor.TI1P" = "Thunderbolt 2";
+"sensor.TW0P" = "WLAN-Karte";

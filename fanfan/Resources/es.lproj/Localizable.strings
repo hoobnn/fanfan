@@ -1,0 +1,263 @@
+/* Settings View */
+"settings.title" = "Ajustes";
+"settings.close" = "Cerrar ajustes";
+"settings.changes_apply" = "Los cambios se aplican al instante";
+"settings.fanfan_title" = "Ajustes de fanfan";
+"settings.customize" = "Personaliza el control de los ventiladores";
+"settings.close_shortcut" = "Cerrar (Cmd+W)";
+"settings.all_changes_apply" = "Todos los cambios se aplican al instante, sin reiniciar la app";
+
+/* Settings Sections */
+"settings.section.menu_bar" = "Barra de menús";
+"settings.section.monitoring" = "Monitorización y alertas";
+"settings.section.general" = "General";
+"settings.section.advanced_pid" = "Ajuste PID avanzado";
+"settings.section.about" = "Acerca de";
+
+/* About / Updates */
+"settings.version" = "Versión";
+"settings.version_desc" = "Versión y compilación de la app instalada";
+"settings.check_updates" = "Buscar actualizaciones";
+"settings.check_updates_desc" = "Comparar con la última versión en GitHub";
+"settings.check_updates.button" = "Buscar";
+"settings.check_updates.checking" = "Buscando…";
+"settings.check_updates.up_to_date" = "Tienes la última versión";
+"settings.check_updates.failed_format" = "Error al buscar: %@";
+
+"update.alert.title" = "Actualización disponible";
+"update.alert.message_header_format" = "La versión %@ está disponible (tienes la %@).";
+"update.alert.download" = "Descargar";
+"update.alert.later" = "Más tarde";
+"update.error.network" = "Error de red";
+
+"settings.pid_override" = "Ganancias personalizadas";
+"settings.pid_override_desc" = "Desactivado: Kp/Ki/Kd se derivan del nivel de respuesta";
+"settings.pid_kp" = "Kp proporcional";
+"settings.pid_kp_desc" = "RPM aportadas por cada °C de error";
+"settings.pid_ki" = "Ki integral";
+"settings.pid_ki_desc" = "Rapidez para eliminar el error estacionario";
+"settings.pid_kd" = "Kd derivativo";
+"settings.pid_kd_desc" = "Respuesta anticipada a la tendencia de temperatura";
+"settings.pid_reset" = "Restablecer valores";
+
+/* Settings Items */
+"settings.launch_at_login" = "Abrir al iniciar sesión";
+"settings.launch_at_login_desc" = "Iniciar la app automáticamente al iniciar sesión";
+"settings.menu_bar_display" = "Mostrar en la barra de menús";
+"settings.menu_bar_display_desc" = "Información que se muestra en la barra de menús";
+"settings.monitoring_interval" = "Intervalo de monitorización";
+"settings.monitoring_interval_desc" = "Frecuencia de lectura de temperaturas (segundos)";
+"settings.high_temp_alert" = "Alerta de temperatura";
+"settings.high_temp_alert_desc" = "Umbral de alerta (°C)";
+"settings.notifications" = "Notificaciones";
+"settings.notifications_desc" = "Avisar cuando la temperatura sea alta";
+"settings.auto_mode_switching" = "Cambio automático de modo";
+"settings.auto_mode_switching_desc" = "Cambia una vez por cada episodio de alta temperatura; puedes volver a manual. A 90 °C se activa aunque esté desactivado.";
+
+/* Display Mode Options */
+"settings.display_mode.none" = "Nada";
+"settings.display_mode.temperature" = "Temperatura";
+"settings.display_mode.power" = "Consumo";
+"settings.display_mode.fan_speed" = "Velocidad ventilador %";
+
+/* Popover View */
+"popover.title" = "Control de ventiladores";
+"popover.settings" = "Ajustes";
+"popover.quit_app" = "Salir de la app";
+"popover.tabs" = "Vista";
+"popover.mode" = "Modo de control";
+
+/* Quit Confirmation */
+"popover.quit_confirm.title" = "¿Salir del control de ventiladores?";
+"popover.quit_confirm.cancel" = "Cancelar";
+"popover.quit_confirm.quit" = "Salir";
+"popover.quit_confirm.message" = "Los ventiladores volverán al modo automático antes de salir.";
+
+/* Helper Installation */
+"popover.helper_required" = "Se necesita el asistente";
+"popover.helper_required_desc" = "El control de ventiladores necesita un asistente en segundo plano. Permítelo una vez en Ajustes del Sistema, sin contraseña.";
+"popover.helper_approval_desc" = "Activa fanfan en Ajustes del Sistema › General › Ítems de inicio y extensiones para terminar la configuración.";
+"popover.install_helper" = "Instalar asistente";
+"popover.open_login_items" = "Abrir Ajustes del Sistema";
+
+/* Access Permissions */
+"popover.system_access_required" = "Se necesita acceso al sistema";
+"popover.system_access_desc" = "La app necesita acceder al controlador de gestión del sistema (SMC) para leer las temperaturas.";
+"popover.no_temperature_data" = "Sin datos de temperatura";
+"popover.no_temperature_data_desc" = "SMC conectado, pero no hay lecturas de temperatura. Puede ocurrir en algunos modelos de Mac.";
+
+/* Auto Mode Settings */
+"popover.strategy" = "Estrategia";
+"popover.strategy.power_saving" = "Ahorro";
+"popover.strategy.balanced" = "Equilibrado";
+"popover.strategy.performance" = "Rendimiento";
+"popover.threshold" = "Temp. objetivo";
+"popover.max_speed" = "Velocidad máx.";
+"popover.response" = "Respuesta";
+
+/* Response Levels */
+"popover.response.min_override" = "Forzar mín.";
+"popover.response.quiet" = "Silencioso";
+"popover.response.balanced" = "Equilibrado";
+"popover.response.auto" = "Auto";
+"popover.response.performance" = "Rendimiento";
+"popover.response.aggressive" = "Agresivo";
+"popover.response.max_override" = "Forzar máx.";
+
+/* Control Modes */
+"popover.mode.manual" = "Manual";
+"popover.mode.auto" = "Auto";
+"popover.mode.system" = "Sistema";
+"popover.startup" = "¿Al iniciar?";
+"popover.startup_help" = "Abrir al iniciar sesión";
+
+/* Helper */
+"popover.install_failed" = "Error en la instalación";
+"popover.install_in_progress" = "El asistente ya se está instalando";
+"popover.helper_not_ready" = "El asistente se registró, pero no está listo";
+
+/* Battery Info */
+"popover.battery" = "Batería";
+"popover.battery.health" = "Salud";
+"popover.battery.cycles" = "Ciclos";
+"popover.battery.status" = "Estado";
+"popover.battery.temp" = "Temp.";
+"popover.battery.voltage" = "Voltaje";
+"popover.battery.power" = "Potencia";
+"popover.battery.capacity" = "Capacidad";
+"popover.battery.source" = "Fuente";
+"popover.battery.full_in" = "Llena en";
+"popover.battery.left" = "Restante";
+
+/* System Info */
+"popover.system" = "Sistema";
+"popover.system.cpu" = "CPU";
+"popover.system.gpu" = "GPU";
+"popover.system.fans" = "Ventiladores";
+"popover.system.rpm" = "RPM";
+"popover.system.fan_limits" = "Límites de ventiladores";
+"popover.system.fan_range" = "Ventilador %d: %d–%d RPM";
+"popover.system.mode" = "Modo";
+
+/* Power Status */
+"popover.power" = "Alimentación";
+"popover.power.charging" = "Cargando";
+"popover.power.plugged_in" = "Conectado";
+"popover.power.battery" = "Batería";
+
+/* Fan Speed View */
+"fan.avg_rpm" = "RPM media";
+"fan.speed" = "Velocidad del ventilador";
+"fan.count_singular" = "%d ventilador";
+"fan.count_plural" = "%d ventiladores";
+"fan.separate_targets" = "Objetivo distinto por ventilador";
+"fan.target" = "Objetivo: %d RPM";
+"fan.number" = "Ventilador %d";
+"fan.current_rpm" = "%d RPM";
+"fan.automatic_control" = "Control automático";
+"fan.automatic_desc" = "La velocidad se ajusta a la temperatura";
+
+/* Tab Bar */
+"tab.overview" = "Resumen";
+"tab.sensors" = "Sensores";
+"tab.fans" = "Ventiladores";
+
+/* Sensors */
+"sensors.none" = "No se detectaron sensores";
+"sensors.fan_details" = "Detalles de ventiladores";
+"sensors.fan" = "Ventilador";
+"sensors.show_all" = "Mostrar los %d";
+"sensors.show_less" = "Mostrar menos";
+"metric.hottest_core.help" = "Temperatura del núcleo más caliente";
+
+/* Temperature Status */
+"temperature.cool" = "Fresco";
+"temperature.normal" = "Normal";
+"temperature.warm" = "Templado";
+"temperature.hot" = "¡Caliente!";
+"temperature.critical" = "¡Crítico!";
+"temperature.no_data" = "Sin datos";
+
+/* Alerts */
+"alert.high_temp.title" = "Alerta de alta temperatura";
+"alert.high_temp.subtitle" = "Temperatura máxima: %.0f°C";
+"alert.high_temp.message" = "Cambia al control automático de ventiladores o revisa tu sistema.";
+"controls.apply_failed" = "No se pudo aplicar el ajuste del ventilador. Revisa el asistente e inténtalo de nuevo.";
+
+/* App */
+"app.title" = "fanfan - Control de ventiladores";
+"app.settings_title" = "Ajustes de fanfan";
+
+/* Hero Card: units stay English to match the monospace readout style */
+"hero.max_temp" = "TEMP MÁX";
+"hero.unit.load" = "% load";
+"hero.unit.battery" = "% bat";
+
+/* Temperature Curve */
+"curve.title" = "TEMPERATURA · 60 S";
+
+/* Micro Metric Cards: aligned with CPU / GPU / SSD in the same row */
+"metric.battery" = "BAT";
+
+/* Controls Card */
+"controls.header" = "CONTROL  %@";
+
+/* Sensor Categories */
+"sensor.category.cpu" = "CPU";
+"sensor.category.gpu" = "GPU";
+"sensor.category.memory" = "Memoria";
+"sensor.category.storage" = "Almacenamiento";
+"sensor.category.battery" = "Batería";
+"sensor.category.system" = "Sistema";
+"sensor.category.ambient" = "Ambiente";
+"sensor.generic" = "Sensor %@";
+
+/* Sensor Names */
+"sensor.TC0P" = "Proximidad CPU";
+"sensor.TC0E" = "Chip CPU";
+"sensor.TC0F" = "Chip CPU";
+"sensor.TC0D" = "Diodo CPU";
+"sensor.TCXC" = "Núcleo CPU";
+"sensor.TC1C" = "Núcleo CPU 1";
+"sensor.TC2C" = "Núcleo CPU 2";
+"sensor.TC3C" = "Núcleo CPU 3";
+"sensor.TC4C" = "Núcleo CPU 4";
+"sensor.TC5C" = "Núcleo CPU 5";
+"sensor.TC6C" = "Núcleo CPU 6";
+"sensor.TC7C" = "Núcleo CPU 7";
+"sensor.TC8C" = "Núcleo CPU 8";
+"sensor.Tp01" = "CPU clúster P";
+"sensor.Tp05" = "CPU clúster E";
+"sensor.Tp09" = "Proximidad CPU";
+"sensor.Tp0D" = "CPU";
+"sensor.Tp0b" = "CPU";
+"sensor.Tp0T" = "CPU";
+"sensor.TGDD" = "Chip GPU";
+"sensor.TG0P" = "Proximidad GPU";
+"sensor.TG0D" = "Diodo GPU";
+"sensor.TG0E" = "GPU";
+"sensor.TG0F" = "GPU";
+"sensor.TG1D" = "Chip GPU 2";
+"sensor.TM0P" = "Proximidad memoria";
+"sensor.TM00" = "Módulo DIMM 1";
+"sensor.TM01" = "Módulo DIMM 2";
+"sensor.TM02" = "Módulo DIMM 3";
+"sensor.TM03" = "Módulo DIMM 4";
+"sensor.TM08" = "Memoria";
+"sensor.TH0P" = "Proximidad disco duro";
+"sensor.TH1P" = "Disco duro 2";
+"sensor.TN0D" = "Diodo SSD";
+"sensor.TN0P" = "Proximidad SSD";
+"sensor.TN1P" = "NAND";
+"sensor.TB0T" = "Sensor de batería 1";
+"sensor.TB1T" = "Sensor de batería 2";
+"sensor.TB2T" = "Sensor de batería 3";
+"sensor.TB3T" = "Batería";
+"sensor.TA0P" = "Ambiente";
+"sensor.TA1P" = "Ambiente 2";
+"sensor.Ts0P" = "Reposamuñecas";
+"sensor.Ts1P" = "Reposamuñecas 2";
+"sensor.Ts2P" = "Carcasa inferior";
+"sensor.TI0P" = "Thunderbolt";
+"sensor.TI1P" = "Thunderbolt 2";
+"sensor.TW0P" = "Tarjeta Wi-Fi";

@@ -1,0 +1,263 @@
+/* 設定介面 */
+"settings.title" = "設定";
+"settings.close" = "關閉設定";
+"settings.changes_apply" = "變更立即生效";
+"settings.fanfan_title" = "fanfan 設定";
+"settings.customize" = "自訂您的風扇控制體驗";
+"settings.close_shortcut" = "關閉 (Cmd+W)";
+"settings.all_changes_apply" = "所有變更立即生效，無需重新啟動 App";
+
+/* 設定分區 */
+"settings.section.menu_bar" = "選單列";
+"settings.section.monitoring" = "監控與警示";
+"settings.section.general" = "一般";
+"settings.section.advanced_pid" = "進階 PID 調校";
+"settings.section.about" = "關於";
+
+/* 關於 / 更新 */
+"settings.version" = "版本";
+"settings.version_desc" = "目前安裝的 App 版本與建置編號";
+"settings.check_updates" = "檢查更新";
+"settings.check_updates_desc" = "與 GitHub 上的最新版本比較";
+"settings.check_updates.button" = "檢查";
+"settings.check_updates.checking" = "檢查中…";
+"settings.check_updates.up_to_date" = "目前已是最新版本";
+"settings.check_updates.failed_format" = "檢查失敗：%@";
+
+"update.alert.title" = "有可用的更新";
+"update.alert.message_header_format" = "新版本 %@ 已推出（目前為 %@）。";
+"update.alert.download" = "下載";
+"update.alert.later" = "稍後";
+"update.error.network" = "網路錯誤";
+
+"settings.pid_override" = "使用自訂增益";
+"settings.pid_override_desc" = "關閉時依回應檔位自動推導 Kp/Ki/Kd";
+"settings.pid_kp" = "Kp 比例";
+"settings.pid_kp_desc" = "每 1°C 誤差貢獻的轉速";
+"settings.pid_ki" = "Ki 積分";
+"settings.pid_ki_desc" = "消除穩態偏差的速度";
+"settings.pid_kd" = "Kd 微分";
+"settings.pid_kd_desc" = "對溫度變化趨勢的預測回應";
+"settings.pid_reset" = "重置為預設值";
+
+/* 設定項目 */
+"settings.launch_at_login" = "登入時啟動";
+"settings.launch_at_login_desc" = "登入時自動啟動 App";
+"settings.menu_bar_display" = "選單列顯示";
+"settings.menu_bar_display_desc" = "在狀態列中顯示的資訊";
+"settings.monitoring_interval" = "監控間隔";
+"settings.monitoring_interval_desc" = "檢查溫度的頻率（秒）";
+"settings.high_temp_alert" = "高溫警示";
+"settings.high_temp_alert_desc" = "警示門檻溫度（°C）";
+"settings.notifications" = "通知";
+"settings.notifications_desc" = "發生高溫事件時顯示警示";
+"settings.auto_mode_switching" = "自動切換模式";
+"settings.auto_mode_switching_desc" = "每次高溫觸發一次，之後可切回手動；達到 90°C 時，即使關閉此項也會觸發";
+
+/* 顯示模式選項 */
+"settings.display_mode.none" = "無";
+"settings.display_mode.temperature" = "溫度";
+"settings.display_mode.power" = "耗電量";
+"settings.display_mode.fan_speed" = "風扇轉速%";
+
+/* 彈出視窗 */
+"popover.title" = "風扇控制";
+"popover.settings" = "設定";
+"popover.quit_app" = "結束 App";
+"popover.tabs" = "檢視";
+"popover.mode" = "控制模式";
+
+/* 結束確認 */
+"popover.quit_confirm.title" = "要結束風扇控制嗎？";
+"popover.quit_confirm.cancel" = "取消";
+"popover.quit_confirm.quit" = "結束";
+"popover.quit_confirm.message" = "結束前會將風扇設回自動模式。";
+
+/* 安裝輔助程式 */
+"popover.helper_required" = "需要輔助程式";
+"popover.helper_required_desc" = "控制風扇需要一個背景輔助程式，在系統設定中允許一次即可，無需輸入密碼。";
+"popover.helper_approval_desc" = "請在「系統設定 › 一般 › 登入項目與延伸功能」中開啟 fanfan 以完成設定。";
+"popover.install_helper" = "安裝輔助程式";
+"popover.open_login_items" = "打開系統設定";
+
+/* 存取權限 */
+"popover.system_access_required" = "需要系統存取權限";
+"popover.system_access_desc" = "App 需要存取系統管理控制器（SMC）來讀取溫度。";
+"popover.no_temperature_data" = "無溫度資料";
+"popover.no_temperature_data_desc" = "SMC 已連線，但沒有溫度讀數。部分 Mac 機型可能會發生此情況。";
+
+/* 自動模式設定 */
+"popover.strategy" = "策略";
+"popover.strategy.power_saving" = "省電";
+"popover.strategy.balanced" = "均衡";
+"popover.strategy.performance" = "效能";
+"popover.threshold" = "目標溫度";
+"popover.max_speed" = "最高轉速";
+"popover.response" = "回應";
+
+/* 回應等級 */
+"popover.response.min_override" = "最低覆寫";
+"popover.response.quiet" = "安靜";
+"popover.response.balanced" = "平衡";
+"popover.response.auto" = "自動";
+"popover.response.performance" = "效能";
+"popover.response.aggressive" = "積極";
+"popover.response.max_override" = "最高覆寫";
+
+/* 控制模式 */
+"popover.mode.manual" = "手動";
+"popover.mode.auto" = "自動";
+"popover.mode.system" = "系統";
+"popover.startup" = "開機啟動？";
+"popover.startup_help" = "登入時啟動";
+
+/* 輔助程式 */
+"popover.install_failed" = "安裝失敗";
+"popover.install_in_progress" = "輔助程式正在安裝中";
+"popover.helper_not_ready" = "輔助程式已註冊，但未能就緒";
+
+/* 電池資訊 */
+"popover.battery" = "電池";
+"popover.battery.health" = "健康度";
+"popover.battery.cycles" = "循環次數";
+"popover.battery.status" = "狀態";
+"popover.battery.temp" = "溫度";
+"popover.battery.voltage" = "電壓";
+"popover.battery.power" = "功率";
+"popover.battery.capacity" = "容量";
+"popover.battery.source" = "電源";
+"popover.battery.full_in" = "充滿還需";
+"popover.battery.left" = "剩餘";
+
+/* 系統資訊 */
+"popover.system" = "系統";
+"popover.system.cpu" = "CPU";
+"popover.system.gpu" = "GPU";
+"popover.system.fans" = "風扇";
+"popover.system.rpm" = "轉速";
+"popover.system.fan_limits" = "風扇限制";
+"popover.system.fan_range" = "風扇 %d：%d–%d 轉";
+"popover.system.mode" = "模式";
+
+/* 電源狀態 */
+"popover.power" = "功率";
+"popover.power.charging" = "充電中";
+"popover.power.plugged_in" = "已接上電源";
+"popover.power.battery" = "使用電池";
+
+/* 風扇轉速檢視 */
+"fan.avg_rpm" = "avg RPM";
+"fan.speed" = "風扇轉速";
+"fan.count_singular" = "%d 個風扇";
+"fan.count_plural" = "%d 個風扇";
+"fan.separate_targets" = "每個風扇個別設定";
+"fan.target" = "目標：%d 轉";
+"fan.number" = "風扇 %d";
+"fan.current_rpm" = "%d 轉";
+"fan.automatic_control" = "自動控制";
+"fan.automatic_desc" = "轉速隨溫度調整";
+
+/* 標籤頁 */
+"tab.overview" = "概覽";
+"tab.sensors" = "感測器";
+"tab.fans" = "風扇";
+
+/* 感測器 */
+"sensors.none" = "未偵測到感測器";
+"sensors.fan_details" = "風扇詳細資訊";
+"sensors.fan" = "風扇";
+"sensors.show_all" = "顯示全部 %d 個";
+"sensors.show_less" = "收合";
+"metric.hottest_core.help" = "最熱核心溫度";
+
+/* 溫度狀態 */
+"temperature.cool" = "涼爽";
+"temperature.normal" = "正常";
+"temperature.warm" = "偏熱";
+"temperature.hot" = "過熱！";
+"temperature.critical" = "危險！";
+"temperature.no_data" = "無資料";
+
+/* 警示 */
+"alert.high_temp.title" = "高溫警示";
+"alert.high_temp.subtitle" = "最高溫度：%.0f°C";
+"alert.high_temp.message" = "建議切換為自動風扇控制，或檢查您的系統。";
+"controls.apply_failed" = "無法套用風扇設定，請檢查輔助程式後再試一次。";
+
+/* App */
+"app.title" = "fanfan - 風扇控制";
+"app.settings_title" = "fanfan 設定";
+
+/* 主卡片：單位保留英文，更符合等寬數字風格 */
+"hero.max_temp" = "最高溫度";
+"hero.unit.load" = "% load";
+"hero.unit.battery" = "% bat";
+
+/* 溫度曲線 */
+"curve.title" = "溫度 · 60 秒";
+
+/* 指標卡片：與同列的 CPU / GPU / SSD 視覺對齊 */
+"metric.battery" = "BAT";
+
+/* 控制卡片 */
+"controls.header" = "%@ 控制";
+
+/* 感測器分類 */
+"sensor.category.cpu" = "CPU";
+"sensor.category.gpu" = "GPU";
+"sensor.category.memory" = "記憶體";
+"sensor.category.storage" = "儲存裝置";
+"sensor.category.battery" = "電池";
+"sensor.category.system" = "系統";
+"sensor.category.ambient" = "環境";
+"sensor.generic" = "%@ 感測器";
+
+/* 感測器名稱 */
+"sensor.TC0P" = "CPU 鄰近";
+"sensor.TC0E" = "CPU 晶粒";
+"sensor.TC0F" = "CPU 晶粒";
+"sensor.TC0D" = "CPU 溫度";
+"sensor.TCXC" = "CPU 核心";
+"sensor.TC1C" = "CPU 核心 1";
+"sensor.TC2C" = "CPU 核心 2";
+"sensor.TC3C" = "CPU 核心 3";
+"sensor.TC4C" = "CPU 核心 4";
+"sensor.TC5C" = "CPU 核心 5";
+"sensor.TC6C" = "CPU 核心 6";
+"sensor.TC7C" = "CPU 核心 7";
+"sensor.TC8C" = "CPU 核心 8";
+"sensor.Tp01" = "CPU 效能核心叢集";
+"sensor.Tp05" = "CPU 節能核心叢集";
+"sensor.Tp09" = "CPU 鄰近";
+"sensor.Tp0D" = "CPU";
+"sensor.Tp0b" = "CPU";
+"sensor.Tp0T" = "CPU";
+"sensor.TGDD" = "GPU 晶粒";
+"sensor.TG0P" = "GPU 鄰近";
+"sensor.TG0D" = "GPU 溫度";
+"sensor.TG0E" = "GPU";
+"sensor.TG0F" = "GPU";
+"sensor.TG1D" = "GPU 晶粒 2";
+"sensor.TM0P" = "記憶體鄰近";
+"sensor.TM00" = "記憶體插槽 1";
+"sensor.TM01" = "記憶體插槽 2";
+"sensor.TM02" = "記憶體插槽 3";
+"sensor.TM03" = "記憶體插槽 4";
+"sensor.TM08" = "記憶體";
+"sensor.TH0P" = "硬碟鄰近";
+"sensor.TH1P" = "硬碟 2";
+"sensor.TN0D" = "SSD 溫度";
+"sensor.TN0P" = "SSD 鄰近";
+"sensor.TN1P" = "NAND 快閃記憶體";
+"sensor.TB0T" = "電池感測器 1";
+"sensor.TB1T" = "電池感測器 2";
+"sensor.TB2T" = "電池感測器 3";
+"sensor.TB3T" = "電池";
+"sensor.TA0P" = "環境";
+"sensor.TA1P" = "環境 2";
+"sensor.Ts0P" = "掌墊";
+"sensor.Ts1P" = "掌墊 2";
+"sensor.Ts2P" = "機身底部";
+"sensor.TI0P" = "Thunderbolt";
+"sensor.TI1P" = "Thunderbolt 2";
+"sensor.TW0P" = "無線網卡";

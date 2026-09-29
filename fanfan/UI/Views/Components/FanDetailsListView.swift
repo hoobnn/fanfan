@@ -83,7 +83,7 @@ struct FanDetailsListView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .opacity(rpm > 0 ? 1 : 0.45)
-        .accessibilityLabel("Fan \(index + 1)")
+        .accessibilityLabel(String(format: NSLocalizedString("fan.number", comment: ""), index + 1))
         .accessibilityValue("\(rpm) rpm, \(Int(pct * 100))%")
     }
 

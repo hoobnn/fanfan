@@ -81,7 +81,7 @@ class PermissionsManager: ObservableObject {
     
     func installHelper(completion: @escaping (Bool, String?) -> Void) {
         guard !isInstalling else {
-            completion(false, "Helper installation already in progress")
+            completion(false, NSLocalizedString("popover.install_in_progress", comment: ""))
             return
         }
         if service.status == .requiresApproval {
@@ -144,7 +144,7 @@ class PermissionsManager: ObservableObject {
                     self.isHelperInstalled = daemonReady
                     completion(
                         daemonReady,
-                        daemonReady ? nil : "Helper registered but did not become ready"
+                        daemonReady ? nil : NSLocalizedString("popover.helper_not_ready", comment: "")
                     )
                 }
             }

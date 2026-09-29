@@ -1,0 +1,263 @@
+/* 設定画面 */
+"settings.title" = "設定";
+"settings.close" = "設定を閉じる";
+"settings.changes_apply" = "変更はすぐに反映されます";
+"settings.fanfan_title" = "fanfan の設定";
+"settings.customize" = "ファン制御をカスタマイズできます";
+"settings.close_shortcut" = "閉じる (Cmd+W)";
+"settings.all_changes_apply" = "すべての変更はアプリを再起動せずにすぐ反映されます";
+
+/* 設定セクション */
+"settings.section.menu_bar" = "メニューバー";
+"settings.section.monitoring" = "モニタリングと警告";
+"settings.section.general" = "一般";
+"settings.section.advanced_pid" = "PID 詳細調整";
+"settings.section.about" = "情報";
+
+/* 情報 / アップデート */
+"settings.version" = "バージョン";
+"settings.version_desc" = "インストール済みのバージョンとビルド";
+"settings.check_updates" = "アップデートを確認";
+"settings.check_updates_desc" = "GitHub の最新リリースと比較します";
+"settings.check_updates.button" = "確認";
+"settings.check_updates.checking" = "確認中…";
+"settings.check_updates.up_to_date" = "最新バージョンです";
+"settings.check_updates.failed_format" = "確認に失敗しました：%@";
+
+"update.alert.title" = "アップデートがあります";
+"update.alert.message_header_format" = "バージョン %@ が利用可能です（現在 %@）。";
+"update.alert.download" = "ダウンロード";
+"update.alert.later" = "あとで";
+"update.error.network" = "ネットワークエラー";
+
+"settings.pid_override" = "カスタムゲイン";
+"settings.pid_override_desc" = "オフの場合、応答レベルから Kp/Ki/Kd を自動算出します";
+"settings.pid_kp" = "Kp 比例";
+"settings.pid_kp_desc" = "誤差 1°C あたりの RPM";
+"settings.pid_ki" = "Ki 積分";
+"settings.pid_ki_desc" = "定常偏差を解消する速さ";
+"settings.pid_kd" = "Kd 微分";
+"settings.pid_kd_desc" = "温度変化の傾向に対する予測応答";
+"settings.pid_reset" = "デフォルトに戻す";
+
+/* 設定項目 */
+"settings.launch_at_login" = "ログイン時に起動";
+"settings.launch_at_login_desc" = "ログイン時にアプリを自動的に起動します";
+"settings.menu_bar_display" = "メニューバーの表示";
+"settings.menu_bar_display_desc" = "ステータスバーに表示する情報";
+"settings.monitoring_interval" = "監視間隔";
+"settings.monitoring_interval_desc" = "温度を確認する頻度（秒）";
+"settings.high_temp_alert" = "高温警告";
+"settings.high_temp_alert_desc" = "警告のしきい値温度（°C）";
+"settings.notifications" = "通知";
+"settings.notifications_desc" = "高温時に警告を表示します";
+"settings.auto_mode_switching" = "自動モード切り替え";
+"settings.auto_mode_switching_desc" = "高温になるたびに一度だけ切り替わり、手動に戻すこともできます。90°C に達するとオフでも作動します。";
+
+/* 表示モード */
+"settings.display_mode.none" = "なし";
+"settings.display_mode.temperature" = "温度";
+"settings.display_mode.power" = "消費電力";
+"settings.display_mode.fan_speed" = "ファン回転数 %";
+
+/* ポップオーバー */
+"popover.title" = "ファン制御";
+"popover.settings" = "設定";
+"popover.quit_app" = "アプリを終了";
+"popover.tabs" = "表示";
+"popover.mode" = "制御モード";
+
+/* 終了確認 */
+"popover.quit_confirm.title" = "ファン制御を終了しますか？";
+"popover.quit_confirm.cancel" = "キャンセル";
+"popover.quit_confirm.quit" = "終了";
+"popover.quit_confirm.message" = "終了する前にファンは自動モードに戻ります。";
+
+/* ヘルパーのインストール */
+"popover.helper_required" = "ヘルパーが必要です";
+"popover.helper_required_desc" = "ファン制御にはバックグラウンドのヘルパーが必要です。システム設定で一度許可するだけで、パスワードは不要です。";
+"popover.helper_approval_desc" = "「システム設定 › 一般 › ログイン項目と機能拡張」で fanfan をオンにして設定を完了してください。";
+"popover.install_helper" = "ヘルパーをインストール";
+"popover.open_login_items" = "システム設定を開く";
+
+/* アクセス権限 */
+"popover.system_access_required" = "システムへのアクセスが必要です";
+"popover.system_access_desc" = "温度を読み取るには、システム管理コントローラ（SMC）へのアクセスが必要です。";
+"popover.no_temperature_data" = "温度データなし";
+"popover.no_temperature_data_desc" = "SMC に接続しましたが、温度を読み取れません。一部の Mac モデルで発生することがあります。";
+
+/* 自動モード設定 */
+"popover.strategy" = "方針";
+"popover.strategy.power_saving" = "省電力";
+"popover.strategy.balanced" = "バランス";
+"popover.strategy.performance" = "高性能";
+"popover.threshold" = "目標温度";
+"popover.max_speed" = "最大回転数";
+"popover.response" = "応答";
+
+/* 応答レベル */
+"popover.response.min_override" = "最小固定";
+"popover.response.quiet" = "静音";
+"popover.response.balanced" = "バランス";
+"popover.response.auto" = "自動";
+"popover.response.performance" = "高性能";
+"popover.response.aggressive" = "強力";
+"popover.response.max_override" = "最大固定";
+
+/* 制御モード */
+"popover.mode.manual" = "手動";
+"popover.mode.auto" = "自動";
+"popover.mode.system" = "システム";
+"popover.startup" = "自動起動？";
+"popover.startup_help" = "ログイン時に起動";
+
+/* ヘルパー */
+"popover.install_failed" = "インストールに失敗しました";
+"popover.install_in_progress" = "ヘルパーはすでにインストール中です";
+"popover.helper_not_ready" = "ヘルパーは登録されましたが、準備ができませんでした";
+
+/* バッテリー情報 */
+"popover.battery" = "バッテリー";
+"popover.battery.health" = "状態";
+"popover.battery.cycles" = "充放電回数";
+"popover.battery.status" = "ステータス";
+"popover.battery.temp" = "温度";
+"popover.battery.voltage" = "電圧";
+"popover.battery.power" = "電力";
+"popover.battery.capacity" = "容量";
+"popover.battery.source" = "電源";
+"popover.battery.full_in" = "満充電まで";
+"popover.battery.left" = "残り";
+
+/* システム情報 */
+"popover.system" = "システム";
+"popover.system.cpu" = "CPU";
+"popover.system.gpu" = "GPU";
+"popover.system.fans" = "ファン";
+"popover.system.rpm" = "RPM";
+"popover.system.fan_limits" = "ファンの範囲";
+"popover.system.fan_range" = "ファン %d：%d–%d RPM";
+"popover.system.mode" = "モード";
+
+/* 電源状態 */
+"popover.power" = "電力";
+"popover.power.charging" = "充電中";
+"popover.power.plugged_in" = "電源接続中";
+"popover.power.battery" = "バッテリー駆動";
+
+/* ファン回転数 */
+"fan.avg_rpm" = "avg RPM";
+"fan.speed" = "ファン回転数";
+"fan.count_singular" = "ファン %d 基";
+"fan.count_plural" = "ファン %d 基";
+"fan.separate_targets" = "ファンごとに個別設定";
+"fan.target" = "目標：%d RPM";
+"fan.number" = "ファン %d";
+"fan.current_rpm" = "%d RPM";
+"fan.automatic_control" = "自動制御";
+"fan.automatic_desc" = "温度に応じて回転数を調整します";
+
+/* タブ */
+"tab.overview" = "概要";
+"tab.sensors" = "センサー";
+"tab.fans" = "ファン";
+
+/* センサー */
+"sensors.none" = "センサーが見つかりません";
+"sensors.fan_details" = "ファンの詳細";
+"sensors.fan" = "ファン";
+"sensors.show_all" = "すべて表示（%d）";
+"sensors.show_less" = "折りたたむ";
+"metric.hottest_core.help" = "最も高いコア温度";
+
+/* 温度ステータス */
+"temperature.cool" = "低温";
+"temperature.normal" = "正常";
+"temperature.warm" = "やや高温";
+"temperature.hot" = "高温！";
+"temperature.critical" = "危険！";
+"temperature.no_data" = "データなし";
+
+/* 警告 */
+"alert.high_temp.title" = "高温警告";
+"alert.high_temp.subtitle" = "最高温度：%.0f°C";
+"alert.high_temp.message" = "自動ファン制御に切り替えるか、システムを確認してください。";
+"controls.apply_failed" = "ファンの設定を適用できませんでした。ヘルパーを確認してもう一度お試しください。";
+
+/* アプリ */
+"app.title" = "fanfan - ファン制御";
+"app.settings_title" = "fanfan の設定";
+
+/* メインカード：単位は等幅の数値表示に合わせて英語のまま */
+"hero.max_temp" = "最高温度";
+"hero.unit.load" = "% load";
+"hero.unit.battery" = "% bat";
+
+/* 温度グラフ */
+"curve.title" = "温度 · 60秒";
+
+/* メトリクスカード：同じ行の CPU / GPU / SSD と揃える */
+"metric.battery" = "BAT";
+
+/* 制御カード */
+"controls.header" = "%@ 制御";
+
+/* センサーの分類 */
+"sensor.category.cpu" = "CPU";
+"sensor.category.gpu" = "GPU";
+"sensor.category.memory" = "メモリ";
+"sensor.category.storage" = "ストレージ";
+"sensor.category.battery" = "バッテリー";
+"sensor.category.system" = "システム";
+"sensor.category.ambient" = "周囲";
+"sensor.generic" = "%@ センサー";
+
+/* センサー名 */
+"sensor.TC0P" = "CPU 近傍";
+"sensor.TC0E" = "CPU ダイ";
+"sensor.TC0F" = "CPU ダイ";
+"sensor.TC0D" = "CPU 温度";
+"sensor.TCXC" = "CPU コア";
+"sensor.TC1C" = "CPU コア 1";
+"sensor.TC2C" = "CPU コア 2";
+"sensor.TC3C" = "CPU コア 3";
+"sensor.TC4C" = "CPU コア 4";
+"sensor.TC5C" = "CPU コア 5";
+"sensor.TC6C" = "CPU コア 6";
+"sensor.TC7C" = "CPU コア 7";
+"sensor.TC8C" = "CPU コア 8";
+"sensor.Tp01" = "CPU 高性能クラスタ";
+"sensor.Tp05" = "CPU 高効率クラスタ";
+"sensor.Tp09" = "CPU 近傍";
+"sensor.Tp0D" = "CPU";
+"sensor.Tp0b" = "CPU";
+"sensor.Tp0T" = "CPU";
+"sensor.TGDD" = "GPU ダイ";
+"sensor.TG0P" = "GPU 近傍";
+"sensor.TG0D" = "GPU 温度";
+"sensor.TG0E" = "GPU";
+"sensor.TG0F" = "GPU";
+"sensor.TG1D" = "GPU ダイ 2";
+"sensor.TM0P" = "メモリ近傍";
+"sensor.TM00" = "DIMM 1";
+"sensor.TM01" = "DIMM 2";
+"sensor.TM02" = "DIMM 3";
+"sensor.TM03" = "DIMM 4";
+"sensor.TM08" = "メモリ";
+"sensor.TH0P" = "HDD 近傍";
+"sensor.TH1P" = "HDD 2";
+"sensor.TN0D" = "SSD 温度";
+"sensor.TN0P" = "SSD 近傍";
+"sensor.TN1P" = "NAND";
+"sensor.TB0T" = "バッテリーセンサー 1";
+"sensor.TB1T" = "バッテリーセンサー 2";
+"sensor.TB2T" = "バッテリーセンサー 3";
+"sensor.TB3T" = "バッテリー";
+"sensor.TA0P" = "周囲";
+"sensor.TA1P" = "周囲 2";
+"sensor.Ts0P" = "パームレスト";
+"sensor.Ts1P" = "パームレスト 2";
+"sensor.Ts2P" = "底面ケース";
+"sensor.TI0P" = "Thunderbolt";
+"sensor.TI1P" = "Thunderbolt 2";
+"sensor.TW0P" = "Wi-Fi カード";

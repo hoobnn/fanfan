@@ -36,7 +36,7 @@ fanfan.app (user)  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶ 
 - `Theme.swift` —— 设计规则严格执行：**温度是唯一的颜色**。UI 全单色，温度升高时一层几乎不可见的暖色从 popover 顶部渗入。新增 UI 一律从 `Theme` 取色，不要硬编码。
 - `SystemMonitor.swift` —— IOKit 传感器 / SMC 读取器，SMC 键位目录在这里。
 - `StatusBarManager.swift` —— 四种状态栏显示模式由 `StatusBarDisplayModeChanged` 通知驱动。
-- 本地化字符串在 `en.lproj/` 和 `zh-Hans.lproj/`，用 `NSLocalizedString`，两种语言必须同步。
+- 本地化字符串在 `fanfan/Resources/<lang>.lproj/Localizable.strings`（en、zh-Hans、zh-Hant、ja、ko、de、fr、es），用 `NSLocalizedString`，新增或修改键时所有语言必须同步。`sensor.<SMC 键>` 只在非英文文件里出现，英文名直接取自 `SystemMonitor` 的键位目录。新增语言还要加进 `project.pbxproj` 的 `knownRegions`。
 
 ## 构建、运行、测试
 
