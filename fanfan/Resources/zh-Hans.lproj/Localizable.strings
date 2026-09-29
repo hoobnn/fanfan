@@ -64,6 +64,8 @@
 "popover.title" = "风扇控制";
 "popover.settings" = "设置";
 "popover.quit_app" = "退出应用";
+"popover.tabs" = "视图";
+"popover.mode" = "控制模式";
 
 /* 退出确认 */
 "popover.quit_confirm.title" = "退出风扇控制？";

@@ -19,6 +19,8 @@ struct FanBladeView: View {
     var accent: Color
 
     @Environment(\.colorScheme) private var scheme
+    /// Reduce Motion freezes the rotor; RPM is still shown as text beside it. / 中文：开启「减弱动态效果」时转子静止；转速仍以文字显示在旁边。
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Rotation is integrated incrementally from these anchors so a change in / 中文：旋转从这些锚点增量积分，因此变化发生在
     /// `visualRps` only alters the *rate* — never the current angle. Driving / 中文：`visualRps` 只改变速度，不改变当前角度；如果直接使用
@@ -29,6 +31,7 @@ struct FanBladeView: View {
 
     /// Visual rotations-per-second, capped so very high RPM doesn't strobe. / 中文：Visual rotations-per-second, capped so very high RPM doesn't strobe.
     private var visualRps: Double {
+        guard !reduceMotion else { return 0 }
         let target = Double(rpm) / Double(max(1, maxRpm)) * 2.2
         return min(3.5, max(0, target))
     }

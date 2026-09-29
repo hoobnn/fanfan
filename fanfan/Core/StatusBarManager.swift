@@ -79,6 +79,17 @@ class StatusBarManager: NSObject, ObservableObject {
             selector: #selector(applicationDidResignActive(_:)),
             name: NSApplication.didResignActiveNotification,
             object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(accessibilityDisplayOptionsDidChange(_:)),
+            name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil)
+    }
+
+    /// Reduce Motion toggled in System Settings — stop or resume the spin. / 中文：系统设置中切换了「减弱动态效果」——停止或恢复旋转。
+    @objc private func accessibilityDisplayOptionsDidChange(_ notification: Notification) {
+        stopAnimation()
+        updateAnimationSpeed()
     }
 
     @objc private func applicationDidResignActive(_ notification: Notification) {
@@ -116,7 +127,8 @@ class StatusBarManager: NSObject, ObservableObject {
         // cheaper downstream than re-blitting a custom RGBA bitmap. The icon / 中文：远低于重新位图绘制 RGBA 像素的成本。该图标本就是
         // is already a monochrome silhouette, so template mode renders correctly. / 中文：单色剪影，使用模板模式渲染正确。
         button.image?.isTemplate = true
-        button.title = "fanfan 85°"  // Initial temperature display with app name to ensure visibility
+        // Placeholder until the first sample lands — same width as a real reading. / 中文：首个采样到来前的占位，与真实读数等宽。
+        button.title = "\u{2007}--°"
         button.imagePosition = .imageLeft
         button.toolTip = "fanfan"
         
@@ -363,7 +375,9 @@ class StatusBarManager: NSObject, ObservableObject {
     }
     
     private func updateAnimationSpeed() {
-        guard displayFanSpeedMax > 0 else {
+        // Reduce Motion: a still fan icon; the title still carries the reading. / 中文：减弱动态效果时图标静止，读数仍由标题显示。
+        guard displayFanSpeedMax > 0,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
             stopAnimation()
             statusItem?.button?.image = cachedIcon(for: 0)
             return
@@ -490,6 +504,7 @@ class StatusBarManager: NSObject, ObservableObject {
     
     deinit {
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         stopAnimation()
     }
 }

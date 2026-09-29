@@ -49,11 +49,11 @@ struct HeroCard: View {
                         Text((level?.label.uppercased() ?? "—"))
                             .font(Theme.label(10, weight: .semibold))
                             .tracking(0.6)
-                            .foregroundColor(Theme.text3(scheme))
+                            .foregroundStyle(Theme.text3)
                         Text("·  " + NSLocalizedString("hero.max_temp", comment: ""))
                             .font(Theme.label(10, weight: .medium))
                             .tracking(0.4)
-                            .foregroundColor(Theme.text4(scheme))
+                            .foregroundStyle(Theme.text4)
                     }
 
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
@@ -63,7 +63,7 @@ struct HeroCard: View {
                             .contentTransition(.numericText())
                         Text("°C")
                             .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(Theme.text3(scheme))
+                            .foregroundStyle(Theme.text3)
                     }
                     .padding(.top, 1)
                 }
@@ -99,11 +99,11 @@ struct HeroCard: View {
                     Spacer()
                     Text("100°").font(Theme.num(9, weight: .medium))
                 }
-                .foregroundColor(Theme.text4(scheme))
+                .foregroundStyle(Theme.text4)
             }
 
             if showsFan || metrics.hasBattery {
-                Divider().background(Theme.separator(scheme))
+                Divider()
 
                 HStack(spacing: 0) {
                     if showsFan {
@@ -131,10 +131,10 @@ struct HeroCard: View {
         HStack(alignment: .firstTextBaseline, spacing: 2) {
             Text(value)
                 .font(Theme.num(12, weight: .semibold))
-                .foregroundColor(Theme.text1(scheme))
+                .foregroundStyle(Theme.text1)
             Text(unit)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(Theme.text3(scheme))
+                .foregroundStyle(Theme.text3)
         }
         .frame(maxWidth: .infinity)
     }

@@ -23,7 +23,7 @@ struct MicroMetricCard: View {
             Text(label.uppercased())
                 .font(Theme.label(9, weight: .bold))
                 .tracking(0.6)
-                .foregroundColor(Theme.text3(scheme))
+                .foregroundStyle(Theme.text3)
 
             HStack(alignment: .firstTextBaseline, spacing: 1) {
                 Text(temp.map { String(format: "%.0f", $0) } ?? "—")
@@ -32,7 +32,7 @@ struct MicroMetricCard: View {
                     .contentTransition(.numericText())
                 Text("°")
                     .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
             }
             .padding(.bottom, 2)
 

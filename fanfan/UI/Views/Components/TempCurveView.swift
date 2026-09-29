@@ -32,7 +32,7 @@ struct TempCurveView: View {
                         p.move(to: CGPoint(x: 0, y: y))
                         p.addLine(to: CGPoint(x: w, y: y))
                     }
-                    .stroke(Theme.text1(scheme).opacity(0.10),
+                    .stroke(Color.primary.opacity(0.10),
                             style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
                 }
 

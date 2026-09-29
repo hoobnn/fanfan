@@ -16,6 +16,7 @@ struct HeatBar: View {
     var height: CGFloat = 3
 
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geo in
@@ -54,7 +55,7 @@ struct HeatBar: View {
                     .frame(width: geo.size.width * pct)
                     .shadow(color: accent.opacity(scheme == .dark ? 0.6 : 0.38),
                             radius: 2.5, x: 0, y: 0)
-                    .animation(.easeOut(duration: 0.6), value: pct)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.6), value: pct)
             }
             .frame(height: height)
             .frame(maxHeight: .infinity, alignment: .center)

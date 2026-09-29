@@ -118,11 +118,11 @@ struct ControlsCard: View, Equatable {
                         modeLabel(selectedMode).uppercased()))
                 .font(Theme.label(10.5, weight: .semibold))
                 .tracking(0.4)
-                .foregroundColor(Theme.text3(scheme))
+                .foregroundStyle(Theme.text3)
 
             Spacer()
 
-            Picker("", selection: Binding(
+            Picker(NSLocalizedString("popover.mode", comment: ""), selection: Binding(
                 get: { selectedMode },
                 set: { newMode in
                     guard newMode != selectedMode else { return }
@@ -174,7 +174,8 @@ struct ControlsCard: View, Equatable {
                     set: { viewModel.setAutoAggressiveness(responseStep($0)) }
                 ),
                 range: 0...Double(responseSteps.count - 1), step: 1,
-                format: { responseLabel(for: responseStep($0)) }
+                format: { responseLabel(for: responseStep($0)) },
+                showsTicks: true
             )
         }
     }
@@ -186,9 +187,9 @@ struct ControlsCard: View, Equatable {
         HStack {
             Text(NSLocalizedString("popover.strategy", comment: ""))
                 .font(.system(size: 11.5, weight: .medium))
-                .foregroundColor(Theme.text1(scheme))
+                .foregroundStyle(Theme.text1)
             Spacer()
-            Picker("", selection: Binding(
+            Picker(NSLocalizedString("popover.strategy", comment: ""), selection: Binding(
                 get: { snapshot.powerStrategy },
                 set: { newStrategy in
                     guard newStrategy != snapshot.powerStrategy else { return }
@@ -218,7 +219,7 @@ struct ControlsCard: View, Equatable {
                 )) {
                     Text(NSLocalizedString("fan.separate_targets", comment: ""))
                         .font(.system(size: 11.5, weight: .medium))
-                        .foregroundColor(Theme.text1(scheme))
+                        .foregroundStyle(Theme.text1)
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
@@ -361,9 +362,13 @@ struct LabeledSlider: View {
     let label: String
     @Binding var value: Double
     let range: ClosedRange<Double>
-    let step: Double.Stride
+    let step: Double
     let format: (Double) -> String
     var accent: SliderAccent = .neutral
+    /// Draw a tick per step. Only for a handful of meaningful notches — on / 中文：每个步进画一个刻度。仅用于少量有意义的档位——
+    /// fine-grained ranges (rpm in 50s, °C in 1s) the macOS 26 slider would / 中文：细粒度范围（按 50 rpm、1 °C 步进）下 macOS 26 滑杆
+    /// draw a dense dotted rail, so those snap silently instead. / 中文：会画出密密的点阵，因此改为无刻度静默吸附。
+    var showsTicks: Bool = false
 
     @Environment(\.colorScheme) private var scheme
 
@@ -372,14 +377,17 @@ struct LabeledSlider: View {
             HStack {
                 Text(label)
                     .font(.system(size: 11.5, weight: .medium))
-                    .foregroundColor(Theme.text1(scheme))
+                    .foregroundStyle(Theme.text1)
                 Spacer()
                 Text(format(value))
                     .font(Theme.num(11.5, weight: .semibold))
-                    .foregroundColor(Theme.text1(scheme))
+                    .foregroundStyle(Theme.text1)
+                    .contentTransition(.numericText())
             }
-            Slider(value: $value, in: range, step: step)
+            SnappingSlider(value: $value, range: range, step: step, showsTicks: showsTicks)
                 .tint(sliderTint)
+                .accessibilityLabel(label)
+                .accessibilityValue(format(value))
         }
     }
 
@@ -391,5 +399,32 @@ struct LabeledSlider: View {
         case .thermal: return Theme.thermalColor(forTemperature: value, scheme: scheme)
         case .neutral: return Theme.sliderTint(scheme)
         }
+    }
+}
+
+/// System slider that lands on `step` multiples, with or without ticks. / 中文：落在 `step` 整数倍上的系统滑杆，可选是否显示刻度。
+struct SnappingSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    var showsTicks: Bool = false
+
+    var body: some View {
+        if showsTicks {
+            Slider(value: $value, in: range, step: step)
+        } else {
+            Slider(value: Binding(
+                get: { value },
+                set: { value = Self.snap($0, to: step, in: range) }
+            ), in: range)
+        }
+    }
+
+    /// Rounds to the nearest step counted from the range's lower bound, the / 中文：从范围下界起按步进取最近值，
+    /// same grid a stepped `Slider` uses. / 中文：与带 step 的 `Slider` 使用同一网格。
+    static func snap(_ raw: Double, to step: Double, in range: ClosedRange<Double>) -> Double {
+        guard step > 0 else { return raw }
+        let snapped = range.lowerBound + ((raw - range.lowerBound) / step).rounded() * step
+        return Swift.min(Swift.max(snapped, range.lowerBound), range.upperBound)
     }
 }

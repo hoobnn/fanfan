@@ -64,6 +64,8 @@
 "popover.title" = "Fan Control";
 "popover.settings" = "Settings";
 "popover.quit_app" = "Quit App";
+"popover.tabs" = "View";
+"popover.mode" = "Control Mode";
 
 /* Quit Confirmation */
 "popover.quit_confirm.title" = "Quit Fan Control?";

@@ -31,14 +31,14 @@ struct FanDetailsListView: View {
                 Text(NSLocalizedString("sensors.fan_details", comment: "").uppercased())
                     .font(Theme.label(10.5, weight: .semibold))
                     .tracking(0.4)
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
                 Spacer()
                 let key = metrics.numberOfFans == 1
                     ? "fan.count_singular" : "fan.count_plural"
                 Text(String(format: NSLocalizedString(key, comment: ""),
                             metrics.numberOfFans))
                     .font(Theme.num(11, weight: .medium))
-                    .foregroundColor(Theme.text2(scheme))
+                    .foregroundStyle(Theme.text2)
             }
             .padding(.horizontal, 14)
             .padding(.top, 10)
@@ -69,7 +69,7 @@ struct FanDetailsListView: View {
             Text("F\(index + 1)")
                 .font(Theme.label(11, weight: .semibold))
                 .tracking(0.4)
-                .foregroundColor(Theme.text3(scheme))
+                .foregroundStyle(Theme.text3)
                 .frame(width: 26, alignment: .leading)
 
             HeatBar(value: Double(rpm), min: Double(mn), max: Double(mx),
@@ -77,7 +77,7 @@ struct FanDetailsListView: View {
 
             Text("\(rpm)")
                 .font(Theme.num(12.5, weight: .semibold))
-                .foregroundColor(Theme.text1(scheme))
+                .foregroundStyle(Theme.text1)
                 .frame(width: 52, alignment: .trailing)
         }
         .padding(.horizontal, 14)

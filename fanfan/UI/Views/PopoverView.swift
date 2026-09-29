@@ -43,22 +43,23 @@ struct PopoverView: View {
         .frame(minHeight:   usesFixedHeight ? fixedPopoverHeight : nil,
                idealHeight: usesFixedHeight ? fixedPopoverHeight : nil,
                maxHeight:   usesFixedHeight ? fixedPopoverHeight : nil)
-        .background {
-            ZStack(alignment: .top) {
-                Rectangle().fill(Theme.bgPrimary(scheme))
-                // Temperature atmosphere — a barely-there wash bleeding down
-                // from the top so the whole popover breathes the current heat.
-                // Anchored to a fixed pixel height so tab-switching height
-                // changes don't restretch the gradient behind the header.
-                LinearGradient(
+        .background(alignment: .top) {
+            // No opaque fill: the popover's own Liquid Glass material is the
+            // surface, the cards sit on it as the content layer.
+            // 中文：不铺不透明底色：popover 自带的 Liquid Glass 材质就是底面，卡片作为内容层叠在上面。
+            //
+            // Temperature atmosphere — a barely-there wash bleeding down
+            // from the top so the whole popover breathes the current heat.
+            // Anchored to a fixed pixel height so tab-switching height
+            // changes don't restretch the gradient behind the header.
+            LinearGradient(
                     colors: [atmosphere.opacity(scheme == .dark ? 0.09 : 0.055),
                              .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .frame(height: 240)
-            }
-            .ignoresSafeArea()
+                .ignoresSafeArea()
         }
         .onAppear(perform: onAppear)
         .onDisappear(perform: onDisappear)
@@ -80,31 +81,26 @@ struct PopoverView: View {
             HStack(spacing: 4) {
                 Text(NSLocalizedString("popover.title", comment: ""))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Theme.text1(scheme))
+                    .foregroundStyle(Theme.text1)
 
                 Spacer()
 
-                Button {
-                    openWindow(id: "settings")
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                        .foregroundColor(Theme.text3(scheme))
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
+                GlassEffectContainer(spacing: 6) {
+                    HStack(spacing: 6) {
+                        headerButton(
+                            systemImage: "gearshape",
+                            title: NSLocalizedString("popover.settings", comment: "")
+                        ) {
+                            openWindow(id: "settings")
+                        }
+                        headerButton(
+                            systemImage: "power",
+                            title: NSLocalizedString("popover.quit_app", comment: "")
+                        ) {
+                            showingQuitConfirm = true
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    showingQuitConfirm = true
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Theme.text3(scheme))
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
             }
             // Indent title + buttons to sit on the same vertical baseline as
             // card content below (popover edge + 22pt). Negative trailing
@@ -112,7 +108,7 @@ struct PopoverView: View {
             // anchored to the card-content right edge rather than floating
             // inside it.
             .padding(.leading, 12)
-            .padding(.trailing, 6)
+            .padding(.trailing, 8)
 
             if showsTabs {
                 tabBar
@@ -175,52 +171,36 @@ struct PopoverView: View {
     // MARK: - Tabs / 中文：标签页
 
     private var tabBar: some View {
-        HStack(spacing: 3) {
-            tabButton(.overview, NSLocalizedString("tab.overview", comment: ""))
-            tabButton(.sensors,  NSLocalizedString("tab.sensors",  comment: ""))
+        // Bare state change through the binding — wrapping it in
+        // `withAnimation` animates the frame's height at the same time
+        // NSPopover runs its own resize animation; the two run on different
+        // curves and produce a visible "text drops down" jitter when
+        // shrinking sensors → overview.
+        // 中文：通过 binding 直接改状态——若包进 `withAnimation`，会与 NSPopover 自身的
+        // 尺寸动画同时驱动高度，两条曲线不同步，从传感器切回概览时出现文字下坠抖动。
+        Picker(NSLocalizedString("popover.tabs", comment: ""), selection: $selectedTab) {
+            Text(NSLocalizedString("tab.overview", comment: "")).tag(Tab.overview)
+            Text(NSLocalizedString("tab.sensors",  comment: "")).tag(Tab.sensors)
         }
-        .padding(2)
-        .background(Theme.fill2(scheme), in: Capsule())
+        .labelsHidden()
+        .tabsPickerStyle()
     }
 
-    private func tabButton(_ tab: Tab, _ label: String) -> some View {
-        Button {
-            // Bare state change — wrapping in `withAnimation` animates the
-            // frame's height (and any other selectedTab-derived layout) at
-            // the same time NSPopover runs its own resize animation; the two
-            // run on different curves and produce a visible "text drops down"
-            // jitter when shrinking sensors → overview. Letting NSPopover own
-            // the resize and only animating the tab indicator removes it.
-            selectedTab = tab
-        } label: {
-            let selected = selectedTab == tab
-            Text(label)
-                .font(.system(size: 11,
-                              weight: selected ? .semibold : .medium))
-                .foregroundColor(selected ? Theme.text1(scheme) : Theme.text3(scheme))
-                .lineLimit(1)
-                .minimumScaleFactor(0.86)
-                .frame(maxWidth: .infinity, minHeight: 22)
-                .background {
-                    // Animation scoped to the capsule only. SwiftUI can't
-                    // tween font weights, it cross-fades snapshots whose
-                    // metrics differ slightly — animating the text alongside
-                    // produced a visible vertical jiggle on both labels.
-                    ZStack {
-                        if selected {
-                            Capsule()
-                                .fill(Theme.cardBg(scheme))
-                                .overlay {
-                                    Capsule()
-                                        .strokeBorder(Theme.cardStroke(scheme), lineWidth: 0.6)
-                                }
-                        }
-                    }
-                    .animation(.easeInOut(duration: 0.14), value: selectedTab)
-                }
-                .contentShape(Capsule())
-            }
-        .buttonStyle(.plain)
+    /// Icon-only header control. Glass buttons respond to the pointer on / 中文：仅图标的头部按钮。玻璃按钮在 macOS 27
+    /// macOS 27; the title backs both the tooltip and VoiceOver. / 中文：上会跟随指针反馈；title 同时用作提示与 VoiceOver 标签。
+    private func headerButton(systemImage: String,
+                              title: String,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11.5, weight: .medium))
+                .frame(width: 14, height: 14)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(.small)
+        .help(title)
+        .accessibilityLabel(title)
     }
 
     // MARK: - Overview / 中文：概览
@@ -273,11 +253,11 @@ struct PopoverView: View {
                 Text(NSLocalizedString("curve.title", comment: ""))
                     .font(Theme.label(10, weight: .semibold))
                     .tracking(0.4)
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
                 Spacer()
                 Text(String(format: "%.0f°", maxTemperature))
                     .font(Theme.num(11.5, weight: .semibold))
-                    .foregroundColor(Theme.text1(scheme))
+                    .foregroundStyle(Theme.text1)
             }
             TempCurveView(samples: tempHistory, accent: accent)
                 .frame(height: 38)
@@ -298,9 +278,9 @@ struct PopoverView: View {
                     LaunchAtLoginManager.shared.isEnabled = newValue
                 }
             )) {
-                Text(NSLocalizedString("popover.startup", comment: ""))
+                Text(NSLocalizedString("popover.startup_help", comment: ""))
                     .font(.system(size: 11))
-                    .foregroundColor(Theme.text2(scheme))
+                    .foregroundStyle(Theme.text2)
             }
             .toggleStyle(.switch)
             .controlSize(.mini)
@@ -309,7 +289,7 @@ struct PopoverView: View {
 
             Text(version)
                 .font(Theme.num(10, weight: .medium))
-                .foregroundColor(Theme.text3(scheme))
+                .foregroundStyle(Theme.text3)
         }
         // Align with the card-content baseline (22pt) so the footer reads
         // as belonging to the content column rather than floating between
@@ -462,23 +442,25 @@ private struct InstallHelperStateView: View {
 
     @Environment(\.colorScheme) private var scheme
 
+    // Hand-laid rather than `ContentUnavailableView`: that view wraps itself / 中文：不用 `ContentUnavailableView`：它内部自带滚动视图，
+    // in a scroll view, which collapses inside the fit-to-content Overview. / 中文：在按内容自适应高度的概览页里会被压扁。
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Image(systemName: "wrench.and.screwdriver")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundColor(Theme.text2(scheme))
-                .padding(.bottom, 3)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Theme.text2)
+                .padding(.bottom, 2)
 
             Text(NSLocalizedString("popover.helper_required", comment: ""))
                 .font(.system(size: 12.5, weight: .semibold))
-                .foregroundColor(Theme.text1(scheme))
+                .foregroundStyle(Theme.text1)
 
             Text(NSLocalizedString(
                 needsApproval ? "popover.helper_approval_desc" : "popover.helper_required_desc",
                 comment: ""
             ))
                 .font(.system(size: 11))
-                .foregroundColor(Theme.text2(scheme))
+                .foregroundStyle(Theme.text2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20)
@@ -486,11 +468,12 @@ private struct InstallHelperStateView: View {
             if let err = installError {
                 Text(err)
                     .font(.system(size: 10))
-                    .foregroundColor(Theme.danger(scheme))
+                    .foregroundStyle(Theme.danger(scheme))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 16)
             }
 
+            // The one primary action on the page, so the only tinted control. / 中文：本页唯一的主操作，也是唯一着色的控件。
             Button(action: installHelper) {
                 Group {
                     if isInstalling {
@@ -500,20 +483,15 @@ private struct InstallHelperStateView: View {
                             needsApproval ? "popover.open_login_items" : "popover.install_helper",
                             comment: ""
                         ))
-                            .font(.system(size: 11.5, weight: .semibold))
                     }
                 }
-                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(Theme.text1(scheme).opacity(0.92))
-                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .shadow(color: Theme.cardShadow(scheme), radius: 5, x: 0, y: 2)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glassProminent)
+            .controlSize(.large)
             .disabled(isInstalling)
             .padding(.horizontal, 30)
-            .padding(.top, 3)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
@@ -526,24 +504,9 @@ private struct PopoverMessageStateView: View {
     let title: String
     let message: String
 
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundColor(Theme.text2(scheme))
-            Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundColor(Theme.text1(scheme))
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundColor(Theme.text2(scheme))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 26)
+        ContentUnavailableView(title, systemImage: icon, description: Text(message))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

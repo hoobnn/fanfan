@@ -69,10 +69,10 @@ struct SensorListView: View {
                 Text(section.category.displayName.uppercased())
                     .font(Theme.label(10, weight: .semibold))
                     .tracking(0.4)
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
                 Text("\(section.sensors.count)")
                     .font(Theme.num(9, weight: .medium))
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
                 Spacer()
                 Text(String(format: "%.0f°", section.maxTemperature))
                     .font(Theme.num(11, weight: .semibold))
@@ -102,7 +102,7 @@ struct SensorListView: View {
                          ? NSLocalizedString("sensors.show_less", comment: "")
                          : String(format: NSLocalizedString("sensors.show_all", comment: ""), sensors.count))
                         .font(.system(size: 11))
-                        .foregroundColor(Theme.text2(scheme))
+                        .foregroundStyle(Theme.text2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
@@ -130,11 +130,11 @@ struct SensorListView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(sensor.name)
                     .font(.system(size: 11.5))
-                    .foregroundColor(Theme.text1(scheme))
+                    .foregroundStyle(Theme.text1)
                     .lineLimit(1)
                 Text(sensor.id)
                     .font(Theme.num(9, weight: .medium))
-                    .foregroundColor(Theme.text3(scheme))
+                    .foregroundStyle(Theme.text3)
                     .tracking(0.4)
             }
             Spacer()
@@ -142,7 +142,7 @@ struct SensorListView: View {
                 .frame(width: 60)
             Text(String(format: "%.0f°", sensor.temperature))
                 .font(Theme.num(12, weight: .semibold))
-                .foregroundColor(Theme.text1(scheme))
+                .foregroundStyle(Theme.text1)
                 .frame(width: 44, alignment: .trailing)
         }
         .padding(.horizontal, 12)
@@ -151,18 +151,8 @@ struct SensorListView: View {
 }
 
 private struct EmptySensorState: View {
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
-        VStack(spacing: 7) {
-            Image(systemName: "thermometer.medium.slash")
-                .font(.system(size: 20))
-                .foregroundColor(Theme.text3(scheme))
-            Text(NSLocalizedString("sensors.none", comment: ""))
-                .font(.system(size: 11.5))
-                .foregroundColor(Theme.text2(scheme))
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 26)
+        ContentUnavailableView(NSLocalizedString("sensors.none", comment: ""),
+                               systemImage: "thermometer.medium.slash")
     }
 }

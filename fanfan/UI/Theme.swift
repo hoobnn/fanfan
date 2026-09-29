@@ -53,7 +53,7 @@ struct Theme {
     }
 
     static func accent(for level: TemperatureLevel?, scheme: ColorScheme) -> Color {
-        guard let level = level else { return text2(scheme) }
+        guard let level = level else { return .secondary }
         let rgb = thermalRGB(for: level, scheme: scheme)
         return Color(red: rgb.0, green: rgb.1, blue: rgb.2)
     }
@@ -98,20 +98,16 @@ struct Theme {
         return Color(red: c.0, green: c.1, blue: c.2)
     }
 
-    // ── Text (monochrome) ───────────────────────────────────────────── / 中文：── Text (单色) ─────────────────────────────────────────────
+    // ── Text (monochrome) ───────────────────────────────────────────── / 中文：── 文字（单色）─────────────────────────────────────────────
 
-    static func text1(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.88)
-    }
-    static func text2(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.58) : Color.black.opacity(0.56)
-    }
-    static func text3(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.36) : Color.black.opacity(0.36)
-    }
-    static func text4(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.20) : Color.black.opacity(0.20)
-    }
+    // Hierarchical styles instead of fixed black/white opacities: they pick up / 中文：用层级样式替代写死的黑/白透明度：在 Liquid Glass
+    // vibrancy on the Liquid Glass popover and follow Increase Contrast. / 中文：popover 上获得 vibrancy，并跟随「增强对比度」。
+    static let text1 = HierarchicalShapeStyle.primary
+    static let text2 = HierarchicalShapeStyle.secondary
+    static let text3 = HierarchicalShapeStyle.tertiary
+    // `.quaternary` is fill-level and fades out on glass, so the faintest text / 中文：`.quaternary` 是填充级，在玻璃上几乎消失，
+    // tier reuses `.tertiary`. / 中文：因此最淡的文字档复用 `.tertiary`。
+    static let text4 = HierarchicalShapeStyle.tertiary
 
     // ── Fills & separators (monochrome) ─────────────────────────────── / 中文：── Fills & separators (单色) ───────────────────────────────
 
@@ -133,31 +129,25 @@ struct Theme {
                         : Color(red: 0.74, green: 0.22, blue: 0.18)
     }
 
-    // ── Card surface ────────────────────────────────────────────────── / 中文：── 卡片 surface ──────────────────────────────────────────────────
+    // ── Card surface ────────────────────────────────────────────────── / 中文：── 卡片表面 ──────────────────────────────────────────────────
 
+    /// Cards are the content layer sitting on the popover's Liquid Glass, so / 中文：卡片是叠在 popover Liquid Glass 上的内容层，
+    /// they stay a translucent tile — never glass themselves (no glass on / 中文：因此只做半透明色块，自身不上玻璃（避免玻璃叠玻璃），
+    /// glass) and no drop shadow, like Control Center modules. / 中文：也不加投影，与控制中心模块一致。
     static func cardBg(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.62)
+        scheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.55)
     }
 
-    static func bgPrimary(_ scheme: ColorScheme) -> AnyShapeStyle {
-        AnyShapeStyle(.windowBackground)
-    }
-
-    /// Hairline edge for cards — lit from the top, fading to a dark base so / 中文：Hairline edge for 卡片s — lit from the top, fading to a dark base so
-    /// surfaces read as machined panels rather than flat fills. / 中文：surfaces 读取 as machined panels rather than flat fills.
+    /// Hairline edge for cards — a faint lit top that keeps tiles separable / 中文：卡片发丝边——顶部微亮，让色块在
+    /// on bright wallpapers without reading as a raised panel. / 中文：明亮壁纸上仍可分辨，但不显得凸起。
     static func cardStroke(_ scheme: ColorScheme) -> LinearGradient {
         scheme == .dark
-            ? LinearGradient(colors: [Color.white.opacity(0.16),
-                                      Color.white.opacity(0.035)],
+            ? LinearGradient(colors: [Color.white.opacity(0.12),
+                                      Color.white.opacity(0.03)],
                              startPoint: .top, endPoint: .bottom)
-            : LinearGradient(colors: [Color.white.opacity(0.95),
-                                      Color.black.opacity(0.055)],
+            : LinearGradient(colors: [Color.white.opacity(0.8),
+                                      Color.black.opacity(0.04)],
                              startPoint: .top, endPoint: .bottom)
-    }
-
-    /// Soft ambient elevation under cards. / 中文：Soft ambient elevation under 卡片s.
-    static func cardShadow(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.black.opacity(0.40) : Color.black.opacity(0.10)
     }
 
     /// Subtle vertical gradient for large display numbers — gives the hero / 中文：Subtle vertical 渐变 for large display numbers — gives the hero
@@ -199,8 +189,8 @@ struct Theme {
 // MARK: - Card surface modifier / 中文：卡片表面修饰器
 
 extension Theme {
-    /// Refined card surface: monochrome fill, a hairline lit edge, and a soft / 中文：Refined 卡片 surface: 单色 fill, a hairline lit edge, and a soft
-    /// ambient shadow. Centralizes the look so every card stays consistent. / 中文：ambient shadow. Centralizes the look so every 卡片 stays consistent.
+    /// Card surface: translucent monochrome fill plus a hairline lit edge. / 中文：卡片表面：半透明单色填充加发丝亮边。
+    /// Centralizes the look so every card stays consistent. / 中文：集中定义外观，保证所有卡片一致。
     struct CardSurface: ViewModifier {
         let scheme: ColorScheme
         let cornerRadius: CGFloat
@@ -213,9 +203,6 @@ extension Theme {
                     shape.strokeBorder(Theme.cardStroke(scheme), lineWidth: 0.75)
                 }
                 .clipShape(shape)
-                .shadow(color: Theme.cardShadow(scheme),
-                        radius: scheme == .dark ? 7 : 5,
-                        x: 0, y: scheme == .dark ? 3 : 2)
         }
     }
 }
@@ -224,5 +211,25 @@ extension View {
     /// Apply the standard refined card surface. / 中文：Apply the standard refined 卡片 surface.
     func themedCard(_ scheme: ColorScheme, cornerRadius: CGFloat = 12) -> some View {
         modifier(Theme.CardSurface(scheme: scheme, cornerRadius: cornerRadius))
+    }
+}
+
+// MARK: - Picker styles / 中文：选择器样式
+
+extension View {
+    /// Page-switching picker: the macOS 27 `.tabs` style where available, / 中文：页面切换选择器：可用时用 macOS 27 的 `.tabs` 样式，
+    /// the segmented control on macOS 26. The compiler check keeps Xcode 26 / 中文：macOS 26 上回退为分段控件。编译器判断让 Xcode 26
+    /// toolchains (without the macOS 27 SDK symbol) building. / 中文：工具链（SDK 里没有该符号）也能编译。
+    @ViewBuilder
+    func tabsPickerStyle() -> some View {
+        #if compiler(>=6.4)
+        if #available(macOS 27, *) {
+            pickerStyle(.tabs)
+        } else {
+            pickerStyle(.segmented)
+        }
+        #else
+        pickerStyle(.segmented)
+        #endif
     }
 }
