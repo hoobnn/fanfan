@@ -77,7 +77,7 @@ Launch fanfan and click **Install Helper** when prompted. This installs the priv
 
 **Fan Control:**
 - Requires `sudo` access for SMC writes
-- Install the privileged fan daemon once to avoid repeated password prompts
+- Allow the fan-control helper once in System Settings › Login Items & Extensions
 - Temperature reading works without sudo
 
 **Permissions:**

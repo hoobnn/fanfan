@@ -59,6 +59,6 @@ body:
       description: |
         Optional. Helper state and recent helper logs:
         可选。helper 状态和最近的日志：
-        `launchctl print system/com.hoobnn.fanfan.smcd | head -20`
+        `launchctl print system/com.hoobnn.fanfan.helper | head -20`
         `tail -50 /var/log/fanfan-smcd.err`
       render: text

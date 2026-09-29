@@ -62,6 +62,9 @@ DSYM_UUIDS=$(xcrun dwarfdump --uuid "$DSYM")
 
 test -f "$BUILT_APP/Contents/Resources/fanfan-smcd" \
   || { echo "❌ Daemon missing from bundle" >&2; exit 1; }
+# SMAppService only finds the daemon through this plist.
+test -f "$BUILT_APP/Contents/Library/LaunchDaemons/com.hoobnn.fanfan.helper.plist" \
+  || { echo "❌ LaunchDaemon plist missing from bundle" >&2; exit 1; }
 
 mkdir -p release
 rm -rf release/fanfan.app

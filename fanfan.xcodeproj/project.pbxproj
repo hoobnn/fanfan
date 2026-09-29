@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F0A1C0022FB7000000000002 /* com.hoobnn.fanfan.helper.plist in Copy LaunchDaemon */ = {isa = PBXBuildFile; fileRef = F0A1C0012FB7000000000001 /* com.hoobnn.fanfan.helper.plist */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		2596D75C2FB6BD55006A53A9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -16,9 +20,24 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F0A1C0032FB7000000000003 /* Copy LaunchDaemon */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				F0A1C0022FB7000000000002 /* com.hoobnn.fanfan.helper.plist in Copy LaunchDaemon */,
+			);
+			name = "Copy LaunchDaemon";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		2596D7582FB6BD55006A53A9 /* fanfanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fanfanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D127C6E22F14343F00456D59 /* fanfan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fanfan.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0A1C0012FB7000000000001 /* com.hoobnn.fanfan.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = com.hoobnn.fanfan.helper.plist; path = "tools/fanfan-smcd/com.hoobnn.fanfan.helper.plist"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -57,6 +76,7 @@
 			children = (
 				D127C6E42F14343F00456D59 /* fanfan */,
 				2596D7592FB6BD55006A53A9 /* fanfanTests */,
+				F0A1C0012FB7000000000001 /* com.hoobnn.fanfan.helper.plist */,
 				D127C6E32F14343F00456D59 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +123,7 @@
 				D127C6DE2F14343F00456D59 /* Sources */,
 				D127C6DF2F14343F00456D59 /* Frameworks */,
 				D127C6E02F14343F00456D59 /* Resources */,
+				F0A1C0032FB7000000000003 /* Copy LaunchDaemon */,
 			);
 			buildRules = (
 			);

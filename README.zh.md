@@ -60,16 +60,11 @@ brew install --cask fanfan
 curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 ```
 
-需要 macOS 26+（Apple Silicon 或 Intel）。首次启动需输入管理员密码，以安装风扇控制辅助进程。
+需要 macOS 26+（Apple Silicon 或 Intel）。首次启动点击「安装助手」，然后在 系统设置 › 通用 › 登录项与扩展 中允许 fanfan 即可，无需输入管理员密码。
 
 ### 卸载
 
-`brew uninstall --cask fanfan` 会同时移除应用和辅助进程（加 `--zap` 连偏好设置一起清理）。手动安装的话，先退出 fanfan 并从「应用程序」删除，再移除辅助进程：
-
-```bash
-sudo launchctl bootout system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
-sudo rm /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist /Library/PrivilegedHelperTools/fanfan-smcd
-```
+`brew uninstall --cask fanfan` 会同时移除应用和辅助进程（加 `--zap` 连偏好设置一起清理）。手动安装的话，退出 fanfan 并从「应用程序」删除即可——辅助进程在应用包内，会随之停止。
 
 ## 常见问题
 
@@ -79,8 +74,8 @@ fanfan 只在硬件自身允许的范围内设置转速——辅助进程会拒�
 **支持 Apple Silicon（M 系列）Mac 吗？**
 支持。fanfan 是 Apple Silicon 与 Intel 通用应用，要求 macOS 26 及以上。Apple Silicon MacBook Air 等无风扇机型只显示温度。
 
-**为什么要输入管理员密码？**
-向 SMC 写入风扇转速需要 root 权限。fanfan 只安装一次极简的 root 辅助进程，而不是让整个应用以 root 运行；读取温度不需要任何特殊权限。
+**为什么要允许在后台运行？**
+向 SMC 写入风扇转速需要 root 权限。fanfan 不让整个应用以 root 运行，而是注册一个极简的 root 辅助进程，由 macOS 在「登录项与扩展」里请你允许一次；读取温度不需要任何特殊权限。
 
 **fanfan 能替代 Macs Fan Control 或 smcFanControl 吗？**
 它做的是同一件核心的事——读取 SMC 传感器、设置风扇转速——以免费、MIT 许可、开源且无第三方依赖的菜单栏应用形式提供。
@@ -88,12 +83,13 @@ fanfan 只在硬件自身允许的范围内设置转速——辅助进程会拒�
 ## 工作原理
 
 写入风扇转速需要 root 权限。fanfan 不让整个应用以 root 运行，
-而是安装一个极简的 C LaunchDaemon，由它持有 SMC 句柄，
-通过带版本的精简 Unix socket 协议完成健康检查、租约续期、转速写入和
-固件控制恢复。若应用崩溃或失去响应，10 秒租约到期后会自动交还固件控制。
+而是经 `SMAppService` 注册一个极简的 C LaunchDaemon，由它持有 SMC 句柄，
+通过带版本的精简 XPC 协议完成健康检查、租约续期、转速写入和固件控制恢复。
+只有开发者签名的 fanfan 应用才能连接。应用退出或崩溃时风扇立即交还固件控制；
+应用卡死时由 10 秒租约兜底。
 
 ```
-fanfan.app  ──Unix socket──▶  fanfan-smcd（root）  ──IOKit──▶  SMC
+fanfan.app  ──XPC──▶  fanfan-smcd（root）  ──IOKit──▶  SMC
 ```
 
 应用本身以普通用户身份运行，温度读取直接走 IOKit。

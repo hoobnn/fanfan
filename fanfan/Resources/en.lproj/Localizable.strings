@@ -73,9 +73,10 @@
 
 /* Helper Installation */
 "popover.helper_required" = "Helper Tool Required";
-"popover.helper_required_desc" = "To control fans without constant password prompts, a helper tool must be installed.";
+"popover.helper_required_desc" = "Fan control needs a background helper. Allow it once in System Settings — no password required.";
+"popover.helper_approval_desc" = "Turn on fanfan in System Settings › General › Login Items & Extensions to finish setup.";
 "popover.install_helper" = "Install Helper";
-"popover.helper_location" = "Helper is installed to /usr/local/bin";
+"popover.open_login_items" = "Open System Settings";
 
 /* Access Permissions */
 "popover.system_access_required" = "System Access Required";

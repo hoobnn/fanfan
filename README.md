@@ -60,16 +60,11 @@ Download the latest DMG from [Releases](https://github.com/hoobnn/fanfan/release
 curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 ```
 
-Requires macOS 26+ (Apple Silicon or Intel). First launch asks for an administrator password to install the fan-control helper.
+Requires macOS 26+ (Apple Silicon or Intel). On first launch, click **Install Helper** and allow fanfan in System Settings › General › Login Items & Extensions. No administrator password is needed.
 
 ### Uninstall
 
-`brew uninstall --cask fanfan` removes the app and the helper (add `--zap` to also remove preferences). For a manual install, quit fanfan, delete it from Applications, then remove the helper:
-
-```bash
-sudo launchctl bootout system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
-sudo rm /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist /Library/PrivilegedHelperTools/fanfan-smcd
-```
+`brew uninstall --cask fanfan` removes the app and the helper (add `--zap` to also remove preferences). For a manual install, quit fanfan and delete it from Applications — the helper lives inside the app bundle and stops with it.
 
 ## FAQ
 
@@ -79,8 +74,8 @@ fanfan only sets speeds within the hardware's own limits — the helper rejects 
 **Does it work on Apple Silicon (M-series) Macs?**
 Yes. fanfan is a universal app for Apple Silicon and Intel Macs on macOS 26 or later. Fanless Macs, such as the Apple Silicon MacBook Air, show temperatures only.
 
-**Why does it need an administrator password?**
-Writing fan speeds to the SMC requires root. fanfan installs a tiny root helper once instead of running the whole app with elevated privileges. Reading temperatures needs no special permission.
+**Why does it ask to run in the background?**
+Writing fan speeds to the SMC requires root. Instead of running the whole app with elevated privileges, fanfan registers a tiny root helper that macOS asks you to allow once in Login Items & Extensions. Reading temperatures needs no special permission.
 
 **Is fanfan a free alternative to Macs Fan Control or smcFanControl?**
 It covers the same core job — reading SMC sensors and setting fan speeds — as a free, MIT-licensed, open-source menu bar app with no third-party dependencies.
@@ -88,13 +83,15 @@ It covers the same core job — reading SMC sensors and setting fan speeds — a
 ## How it works
 
 Writing fan speeds requires root. Instead of running the whole app as root,
-fanfan installs a tiny C LaunchDaemon that owns the SMC handle and accepts
-a small versioned Unix-socket protocol for health checks, lease renewal,
-fan targets, and returning control to firmware. A 10-second lease restores
-firmware control automatically if the app crashes or stops responding.
+fanfan registers a tiny C LaunchDaemon (via `SMAppService`) that owns the
+SMC handle and accepts a small versioned XPC protocol for health checks,
+lease renewal, fan targets, and returning control to firmware. Only the
+fanfan app signed by its developer can connect. Fans return to firmware
+control the moment the app quits or crashes, and a 10-second lease covers an
+app that hangs.
 
 ```
-fanfan.app  ──unix socket──▶  fanfan-smcd (root)  ──IOKit──▶  SMC
+fanfan.app  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶  SMC
 ```
 
 The app itself runs unprivileged. Temperature reads go straight through IOKit.

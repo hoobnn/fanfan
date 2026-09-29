@@ -1,13 +1,14 @@
 /*
  * fanfan privileged SMC daemon.
  *
- * Keeps a root-owned AppleSMC connection open and accepts a deliberately small
- * local socket protocol:
+ * Registered by the app through SMAppService and reached over the XPC Mach
+ * service com.hoobnn.fanfan.helper. Only clients signed by team 8FUPL8QHFH as
+ * the fanfan app may connect. Each message carries one text command under
+ * "line" and gets one text reply under "reply":
  *   SETV2 <fan> <rpm>
  *   AUTOV2 <fan>
  *   PINGV2               (returns protocol version + lease state)
  *   RENEWV2              (renews an active lease; never a pending restore)
- *   AUTO <fan>           (legacy release-only compatibility)
  *
  * Apple Silicon (M3/M4) fan control note:
  *   thermalmonitord holds fans in F<n>Md = 3 ("system mode") and the RTKit
@@ -19,36 +20,46 @@
  *   the firmware reclaims control (and can idle fans to 0 RPM). M1/M5 accept a
  *   direct mode write and have no/absent Ftst, so we try direct first.
  *   A successful SET starts a 10-second lease. The app renews it with RENEWV2;
- *   expiry, daemon shutdown, or a failed SET restores firmware control.
+ *   expiry, the controlling connection going away (app quit or crash), daemon
+ *   shutdown, or a failed SET restores firmware control.
  *   Reference: github.com/agoodkind/macos-smc-fan
  */
 
+#include <dispatch/dispatch.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
 #include <math.h>
-#include <poll.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/un.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include <xpc/xpc.h>
 #include <IOKit/IOKitLib.h>
 #include "smc.h"
 
-#define SOCKET_PATH "/var/run/fanfan-smcd.sock"
+#define SERVICE_NAME "com.hoobnn.fanfan.helper"
+/* Only the fanfan app (release or debug build) signed by our team may talk to
+ * the daemon. */
+#define CLIENT_REQUIREMENT \
+    "anchor apple generic and certificate leaf[subject.OU] = \"8FUPL8QHFH\" and " \
+    "(identifier \"com.hoobnn.fanfan\" or identifier \"com.hoobnn.fanfan.debug\")"
+/* Pre-1.4 installs: a hand-installed system LaunchDaemon on a Unix socket. */
+#define LEGACY_LABEL "com.hoobnn.fanfan.smcd"
+#define LEGACY_PLIST "/Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist"
+#define MAX_COMMAND_LENGTH 127
 #define MAX_FANS 8
 #define MIN_RPM 500
 #define MAX_RPM 8000
 #define SAFE_FALLBACK_MIN_RPM 1000
 #define SAFE_FALLBACK_MAX_RPM 5200
 #define PROTOCOL_VERSION 2
-#define CLIENT_READ_TIMEOUT_MS 2000
-#define CLIENT_READ_POLL_USEC 250000
 #define CONTROL_LEASE_TIMEOUT_MS 10000
 
 /* SMC firmware result codes (returned in SMCKeyData_t.result). */
@@ -61,8 +72,11 @@
 #define UNLOCK_STEP_MS    100
 
 static io_connect_t g_conn = 0;
-static int g_server_fd = -1;
 static volatile sig_atomic_t g_should_exit = 0;
+static dispatch_queue_t g_queue;
+/* The connection whose SET established the current lease. Compared by pointer
+ * only; cleared when that connection goes away. */
+static xpc_connection_t g_control_owner = NULL;
 
 /* Capabilities probed once at startup. */
 static char g_mode_fmt[8] = "F%dMd"; /* "F%dMd" (M4) or "F%dmd" (M5) */
@@ -711,122 +725,42 @@ static int parse_int(const char *s, int *out)
     return 1;
 }
 
-static void write_response(int fd, const char *message)
+static const char *handle_command(char *buffer, xpc_connection_t peer,
+                                  char *response, size_t response_size)
 {
-    size_t length = strlen(message);
-    size_t offset = 0;
-    while (offset < length) {
-        ssize_t written = write(fd, message + offset, length - offset);
-        if (written < 0 && errno == EINTR) {
-            continue;
-        }
-        if (written <= 0) {
-            return;
-        }
-        offset += (size_t)written;
-    }
-}
-
-static ssize_t read_request_line(int fd, char *buffer, size_t capacity)
-{
-    size_t used = 0;
-    int terminated = 0;
-    uint64_t started_at = monotonic_milliseconds();
-
-    while (used + 1 < capacity) {
-        if (g_should_exit) {
-            return -1;
-        }
-        uint64_t now = monotonic_milliseconds();
-        if (started_at != 0 && now != 0 &&
-            now - started_at >= CLIENT_READ_TIMEOUT_MS) {
-            return -1;
-        }
-        ssize_t count = read(fd, buffer + used, capacity - used - 1);
-        if (count < 0 && errno == EINTR) {
-            continue;
-        }
-        if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            continue;
-        }
-        if (count < 0) {
-            return -1;
-        }
-        if (count == 0) {
-            break;
-        }
-        used += (size_t)count;
-        if (memchr(buffer, '\n', used) != NULL || memchr(buffer, '\r', used) != NULL) {
-            terminated = 1;
-            break;
-        }
-    }
-
-    if (!terminated && used + 1 == capacity) {
-        return -2;
-    }
-    buffer[used] = '\0';
-    buffer[strcspn(buffer, "\r\n")] = '\0';
-    return (ssize_t)strlen(buffer);
-}
-
-static void handle_client(int fd)
-{
-    char buffer[128];
-    ssize_t n = read_request_line(fd, buffer, sizeof(buffer));
-    if (n == -2) {
-        write_response(fd, "ERR command-too-long\n");
-        return;
-    }
-    if (n <= 0) {
-        return;
-    }
-
     char *cmd = strtok(buffer, " ");
     if (cmd == NULL) {
-        write_response(fd, "ERR empty\n");
-        return;
+        return "ERR empty";
     }
 
     if (strcmp(cmd, "PINGV2") == 0) {
         if (strtok(NULL, " ") != NULL) {
-            write_response(fd, "ERR trailing-arguments\n");
-            return;
+            return "ERR trailing-arguments";
         }
         /* Health checks must stay fast. Lease restoration performs synchronous
          * IOKit writes and can take longer than the client's one-second health
-         * timeout. The main loop enforces the lease after this client closes and
-         * on every idle poll, so PING only reports the current state. */
-        char response[48];
-        snprintf(response, sizeof(response), "OK pong %d %s\n",
+         * timeout. The lease timer enforces it every second, so PING only
+         * reports the current state. */
+        snprintf(response, response_size, "OK pong %d %s",
                  PROTOCOL_VERSION, control_lease_state_name());
-        write_response(fd, response);
-        return;
+        return response;
     }
     if (strcmp(cmd, "RENEWV2") == 0) {
         if (strtok(NULL, " ") != NULL) {
-            write_response(fd, "ERR trailing-arguments\n");
-            return;
+            return "ERR trailing-arguments";
         }
         enforce_control_lease();
         if (g_lease_state != LEASE_ACTIVE) {
-            write_response(fd, "ERR lease-inactive\n");
-            return;
+            return "ERR lease-inactive";
         }
         renew_control_lease();
-        write_response(fd, "OK\n");
-        return;
-    }
-    if (strcmp(cmd, "PING") == 0) {
-        write_response(fd, "ERR protocol-upgrade-required\n");
-        return;
+        return "OK";
     }
 
     char *fan_s = strtok(NULL, " ");
     int fan = -1;
     if (fan_s == NULL || !parse_int(fan_s, &fan) || fan < 0 || fan >= MAX_FANS) {
-        write_response(fd, "ERR invalid-fan\n");
-        return;
+        return "ERR invalid-fan";
     }
 
     kern_return_t result = kIOReturnError;
@@ -834,42 +768,35 @@ static void handle_client(int fd)
         char *rpm_s = strtok(NULL, " ");
         int rpm = -1;
         if (rpm_s == NULL || !parse_int(rpm_s, &rpm) || rpm < MIN_RPM || rpm > MAX_RPM) {
-            write_response(fd, "ERR invalid-rpm\n");
-            return;
+            return "ERR invalid-rpm";
         }
         if (strtok(NULL, " ") != NULL) {
-            write_response(fd, "ERR trailing-arguments\n");
-            return;
+            return "ERR trailing-arguments";
         }
         result = set_fan_speed(fan, rpm);
-    } else if (strcmp(cmd, "AUTOV2") == 0 || strcmp(cmd, "AUTO") == 0) {
+    } else if (strcmp(cmd, "AUTOV2") == 0) {
         if (strtok(NULL, " ") != NULL) {
-            write_response(fd, "ERR trailing-arguments\n");
-            return;
+            return "ERR trailing-arguments";
         }
         result = set_fan_auto(fan);
     } else {
-        write_response(fd, "ERR unknown-command\n");
-        return;
+        return "ERR unknown-command";
     }
 
     if (result == kIOReturnSuccess) {
         if (strcmp(cmd, "SETV2") == 0) {
             if (g_lease_state == LEASE_RESTORE_PENDING) {
-                write_response(fd, "ERR restore-pending\n");
-                return;
+                return "ERR restore-pending";
             }
             renew_control_lease();
-        } else if ((strcmp(cmd, "AUTOV2") == 0 || strcmp(cmd, "AUTO") == 0) &&
-                   g_lease_state == LEASE_ACTIVE) {
+            g_control_owner = peer;
+        } else if (strcmp(cmd, "AUTOV2") == 0 && g_lease_state == LEASE_ACTIVE) {
             renew_control_lease();
         }
-        write_response(fd, "OK\n");
-    } else {
-        char response[64];
-        snprintf(response, sizeof(response), "ERR iokit-%08x\n", result);
-        write_response(fd, response);
+        return "OK";
     }
+    snprintf(response, response_size, "ERR iokit-%08x", result);
+    return response;
 }
 
 static void cleanup(int sig)
@@ -882,11 +809,6 @@ static void cleanup(int sig)
         }
         usleep(100 * 1000);
     }
-    if (g_server_fd >= 0) {
-        close(g_server_fd);
-        g_server_fd = -1;
-    }
-    unlink(SOCKET_PATH);
     smc_close();
     exit(0);
 }
@@ -897,11 +819,127 @@ static void request_shutdown(int sig)
     g_should_exit = 1;
 }
 
+static void handle_message(xpc_connection_t peer, xpc_object_t message)
+{
+    xpc_object_t reply = xpc_dictionary_create_reply(message);
+    if (reply == NULL) {
+        return;
+    }
+
+    char buffer[MAX_COMMAND_LENGTH + 1];
+    char response[64];
+    const char *line = xpc_dictionary_get_string(message, "line");
+    const char *answer;
+    if (line == NULL) {
+        answer = "ERR empty";
+    } else if (strlen(line) > MAX_COMMAND_LENGTH) {
+        answer = "ERR command-too-long";
+    } else {
+        snprintf(buffer, sizeof(buffer), "%s", line);
+        answer = handle_command(buffer, peer, response, sizeof(response));
+    }
+    xpc_dictionary_set_string(reply, "reply", answer);
+    xpc_connection_send_message(peer, reply);
+    xpc_release(reply);
+    enforce_control_lease();
+}
+
+static void peer_disconnected(xpc_connection_t peer)
+{
+    if (peer != g_control_owner) {
+        return;
+    }
+    /* The app quit or crashed while holding control. Give the fans back now
+     * instead of waiting out the lease. */
+    g_control_owner = NULL;
+    if (g_lease_state == LEASE_ACTIVE) {
+        fprintf(stderr, "fanfan-smcd: controlling client disconnected\n");
+        g_lease_state = LEASE_RESTORE_PENDING;
+        g_next_restore_attempt_ms = 0;
+        enforce_control_lease();
+    }
+}
+
+static void accept_peer(xpc_connection_t peer)
+{
+    if (xpc_connection_set_peer_code_signing_requirement(peer, CLIENT_REQUIREMENT) != 0) {
+        fprintf(stderr, "fanfan-smcd: cannot set client requirement; rejecting\n");
+        xpc_connection_cancel(peer);
+        return;
+    }
+    xpc_retain(peer);
+    xpc_connection_set_target_queue(peer, g_queue);
+    xpc_connection_set_event_handler(peer, ^(xpc_object_t event) {
+        xpc_type_t type = xpc_get_type(event);
+        if (type == XPC_TYPE_DICTIONARY) {
+            handle_message(peer, event);
+        } else if (event == XPC_ERROR_CONNECTION_INVALID) {
+            /* Also delivered when the client fails the signing requirement. */
+            peer_disconnected(peer);
+            xpc_release(peer);
+        }
+    });
+    xpc_connection_resume(peer);
+}
+
+/* Boot out and delete the pre-1.4 LaunchDaemon. Its SIGTERM handler hands the
+ * fans back to firmware before it exits. */
+static void remove_legacy_daemon(void)
+{
+    if (access(LEGACY_PLIST, F_OK) != 0) {
+        return;
+    }
+    fprintf(stderr, "fanfan-smcd: removing legacy daemon\n");
+    char *argv[] = {"/bin/launchctl", "bootout", "system/" LEGACY_LABEL, NULL};
+    pid_t pid = 0;
+    if (posix_spawn(&pid, argv[0], NULL, NULL, argv, NULL) == 0) {
+        int status = 0;
+        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {
+        }
+    }
+    unlink(LEGACY_PLIST);
+    unlink("/Library/PrivilegedHelperTools/fanfan-smcd");
+    unlink("/usr/local/libexec/fanfan-smcd");
+    unlink("/var/run/fanfan-smcd.sock");
+}
+
+/* launchd runs this binary straight out of the app bundle. When an update or
+ * uninstall replaces or removes it, hand the fans back and exit; KeepAlive
+ * relaunches whatever binary is there now. */
+static void watch_own_executable(void)
+{
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) != 0) {
+        return;
+    }
+    int fd = open(path, O_EVTONLY);
+    if (fd < 0) {
+        return;
+    }
+    dispatch_source_t source = dispatch_source_create(
+        DISPATCH_SOURCE_TYPE_VNODE, (uintptr_t)fd,
+        DISPATCH_VNODE_DELETE | DISPATCH_VNODE_RENAME |
+        DISPATCH_VNODE_WRITE | DISPATCH_VNODE_REVOKE,
+        g_queue);
+    if (source == NULL) {
+        close(fd);
+        return;
+    }
+    dispatch_source_set_event_handler(source, ^{
+        fprintf(stderr, "fanfan-smcd: executable replaced; restarting\n");
+        cleanup(0);
+    });
+    dispatch_resume(source);
+}
+
 int main(void)
 {
     signal(SIGINT, request_shutdown);
     signal(SIGTERM, request_shutdown);
     signal(SIGPIPE, SIG_IGN);
+
+    remove_legacy_daemon();
 
     kern_return_t result = smc_open();
     if (result != kIOReturnSuccess) {
@@ -912,84 +950,36 @@ int main(void)
     probe_capabilities();
     reconcile_startup_control();
 
-    unlink(SOCKET_PATH);
-    g_server_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (g_server_fd < 0) {
-        perror("socket");
+    /* One serial queue owns all SMC state: client messages, the lease timer
+     * and shutdown never run concurrently. */
+    g_queue = dispatch_queue_create("com.hoobnn.fanfan.helper", DISPATCH_QUEUE_SERIAL);
+
+    xpc_connection_t listener = xpc_connection_create_mach_service(
+        SERVICE_NAME, g_queue, XPC_CONNECTION_MACH_SERVICE_LISTENER);
+    if (listener == NULL) {
+        fprintf(stderr, "fanfan-smcd: cannot create XPC listener\n");
         cleanup(0);
     }
-
-    struct sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
-
-    if (bind(g_server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        perror("bind");
-        cleanup(0);
-    }
-    if (chmod(SOCKET_PATH, 0660) != 0 || chown(SOCKET_PATH, 0, 80) != 0) {
-        perror("socket permissions");
-        cleanup(0);
-    }
-
-    if (listen(g_server_fd, 16) < 0) {
-        perror("listen");
-        cleanup(0);
-    }
-
-    while (!g_should_exit) {
-        struct pollfd listener = {
-            .fd = g_server_fd,
-            .events = POLLIN,
-            .revents = 0
-        };
-        int poll_result = poll(&listener, 1, 1000);
-        if (poll_result == 0) {
-            enforce_control_lease();
-            continue;
+    xpc_connection_set_event_handler(listener, ^(xpc_object_t event) {
+        if (xpc_get_type(event) == XPC_TYPE_CONNECTION) {
+            accept_peer((xpc_connection_t)event);
         }
-        if (poll_result < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            perror("poll");
-            break;
-        }
-        if ((listener.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
-            fprintf(stderr, "fanfan-smcd: listener poll error: 0x%x\n", listener.revents);
-            break;
-        }
-        if ((listener.revents & POLLIN) == 0) {
-            continue;
-        }
+    });
 
-        int client_fd = accept(g_server_fd, NULL, NULL);
-        if (client_fd < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            perror("accept");
-            break;
+    /* Signal handlers only set a flag; this timer turns it into a clean
+     * shutdown and enforces the lease while idle. */
+    dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, g_queue);
+    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC),
+                              NSEC_PER_SEC, NSEC_PER_SEC / 10);
+    dispatch_source_set_event_handler(timer, ^{
+        if (g_should_exit) {
+            cleanup(0);
         }
-
-        struct timeval receive_timeout = {
-            .tv_sec = 0,
-            .tv_usec = CLIENT_READ_POLL_USEC
-        };
-        struct timeval send_timeout = {
-            .tv_sec = 2,
-            .tv_usec = 0
-        };
-        (void)setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO,
-                         &receive_timeout, sizeof(receive_timeout));
-        (void)setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO,
-                         &send_timeout, sizeof(send_timeout));
-        handle_client(client_fd);
-        close(client_fd);
         enforce_control_lease();
-    }
+    });
+    dispatch_resume(timer);
 
-    cleanup(0);
-    return 0;
+    watch_own_executable();
+    xpc_connection_resume(listener);
+    dispatch_main();
 }

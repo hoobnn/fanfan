@@ -30,7 +30,7 @@ if [[ ! "$LATEST_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; 
 fi
 
 echo "📥 Downloading fanfan $LATEST_VERSION..."
-ARCHIVE_NAME="fanfan-$LATEST_VERSION-macos.zip"
+ARCHIVE_NAME="fanfan-${LATEST_VERSION#v}-macOS.zip"
 ARCHIVE="$INSTALL_TMP_DIR/$ARCHIVE_NAME"
 CHECKSUM="$ARCHIVE.sha256"
 RELEASE_BASE="https://github.com/hoobnn/fanfan/releases/download/$LATEST_VERSION"
@@ -50,7 +50,7 @@ mkdir -p "$EXTRACT_DIR"
 SOURCE_APP="$EXTRACT_DIR/fanfan.app"
 if [ ! -d "$SOURCE_APP" ] || \
    [ ! -f "$SOURCE_APP/Contents/Resources/fanfan-smcd" ] || \
-   [ ! -f "$SOURCE_APP/Contents/Resources/com.hoobnn.fanfan.smcd.plist" ]; then
+   [ ! -f "$SOURCE_APP/Contents/Library/LaunchDaemons/com.hoobnn.fanfan.helper.plist" ]; then
     echo "❌ Release archive does not contain the expected app/helper files"
     exit 1
 fi
@@ -76,56 +76,6 @@ if [ "$INSTALLED_TEAM" != "$EXPECTED_TEAM_ID" ]; then
     exit 1
 fi
 
-echo "🔧 Installing privileged fan daemon (requires password)..."
-sudo mkdir -p /Library/PrivilegedHelperTools /Library/LaunchDaemons
-if sudo test -L /Library/PrivilegedHelperTools; then
-    echo "❌ Refusing symlinked /Library/PrivilegedHelperTools" >&2
-    exit 1
-fi
-sudo /usr/sbin/chown root:wheel /Library/PrivilegedHelperTools
-sudo /bin/chmod 755 /Library/PrivilegedHelperTools
-STAGED_DAEMON="/Library/PrivilegedHelperTools/.fanfan-smcd.installing"
-STAGED_PLIST="/Library/LaunchDaemons/.com.hoobnn.fanfan.smcd.installing"
-sudo rm -f "$STAGED_DAEMON" "$STAGED_PLIST"
-sudo /usr/bin/install -o root -g wheel -m 755 \
-    /Applications/fanfan.app/Contents/Resources/fanfan-smcd \
-    "$STAGED_DAEMON"
-sudo /usr/bin/install -o root -g wheel -m 644 \
-    /Applications/fanfan.app/Contents/Resources/com.hoobnn.fanfan.smcd.plist \
-    "$STAGED_PLIST"
-sudo /usr/bin/codesign --verify --strict --verbose=2 \
-    --test-requirement '=anchor apple generic and certificate leaf[subject.OU] = "8FUPL8QHFH" and identifier "fanfan-smcd"' \
-    "$STAGED_DAEMON"
-if ! sudo /usr/bin/shasum -a 256 "$STAGED_PLIST" | \
-     /usr/bin/grep -q '^aa58f48c612791700897b23f77894bae79a8ba5f485aba8e3ece941afe4ea148 '; then
-    echo "❌ Unexpected LaunchDaemon plist content" >&2
-    exit 1
-fi
-sudo xattr -d com.apple.quarantine "$STAGED_DAEMON" >/dev/null 2>&1 || true
-sudo xattr -d com.apple.quarantine "$STAGED_PLIST" >/dev/null 2>&1 || true
-sudo launchctl bootout system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist >/dev/null 2>&1 || true
-sudo mv -f "$STAGED_DAEMON" /Library/PrivilegedHelperTools/fanfan-smcd
-sudo mv -f "$STAGED_PLIST" /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
-sudo rm -f /usr/local/libexec/fanfan-smcd
-sudo launchctl bootstrap system /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist
-
-DAEMON_READY=false
-READY_DEADLINE=$((SECONDS + 20))
-while (( SECONDS < READY_DEADLINE )); do
-    RESPONSE=$(printf 'PINGV2\n' | /usr/bin/nc -w 1 -U /var/run/fanfan-smcd.sock 2>/dev/null || true)
-    if [[ "$RESPONSE" == "OK pong 2 idle" ||
-          "$RESPONSE" == "OK pong 2 active" ||
-          "$RESPONSE" == "OK pong 2 restoring" ]]; then
-        DAEMON_READY=true
-        break
-    fi
-    sleep 0.25
-done
-if [ "$DAEMON_READY" != true ]; then
-    echo "❌ Privileged helper did not become ready" >&2
-    exit 1
-fi
-
 echo "🧹 Cleaning up..."
 cleanup
 trap - EXIT
@@ -133,6 +83,8 @@ trap - EXIT
 echo ""
 echo "✅ Installation complete!"
 echo "🚀 Launching fanfan..."
+echo "   Click Install Helper, then allow fanfan in"
+echo "   System Settings › General › Login Items & Extensions."
 echo ""
 
 open /Applications/fanfan.app

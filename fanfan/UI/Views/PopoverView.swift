@@ -246,9 +246,10 @@ struct PopoverView: View {
                     ControlsCard(snapshot: controlsSnapshot, viewModel: viewModel)
                         .equatable()
                 } else {
-                        InstallHelperStateView(
-                            installError: installError,
-                            isInstalling: permissions.isInstalling,
+                    InstallHelperStateView(
+                        installError: installError,
+                        isInstalling: permissions.isInstalling,
+                        needsApproval: permissions.needsApproval,
                         installHelper: installHelper
                     )
                 }
@@ -456,6 +457,7 @@ struct PopoverView: View {
 private struct InstallHelperStateView: View {
     let installError: String?
     let isInstalling: Bool
+    let needsApproval: Bool
     let installHelper: () -> Void
 
     @Environment(\.colorScheme) private var scheme
@@ -471,10 +473,14 @@ private struct InstallHelperStateView: View {
                 .font(.system(size: 12.5, weight: .semibold))
                 .foregroundColor(Theme.text1(scheme))
 
-            Text(NSLocalizedString("popover.helper_required_desc", comment: ""))
+            Text(NSLocalizedString(
+                needsApproval ? "popover.helper_approval_desc" : "popover.helper_required_desc",
+                comment: ""
+            ))
                 .font(.system(size: 11))
                 .foregroundColor(Theme.text2(scheme))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20)
 
             if let err = installError {
@@ -490,7 +496,10 @@ private struct InstallHelperStateView: View {
                     if isInstalling {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text(NSLocalizedString("popover.install_helper", comment: ""))
+                        Text(NSLocalizedString(
+                            needsApproval ? "popover.open_login_items" : "popover.install_helper",
+                            comment: ""
+                        ))
                             .font(.system(size: 11.5, weight: .semibold))
                     }
                 }

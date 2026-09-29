@@ -282,18 +282,6 @@ final class FanControlTests: XCTestCase {
         XCTAssertFalse(UpdateChecker.isVersion("1.1.9", newerThan: "1.2.0"))
     }
 
-    func testPrivilegedInstallerEscaping() {
-        let path = "/tmp/fan fan's \\\"bundle\\\""
-        XCTAssertEqual(
-            PermissionsManager.shellQuoted(path),
-            "'/tmp/fan fan'\\''s \\\"bundle\\\"'"
-        )
-        XCTAssertEqual(
-            PermissionsManager.appleScriptEscaped("a\\b\"c"),
-            "a\\\\b\\\"c"
-        )
-    }
-
     func testHelperReadinessPollingCoversLaunchdThrottle() {
         var elapsed = 0.0
         var checks = 0
