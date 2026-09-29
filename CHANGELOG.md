@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.3.2] - 2026-09-29
+
+### Fixed
+- The Dock icon no longer lingers after the settings window is closed. Opening Settings promoted the app to a regular Dock app and nothing demoted it again; it now returns to menu-bar-only once its last window closes.
+- Displayed temperatures now track the real reading within about one refresh instead of lagging tens of seconds behind once load stops. The UI uses its own short median filter, separate from the smoothing that drives the fan loop, and rounds with hysteresis so a value sitting on a boundary no longer flickers. The overview and the sensor page now show the same number, and the high-temperature alert reports whole degrees.
+
+### Changed
+- Each sensor group is sorted hottest first and collapsed to four rows, with “Show all” to expand the rest.
+
 ## [1.3.1] - 2026-09-10
 
 ### Fixed
