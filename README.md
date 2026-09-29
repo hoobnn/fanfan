@@ -77,7 +77,7 @@ sudo rm /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist /Library/PrivilegedH
 fanfan only sets speeds within the hardware's own limits — the helper rejects any target outside the fan's reported minimum and maximum RPM. If the app crashes, hangs, or quits, fans return to macOS firmware control automatically.
 
 **Does it work on Apple Silicon (M-series) Macs?**
-Yes. fanfan is a universal app for Apple Silicon and Intel Macs on macOS 26 or later. Fanless models such as the MacBook Air show temperatures only.
+Yes. fanfan is a universal app for Apple Silicon and Intel Macs on macOS 26 or later. Fanless Macs, such as the Apple Silicon MacBook Air, show temperatures only.
 
 **Why does it need an administrator password?**
 Writing fan speeds to the SMC requires root. fanfan installs a tiny root helper once instead of running the whole app with elevated privileges. Reading temperatures needs no special permission.

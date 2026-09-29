@@ -77,7 +77,7 @@ sudo rm /Library/LaunchDaemons/com.hoobnn.fanfan.smcd.plist /Library/PrivilegedH
 fanfan 只在硬件自身允许的范围内设置转速——辅助进程会拒绝超出风扇上报的最低、最高转速的请求。应用崩溃、卡死或退出时，风扇都会自动交还 macOS 固件控制。
 
 **支持 Apple Silicon（M 系列）Mac 吗？**
-支持。fanfan 是 Apple Silicon 与 Intel 通用应用，要求 macOS 26 及以上。MacBook Air 等无风扇机型只显示温度。
+支持。fanfan 是 Apple Silicon 与 Intel 通用应用，要求 macOS 26 及以上。Apple Silicon MacBook Air 等无风扇机型只显示温度。
 
 **为什么要输入管理员密码？**
 向 SMC 写入风扇转速需要 root 权限。fanfan 只安装一次极简的 root 辅助进程，而不是让整个应用以 root 运行；读取温度不需要任何特殊权限。
