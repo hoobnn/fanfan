@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.3.3] - 2026-09-29
+
+### Fixed
+- The Dock icon no longer sometimes stays behind after every window is closed. The app now re-checks once SwiftUI has finished tearing the window down, and also counts minimized windows, before dropping back to menu-bar-only.
+- Quitting from the Dock icon's menu (or ⌘Q) while Settings is open no longer kills the fan controller. It now closes the windows and returns to the menu bar; use the popover's Quit button to exit. Logout, shutdown and scripted quits such as Homebrew upgrades still terminate normally.
+
 ## [1.3.2] - 2026-09-29
 
 ### Fixed
