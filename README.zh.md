@@ -22,8 +22,8 @@ fanfan 是一款开源 macOS 菜单栏应用，可查看 Mac 温度和风扇转�
 
 <table>
   <tr>
-    <td width="42%" align="center"><img src="docs/view/image.png" alt="fanfan 菜单栏面板：Mac 温度、风扇转速、60 秒温度曲线、CPU/GPU/SSD/电池传感器与自动调速设置"></td>
-    <td width="58%" align="center"><img src="docs/view/setting.png" alt="fanfan 设置：菜单栏显示、监控间隔、高温警报、通知、自动模式切换与自定义 PID 增益"></td>
+    <td width="42%" align="center"><img src="docs/view/zh-Hans/popover.png" alt="fanfan 菜单栏面板：Mac 温度、风扇转速、60 秒温度曲线、CPU/GPU/SSD/电池传感器与自动调速设置"></td>
+    <td width="58%" align="center"><img src="docs/view/zh-Hans/settings.png" alt="fanfan 设置：菜单栏显示、监控间隔、高温警报、通知、自动模式切换与自定义 PID 增益"></td>
   </tr>
   <tr>
     <td align="center"><sub>菜单栏面板</sub></td>
@@ -39,6 +39,7 @@ fanfan 是一款开源 macOS 菜单栏应用，可查看 Mac 温度和风扇转�
 - **菜单栏一眼可见：** 菜单栏可显示温度、功耗或风扇转速百分比，也可以什么都不显示。
 - **高温警报：** 超过设定阈值时发送通知，并可自动切换到自动调速。
 - **高级 PID 调试：** 预设不合适时，可自定义控制器增益。
+- **多语言界面：** 支持 English、简体中文、繁體中文、日本語、한국어、Deutsch、Français 和 Español。默认跟随 macOS 系统语言，也可以在 系统设置 › 通用 › 语言与地区 › 应用程序 里单独为 fanfan 指定语言。
 - **自动恢复控制：** 风扇写入由独立的特权辅助进程完成；应用失去响应后，10 秒租约到期会交还固件控制。退出应用时也会先把风扇交还给 macOS。
 
 无风扇的 Mac 不显示风扇控制项。可用传感器和转速范围因机型而异。

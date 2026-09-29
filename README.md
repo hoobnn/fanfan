@@ -22,8 +22,8 @@ fanfan is an open-source macOS menu bar app for monitoring Mac temperatures and 
 
 <table>
   <tr>
-    <td width="42%" align="center"><img src="docs/view/image.png" alt="fanfan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
-    <td width="58%" align="center"><img src="docs/view/setting.png" alt="fanfan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
+    <td width="42%" align="center"><img src="docs/view/en/popover.png" alt="fanfan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
+    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="fanfan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
   </tr>
   <tr>
     <td align="center"><sub>Menu bar popover</sub></td>
@@ -39,6 +39,7 @@ fanfan is an open-source macOS menu bar app for monitoring Mac temperatures and 
 - **Menu bar at a glance:** Show temperature, power usage, or fan speed % in the menu bar — or nothing.
 - **High-temperature alerts:** Get notified above a threshold you set, and optionally switch to automatic control when it's hit.
 - **Advanced PID tuning:** Set custom controller gains if the presets don't fit your workload.
+- **Speaks your language:** English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français, and Español. fanfan follows the macOS system language, or pick one just for fanfan in System Settings › General › Language & Region › Applications.
 - **Keep control recoverable:** A small privileged helper writes fan speeds; if the app stops responding, its 10-second lease expires and the helper returns control to firmware. Quitting the app also hands fans back to macOS.
 
 Fan controls are hidden on Macs without a fan. Available sensors and fan speed ranges depend on the Mac model.
