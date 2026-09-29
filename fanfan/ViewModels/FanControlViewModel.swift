@@ -119,13 +119,11 @@ class FanControlViewModel: ObservableObject {
     private var highTemperatureModeSwitch = HighTemperatureModeSwitch()
 
     private func setupSettingsObservers() {
-        // High-temp alert and auto mode switch are driven by the unsmoothed
-        // maximum of live CPU/GPU telemetry, so GPU-only overheating is covered
-        // and the safety notification is not delayed by display smoothing.
-        // 中文：高温警报与自动切换由 CPU/GPU 原始实时最高温度驱动，既覆盖 GPU
-        // 单独过热，也不会被界面平滑延迟。（此前警报监听的是 `$highTempAlert` 设置项，
-        // *setting* — so it only fired if the user dragged the threshold / 中文：因此只有用户在温度已超标时拖动阈值滑杆
-        // slider while already over temperature.) / 中文：才会触发。）
+        // Safety events use the unfiltered maximum so even a brief CPU/GPU
+        // overheat can trigger an alert or an automatic mode switch. The alert
+        // reports that triggering reading, even if the UI median hides a spike.
+        // 中文：安全事件使用未滤波的 CPU/GPU 最高值，短暂过热也能触发通知或自动切换；
+        // 通知报告触发时的原始读数，即使界面中位数滤掉了尖峰。
         systemMonitor.$rawMaxTemperature
             .compactMap { $0 }
             .sink { [weak self] temp in
@@ -187,8 +185,10 @@ class FanControlViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$allSensors)
 
-        $allSensors
-            .map(SensorSection.sections)
+        // CPU / GPU rows come from the same fast-tier read as `cpuTemperature` / 中文：CPU / GPU 行与 `cpuTemperature` / `gpuTemperature`
+        // / `gpuTemperature`, so each section header equals the overview value. / 中文：来自同一次快速档读取，因此分组标题与概览数值相等。
+        Publishers.CombineLatest(systemMonitor.$dieSensors, $allSensors)
+            .map { SensorSection.sections(from: $0 + $1) }
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
             .assign(to: &$sensorSections)

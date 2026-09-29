@@ -160,8 +160,16 @@ private let SMC_CMD_READ_KEYINFO: UInt8 = 9
 // MARK: - System Monitor Class / 中文：系统监控类
 
 class SystemMonitor: ObservableObject {
+    /// Display values: hottest per-key reading after `TemperatureDisplayFilter`. / 中文：显示值：经 `TemperatureDisplayFilter` 处理后逐键读数的最大值。
     @Published var cpuTemperature: Double?
     @Published var gpuTemperature: Double?
+    /// Control values: EMA of the raw hottest reading, fed to `FanController`. / 中文：控制值：原始最高读数的 EMA，供 `FanController` 使用。
+    @Published private(set) var controlCpuTemperature: Double?
+    @Published private(set) var controlGpuTemperature: Double?
+    /// Per-key CPU / GPU display rows, from the same fast-tier read as the / 中文：逐键 CPU / GPU 显示行，与上面的显示值来自同一次快速档读取；
+    /// display values above; published only while the popover is open. / 中文：仅在 popover 打开时发布。
+    @Published private(set) var dieSensors: [SensorReading] = []
+    /// Slow-tier sensors (memory, storage, battery, system, ambient). / 中文：慢速档传感器（内存、存储、电池、系统、环境）。
     @Published var allSensors: [SensorReading] = []
     @Published var fanSpeeds: [Int] = []
     @Published var fanMinSpeeds: [Int] = []
@@ -308,15 +316,21 @@ class SystemMonitor: ObservableObject {
     // Keys that have a curated (friendly, localizable) name in sensorKeyMap. / 中文：在 sensorKeyMap 中有精选友好且可本地化名称的键。
     private lazy var curatedSensorKeys: Set<String> = Set(sensorKeyMap.map { $0.0 })
 
-    // EMA smoothing for temperature readings / 中文：温度读数的 EMA 平滑
+    // EMA smoothing for the control path only / 中文：仅用于控制路径的 EMA 平滑
     private var smoothedCpuTemp: Double?
     private var smoothedGpuTemp: Double?
     private let smoothingAlpha: Double = 0.1
 
+    // Display-path sources. Accessed only on `readingsQueue`. / 中文：显示路径数据源，仅在 `readingsQueue` 访问。
+    private var cpuDisplaySource = TemperatureDisplaySource(medianWindow: 3)
+    private var gpuDisplaySource = TemperatureDisplaySource(medianWindow: 3)
+    // Slow tier runs every 6 s+, so no median — it would add 12 s of lag. / 中文：慢速档至少 6 秒一次，不做中位数，否则多出 12 秒滞后。
+    private var slowDisplayFilters: [SensorCategory: TemperatureDisplayFilter] = [:]
+
     // Cached effective SMC keys / 中文：缓存的有效 SMC 键
     // A *set*, not a single key: Apple Silicon spreads the die across dozens of / 中文：这里是「集合」而非单个键：Apple Silicon 把裸片拆成
     // per-core sensors and the hot cluster is not the first key that parses. / 中文：数十个 per-core 传感器，最热的簇并不是第一个能读通的键。
-    // See `hottestTemperature` for why we take the max rather than the first. / 中文：取最大值而非首个命中的原因见 `hottestTemperature`。
+    // See `liveReadings` for why we take the max rather than the first. / 中文：取最大值而非首个命中的原因见 `liveReadings`。
     private var cachedCpuKeys: [String] = []
     private var cachedGpuKeys: [String] = []
 
@@ -542,8 +556,10 @@ class SystemMonitor: ObservableObject {
             self.ensureFullScan()
 
             // Fast tier: CPU / GPU temperature + fan RPM, every tick. / 中文：快速档：每个 tick 都读 CPU / GPU 温度 + 风扇转速。
-            let rawCpuTemp = self.readCpuTemperature()
-            let rawGpuTemp = self.readGpuTemperature()
+            let cpuReadings = self.readCpuReadings()
+            let gpuReadings = self.readGpuReadings()
+            let rawCpuTemp = cpuReadings.values.max()
+            let rawGpuTemp = gpuReadings.values.max()
             let now = Date()
             let currentRawMax = [rawCpuTemp, rawGpuTemp]
                 .compactMap { $0 }
@@ -567,6 +583,17 @@ class SystemMonitor: ObservableObject {
                 self.smoothedGpuTemp = nil
                 gpuTemp = nil
             }
+
+            // Display path: per-key median + integer hysteresis. A tick with no / 中文：显示路径：逐键中位数 + 整数回差。本周期没读到
+            // readings keeps the last value while the source is still fresh. / 中文：数据时，只要数据源仍新鲜就沿用上次的值。
+            let cpuDisplayReadings = self.cpuDisplaySource.update(cpuReadings, isFresh: cpuIsFresh)
+            let gpuDisplayReadings = self.gpuDisplaySource.update(gpuReadings, isFresh: gpuIsFresh)
+            let cpuDisplay = cpuDisplayReadings.values.max()
+            let gpuDisplay = gpuDisplayReadings.values.max()
+            let dieRows: [SensorReading]? = self.sensorScanActive
+                ? self.sensorRows(cpuDisplayReadings, category: .cpu)
+                    + self.sensorRows(gpuDisplayReadings, category: .gpu)
+                : nil
 
             let detectedFanCount = self.resolveFanCount(now: now)
             let (speeds, minSpeeds, maxSpeeds) = self.readFanData(fanCount: detectedFanCount)
@@ -596,8 +623,11 @@ class SystemMonitor: ObservableObject {
             // key discovery, so startup fan control never waits on thousands of
             // SMC index probes.
             DispatchQueue.main.async {
-                if self.cpuTemperature != cpuTemp { self.cpuTemperature = cpuTemp }
-                if self.gpuTemperature != gpuTemp { self.gpuTemperature = gpuTemp }
+                if self.controlCpuTemperature != cpuTemp { self.controlCpuTemperature = cpuTemp }
+                if self.controlGpuTemperature != gpuTemp { self.controlGpuTemperature = gpuTemp }
+                if self.cpuTemperature != cpuDisplay { self.cpuTemperature = cpuDisplay }
+                if self.gpuTemperature != gpuDisplay { self.gpuTemperature = gpuDisplay }
+                if let dieRows, self.dieSensors != dieRows { self.dieSensors = dieRows }
                 if self.rawMaxTemperature != currentRawMax { self.rawMaxTemperature = currentRawMax }
                 if rawCpuTemp != nil { self.lastValidCpuTemperatureAt = now }
                 if rawGpuTemp != nil { self.lastValidGpuTemperatureAt = now }
@@ -787,7 +817,7 @@ class SystemMonitor: ObservableObject {
         // which is the wrong shape for choosing a control input: on an M4 Pro the / 中文：但用来挑选控制输入就完全不对：在 M4 Pro 上
         // curated CPU keys are all inactive placeholders parked at 40.00 °C and / 中文：精选 CPU 键全是停在 40.00 °C 的未激活占位值，
         // they fill every capped slot, hiding all 53 live die sensors from the / 中文：而它们占满了所有封顶名额，把 53 个真实裸片传感器
-        // PID loop. Feed the loop everything and let `hottestTemperature` choose. / 中文：全部挡在 PID 环之外。把全部喂给它，由 `hottestTemperature` 选择。
+        // PID loop. Feed the loop everything and take the max of `liveReadings`. / 中文：全部挡在 PID 环之外。把全部喂给它，对 `liveReadings` 取最大值。
         discoveredCpuKeys = discovered.filter { $0.2 == .cpu }.map { $0.0 }
         discoveredGpuKeys = discovered.filter { $0.2 == .gpu }.map { $0.0 }
         // Do not permanently cache a transient startup failure. A later tick can
@@ -807,7 +837,10 @@ class SystemMonitor: ObservableObject {
         _ sensors: [(String, String, SensorCategory)]
     ) -> [(String, String, SensorCategory)] {
         var result: [(String, String, SensorCategory)] = []
-        for category in SensorCategory.allCases {
+        // CPU / GPU rows come from the fast tier (`dieSensors`), not this list. / 中文：CPU / GPU 行来自快速档（`dieSensors`），不走这份列表。
+        // Only die sensors have known 40.00 °C placeholders; other categories / 中文：只有裸片传感器有已知的 40.00 °C 占位值；
+        // can legitimately read 40 °C. / 中文：其他类别真实读数也可能恰好是 40 °C。
+        for category in SensorCategory.allCases where category != .cpu && category != .gpu {
             let inCategory = sensors.filter { $0.2 == category }
             guard !inCategory.isEmpty else { continue }
             let curated = inCategory.filter { curatedSensorKeys.contains($0.0) }
@@ -826,20 +859,41 @@ class SystemMonitor: ObservableObject {
     private func scanAllSensors() -> [SensorReading] {
         ensureFullScan()
 
-        var sensors: [SensorReading] = []
-        for (key, name, category) in discoveredSensorKeys {
+        var raw: [SensorCategory: [String: Double]] = [:]
+        for (key, _, category) in discoveredSensorKeys {
             guard let temp = readSMCValue(key: key), temp > 0, temp < 150 else { continue }
-            let displayName: String
-            if curatedSensorKeys.contains(key) {
-                displayName = NSLocalizedString("sensor.\(key)", value: name, comment: "")
-            } else {
-                displayName = String(format: NSLocalizedString("sensor.generic", comment: ""),
-                                     category.displayName)
-            }
-            sensors.append(SensorReading(id: key, name: displayName,
-                                         temperature: temp, category: category))
+            raw[category, default: [:]][key] = temp
+        }
+        var sensors: [SensorReading] = []
+        for category in SensorCategory.allCases {
+            guard let readings = raw[category] else { continue }
+            var filter = slowDisplayFilters[category]
+                ?? TemperatureDisplayFilter(medianWindow: 1)
+            let display = filter.update(readings)
+            slowDisplayFilters[category] = filter
+            sensors += sensorRows(display, category: category)
         }
         return sensors
+    }
+
+    /// Build list rows for one category's display readings, ordered by key. / 中文：把一个类别的显示读数构造成列表行，按键排序。
+    private func sensorRows(_ readings: [String: Double], category: SensorCategory) -> [SensorReading] {
+        readings.keys.sorted().map { key in
+            SensorReading(id: key, name: displayName(for: key, category: category),
+                          temperature: readings[key]!, category: category)
+        }
+    }
+
+    private lazy var curatedSensorNames: [String: String] = Dictionary(
+        sensorKeyMap.map { ($0.0, $0.1) },
+        uniquingKeysWith: { first, _ in first }
+    )
+
+    private func displayName(for key: String, category: SensorCategory) -> String {
+        if let name = curatedSensorNames[key] {
+            return NSLocalizedString("sensor.\(key)", value: name, comment: "")
+        }
+        return String(format: NSLocalizedString("sensor.generic", comment: ""), category.displayName)
     }
 
     // MARK: - SMC Key Enumeration / 中文：SMC 键枚举
@@ -947,7 +1001,7 @@ class SystemMonitor: ObservableObject {
 
     // MARK: - Cached Key Reading / 中文：缓存键读取
 
-    /// Hottest plausible reading across a candidate key set. / 中文：候选键集合中最热的合理读数。
+    /// Plausible readings across a candidate key set; callers take the max. / 中文：候选键集合中的合理读数；调用方取最大值。
     ///
     /// Apple Silicon exposes the die as dozens of per-core sensors whose values / 中文：Apple Silicon 把裸片暴露成数十个 per-core 传感器，
     /// span a wide band at any instant, so the first key that parses is not the / 中文：同一时刻读数分布很宽，因此首个能读通的键
@@ -960,16 +1014,19 @@ class SystemMonitor: ObservableObject {
     /// hardware idle/unpopulated cores report that constant rather than a live / 中文：本机上空闲/未启用的核心报这个常量而非真实读数
     /// value (unlike the ~1–2 °C gated reading seen on earlier Apple Silicon), / 中文：（不同于早期 Apple Silicon 的约 1–2 °C 门控值），
     /// and letting it through would pin an idle machine's reading at 40 °C. / 中文：放行它会把空闲机器的读数钉在 40 °C。
-    private func hottestTemperature(_ keys: [String]) -> Double? {
-        var hottest: Double?
+    ///
+    /// Returns every plausible reading rather than only the max, so the sensor / 中文：返回全部合理读数而不只是最大值，
+    /// page can show the same per-key values the control path saw this tick. / 中文：让传感器页展示控制路径本周期看到的同一批逐键数值。
+    private func liveReadings(_ keys: [String]) -> [String: Double] {
+        var readings: [String: Double] = [:]
         for key in keys {
             guard let temp = readSMCTemperature(key: key),
                   temp > temperatureFloor,
                   temp < temperatureCeiling,
                   !Self.isPlaceholderReading(temp) else { continue }
-            hottest = max(hottest ?? temp, temp)
+            readings[key] = temp
         }
-        return hottest
+        return readings
     }
 
     /// Sensors parked at exactly 40.00 °C are inactive placeholders, not real / 中文：恰好停在 40.00 °C 的传感器是未激活的占位值，
@@ -979,16 +1036,17 @@ class SystemMonitor: ObservableObject {
         abs(temp - 40.0) < 0.001
     }
 
-    private func readCpuTemperature() -> Double? {
+    private func readCpuReadings() -> [String: Double] {
         // Prefer the cached hot-key set; re-derive only when it stops yielding. / 中文：优先使用缓存的热键集合，仅在其完全失效时重新推导。
         if !cachedCpuKeys.isEmpty {
-            if let temp = hottestTemperature(cachedCpuKeys) {
+            let readings = liveReadings(cachedCpuKeys)
+            if !readings.isEmpty {
                 cpuReadFailures = 0
-                return temp
+                return readings
             }
             cpuReadFailures += 1
             // Transient failure — keep the same set for the next cycle. / 中文：瞬时失败——下个周期继续使用同一集合。
-            if cpuReadFailures < 3 { return nil }
+            if cpuReadFailures < 3 { return [:] }
             cachedCpuKeys = []
         }
         // Re-derive the candidate set and keep every key that reads hot, so a / 中文：重新推导候选集合并保留所有读到有效值的键，
@@ -998,10 +1056,11 @@ class SystemMonitor: ObservableObject {
             guard let temp = readSMCTemperature(key: key) else { return false }
             return temp > temperatureFloor && temp < temperatureCeiling && !Self.isPlaceholderReading(temp)
         }
-        if !live.isEmpty, let temp = hottestTemperature(live) {
+        let readings = liveReadings(live)
+        if !readings.isEmpty {
             cachedCpuKeys = live
             cpuReadFailures = 0
-            return temp
+            return readings
         }
         cpuReadFailures += 1
         if cpuReadFailures >= maxConsecutiveFailures {
@@ -1009,17 +1068,18 @@ class SystemMonitor: ObservableObject {
                 self.lastError = "CPU temperature read failed \(self.cpuReadFailures) times"
             }
         }
-        return nil
+        return [:]
     }
 
-    private func readGpuTemperature() -> Double? {
+    private func readGpuReadings() -> [String: Double] {
         if !cachedGpuKeys.isEmpty {
-            if let temp = hottestTemperature(cachedGpuKeys) {
+            let readings = liveReadings(cachedGpuKeys)
+            if !readings.isEmpty {
                 gpuReadFailures = 0
-                return temp
+                return readings
             }
             gpuReadFailures += 1
-            if gpuReadFailures < 3 { return nil }
+            if gpuReadFailures < 3 { return [:] }
             cachedGpuKeys = []
         }
         // Intel keys first, then any GPU keys found by SMC enumeration — / 中文：先 Intel 键，再加上 SMC 枚举发现的 GPU 键——
@@ -1029,13 +1089,14 @@ class SystemMonitor: ObservableObject {
             guard let temp = readSMCTemperature(key: key) else { return false }
             return temp > temperatureFloor && temp < temperatureCeiling && !Self.isPlaceholderReading(temp)
         }
-        if !live.isEmpty, let temp = hottestTemperature(live) {
+        let readings = liveReadings(live)
+        if !readings.isEmpty {
             cachedGpuKeys = live
             gpuReadFailures = 0
-            return temp
+            return readings
         }
         gpuReadFailures += 1
-        return nil
+        return [:]
     }
 
     // MARK: - Reading Validation / 中文：读数校验

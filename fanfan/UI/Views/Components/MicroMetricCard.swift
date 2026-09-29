@@ -11,6 +11,8 @@ import SwiftUI
 struct MicroMetricCard: View {
     var label: String
     var temp: Double?
+    /// Hover tooltip explaining what the number is, e.g. hottest core. / 中文：悬停提示，说明数值含义，例如最热核心。
+    var help: String? = nil
 
     @Environment(\.colorScheme) private var scheme
 
@@ -41,5 +43,6 @@ struct MicroMetricCard: View {
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .themedCard(scheme, cornerRadius: 8)
+        .help(help ?? "")
     }
 }

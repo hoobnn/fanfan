@@ -161,6 +161,9 @@
 "sensors.none" = "未检测到传感器";
 "sensors.fan_details" = "风扇详情";
 "sensors.fan" = "风扇";
+"sensors.show_all" = "显示全部 %d 个";
+"sensors.show_less" = "收起";
+"metric.hottest_core.help" = "最热核心温度";
 
 /* 温度状态 */
 "temperature.cool" = "凉爽";
@@ -172,7 +175,7 @@
 
 /* 警报 */
 "alert.high_temp.title" = "高温警报";
-"alert.high_temp.subtitle" = "最高温度：%.1f°C";
+"alert.high_temp.subtitle" = "最高温度：%.0f°C";
 "alert.high_temp.message" = "考虑切换到自动风扇控制或检查您的系统。";
 "controls.apply_failed" = "风扇设置未能生效，请检查辅助程序后重试。";
 

@@ -161,6 +161,9 @@
 "sensors.none" = "No sensors detected";
 "sensors.fan_details" = "Fan Details";
 "sensors.fan" = "Fan";
+"sensors.show_all" = "Show all %d";
+"sensors.show_less" = "Show less";
+"metric.hottest_core.help" = "Hottest core temperature";
 
 /* Temperature Status */
 "temperature.cool" = "Cool";
@@ -172,7 +175,7 @@
 
 /* Alerts */
 "alert.high_temp.title" = "High Temperature Alert";
-"alert.high_temp.subtitle" = "Highest temperature: %.1f°C";
+"alert.high_temp.subtitle" = "Highest temperature: %.0f°C";
 "alert.high_temp.message" = "Consider switching to automatic fan control or check your system.";
 "controls.apply_failed" = "Could not apply the fan setting. Check the helper and try again.";
 

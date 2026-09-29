@@ -230,8 +230,10 @@ struct PopoverView: View {
             HeroCard(metrics: heroMetrics, showsFan: hasFans)
             curveCard
             HStack(spacing: 5) {
-                MicroMetricCard(label: "CPU", temp: viewModel.cpuTemperature)
-                MicroMetricCard(label: "GPU", temp: viewModel.gpuTemperature)
+                MicroMetricCard(label: "CPU", temp: viewModel.cpuTemperature,
+                                help: NSLocalizedString("metric.hottest_core.help", comment: ""))
+                MicroMetricCard(label: "GPU", temp: viewModel.gpuTemperature,
+                                help: NSLocalizedString("metric.hottest_core.help", comment: ""))
                 MicroMetricCard(label: "SSD", temp: ssdTemp)
                 MicroMetricCard(label: NSLocalizedString("metric.battery", comment: ""),
                                 temp: batteryTemp)
@@ -272,7 +274,7 @@ struct PopoverView: View {
                     .tracking(0.4)
                     .foregroundColor(Theme.text3(scheme))
                 Spacer()
-                Text(String(format: "%.1f°", maxTemperature))
+                Text(String(format: "%.0f°", maxTemperature))
                     .font(Theme.num(11.5, weight: .semibold))
                     .foregroundColor(Theme.text1(scheme))
             }
@@ -342,7 +344,7 @@ struct PopoverView: View {
 
     private var batteryTemp: Double? {
         if let t = viewModel.batterySensorTemperature { return t }
-        if let t = battery.batteryInfo.temperature, t > 0 { return t }
+        if let t = battery.batteryInfo.temperature, t > 0 { return t.rounded() }
         return nil
     }
 

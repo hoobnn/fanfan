@@ -73,6 +73,36 @@ final class SystemMonitorTests: XCTestCase {
         XCTAssertEqual(sections.first?.maxTemperature, 63.0)
     }
 
+    func testDisplayFilterKeepsAStableHotSensorAlongsideChangingSensors() {
+        var filter = TemperatureDisplayFilter(medianWindow: 3)
+        for tick in 0..<35 {
+            let readings = filter.update([
+                "hot": 90.0,
+                "other": tick.isMultiple(of: 2) ? 70.0 : 71.0
+            ])
+            XCTAssertEqual(readings["hot"], 90.0)
+            XCTAssertEqual(readings.values.max(), 90.0)
+        }
+    }
+
+    func testDisplayFilterRejectsASingleReadSpikeAndResetsHistory() {
+        var filter = TemperatureDisplayFilter(medianWindow: 3)
+        _ = filter.update(["cpu": 70.0])
+        _ = filter.update(["cpu": 70.0])
+        XCTAssertEqual(filter.update(["cpu": 95.0])["cpu"], 70.0)
+        filter.reset()
+        XCTAssertEqual(filter.update(["cpu": 95.0])["cpu"], 95.0)
+    }
+
+    func testDisplaySourceRetainsRowsUntilStaleThenClearsThemTogether() {
+        var source = TemperatureDisplaySource(medianWindow: 3)
+        let initial = source.update(["core": 75.0], isFresh: true)
+        XCTAssertEqual(initial.values.max(), 75.0)
+        XCTAssertEqual(source.update([:], isFresh: true), initial)
+        XCTAssertTrue(source.update([:], isFresh: false).isEmpty)
+        XCTAssertEqual(source.update(["core": 92.0], isFresh: true)["core"], 92.0)
+    }
+
     func testEveryKnownTemperatureSourceMustRemainFresh() {
         let now = Date(timeIntervalSince1970: 1_000)
         let fresh = now.addingTimeInterval(-2)

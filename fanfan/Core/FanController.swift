@@ -787,8 +787,8 @@ class FanController: ObservableObject {
         nextTemperatureFailsafeRetryAt = nil
 
         let rawTemp = max(
-            monitor.cpuTemperature ?? 0,
-            monitor.gpuTemperature ?? 0
+            monitor.controlCpuTemperature ?? 0,
+            monitor.controlGpuTemperature ?? 0
         )
 
         guard rawTemp > 0, monitor.numberOfFans > 0 else { return }
