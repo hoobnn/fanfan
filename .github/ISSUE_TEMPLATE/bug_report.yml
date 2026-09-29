@@ -1,0 +1,64 @@
+name: Bug report · 问题反馈
+description: Something doesn't work as expected. 功能异常或结果不符合预期。
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fan behavior depends heavily on the Mac model, so the hardware details below matter.
+        风扇行为和机型强相关，请尽量填写下面的硬件信息。
+  - type: input
+    id: version
+    attributes:
+      label: fanfan version · 版本
+      placeholder: "1.3.2"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Mac model and chip · 机型与芯片
+      description: Apple menu → About This Mac. 苹果菜单 →「关于本机」。
+      placeholder: "MacBook Pro 16-inch 2024, M4 Pro"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version · 系统版本
+      placeholder: "26.1"
+    validations:
+      required: true
+  - type: input
+    id: fans
+    attributes:
+      label: Number of fans shown · 应用显示的风扇数量
+      placeholder: "2"
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed via · 安装方式
+      options:
+        - Homebrew
+        - DMG
+        - install.sh
+        - Built from source · 自行构建
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened · 问题描述
+      description: What you expected, what happened instead, and the steps to reproduce. 预期结果、实际结果和复现步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs · 日志
+      description: |
+        Optional. Helper state and recent helper logs:
+        可选。helper 状态和最近的日志：
+        `launchctl print system/com.hoobnn.fanfan.smcd | head -20`
+        `tail -50 /var/log/fanfan-smcd.err`
+      render: text
