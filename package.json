@@ -1,7 +1,7 @@
 {
   "name": "fanfan",
   "version": "1.0.0",
-  "description": "![fanfan](docs/icon.png)",
+  "description": "Open-source macOS menu bar app for Mac fan control and temperature monitoring",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -14,14 +14,14 @@
     "type": "git",
     "url": "git+https://github.com/hoobnn/fanfan.git"
   },
-  "keywords": [],
+  "keywords": ["macos", "mac-fan-control", "fan-speed", "temperature-monitor", "menu-bar"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/hoobnn/fanfan/issues"
   },
-  "homepage": "https://github.com/hoobnn/fanfan#readme",
+  "homepage": "https://github.com/hoobnn/fanfan",
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",
