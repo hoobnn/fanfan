@@ -9,10 +9,11 @@
 import SwiftUI
 import AppKit
 import Combine
+import UserNotifications
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusBarManager: StatusBarManager?
-    let viewModel = FanControlViewModel()
+    let statusBarManager = StatusBarManager()
+    lazy var viewModel = FanControlViewModel()
     private var iconUpdateTimer: Timer?
     private var displayModeObserver: NSObjectProtocol?
     private var windowCloseObserver: NSObjectProtocol?
@@ -21,6 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var backgroundActivity: NSObjectProtocol?
     
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Register before launch completes so clicks on older alerts also work
+        // when they launch the app. / 中文：在启动完成前接管通知，兼容点击旧通知启动应用。
+        UNUserNotificationCenter.current().delegate = self
         // Hide dock icon as early as possible to minimize the brief Dock flash
         // that occurs because LSUIElement is NO (so the app shows in Launchpad).
         // 中文：尽早隐藏 Dock 图标，减少因 LSUIElement=NO（为了出现在启动台）
@@ -51,29 +55,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
 
-        // Opening the Settings `Window` scene promotes the app to `.regular`
-        // (LSUIElement is NO), and nothing demotes it again — the Dock icon
-        // lingered after every window was closed. Drop back to `.accessory`
-        // once the last titled window goes away.
-        // 中文：打开设置窗口会把应用提升为 `.regular`（LSUIElement=NO），之后没有
-        // 任何地方再降回来，导致关闭所有窗口后 Dock 图标仍残留。最后一个带标题
-        // 窗口关闭后恢复为 `.accessory`。
+        // Settings may promote the app to `.regular`. Restore menu-bar mode
+        // after its last window closes. / 中文：设置可能将应用提升为普通应用，最后一个窗口关闭后恢复菜单栏模式。
         windowCloseObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in
             let closing = notification.object as? NSWindow
-            // SwiftUI tears the scene down after willClose and can re-promote
-            // the app on its way out, so check again once it has settled.
-            // 中文：SwiftUI 在 willClose 之后才拆除场景，途中可能再次把应用提升为
-            // `.regular`，因此在其稳定后再核对一次。
-            DispatchQueue.main.async { self?.demoteToMenuBarIfWindowless(ignoring: closing) }
-            // By then the closed window is gone; don't ignore it in case Settings was reopened.
-            // 中文：此时已关闭的窗口不再可见；不再忽略它，以防设置窗口已被重新打开。
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self?.demoteToMenuBarIfWindowless(ignoring: nil)
-            }
+            self?.scheduleMenuBarPolicyUpdate(ignoring: closing)
         }
 
         // Initialize components immediately / 中文：立即初始化组件
@@ -83,8 +73,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupApplication() {
         
         // Initialize and setup status bar immediately / 中文：立即初始化并配置状态栏
-        let statusBarManager = StatusBarManager()
-        self.statusBarManager = statusBarManager
         statusBarManager.setupStatusBar()
         
         // Set initial display mode / 中文：设置初始显示模式
@@ -104,8 +92,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create popover content after a brief delay to ensure status bar is ready / 中文：短暂延迟后创建弹出内容，确保状态栏已就绪
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self,
-                  let statusBarManager = self.statusBarManager else { return }
+            guard let self else { return }
+            let statusBarManager = self.statusBarManager
             
             let viewModel = self.viewModel
             statusBarManager.setPopoverContent { [weak statusBarManager] in
@@ -154,8 +142,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func updateStatusBarIcon() {
-        guard let statusBarManager = statusBarManager else { return }
-        
         let maxTemp = viewModel.maxTemperature
         let power = BatteryMonitor.shared.batteryInfo.powerWatts
         statusBarManager.updateIcon(
@@ -228,11 +214,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask.contains(.titled) && (window.isVisible || window.isMiniaturized)
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // A notification click can activate the app without opening or closing
+        // a window. / 中文：通知点击可能只激活应用，不触发任何窗口开关事件。
+        scheduleMenuBarPolicyUpdate()
+    }
+
+    private func scheduleMenuBarPolicyUpdate(ignoring closing: NSWindow? = nil) {
+        DispatchQueue.main.async { [weak self] in
+            self?.demoteToMenuBarIfWindowless(ignoring: closing)
+        }
+        // SwiftUI can promote the app later in the activation/close cycle.
+        // Re-read all windows so newly reopened Settings remains in the Dock.
+        // 中文：等 SwiftUI 生命周期稳定后再检查；重新读取窗口，保留期间重新打开的设置窗口。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.demoteToMenuBarIfWindowless(ignoring: nil)
+        }
+    }
+
     private func demoteToMenuBarIfWindowless(ignoring closing: NSWindow?) {
         let hasOpenWindow = NSApp.windows.contains { $0 !== closing && isUserWindow($0) }
         if !hasOpenWindow, NSApp.activationPolicy() != .accessory {
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+
+    func handleNotificationResponse(actionIdentifier: String, requestIdentifier: String) {
+        guard actionIdentifier == UNNotificationDefaultActionIdentifier,
+              requestIdentifier.hasPrefix("high-temp-") else { return }
+        demoteToMenuBarIfWindowless(ignoring: nil)
+        statusBarManager.showPopover()
+        scheduleMenuBarPolicyUpdate()
+    }
+}
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        await handleNotificationResponse(
+            actionIdentifier: response.actionIdentifier,
+            requestIdentifier: response.notification.request.identifier
+        )
     }
 }
 

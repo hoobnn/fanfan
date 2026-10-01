@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.5.1] - 2026-10-01
+
+### Fixed
+- Clicking a high-temperature notification now opens the temperature panel and returns the app to menu-bar mode when no settings window is open, so dismissing an empty Dock icon no longer requires quitting fanfan. Repeated clicks keep the panel open, and clicks that launch the app wait for the panel to be ready.
+- Segmented controls stay inside the controls card.
+
+### Added
+- Traditional Chinese, Japanese, Korean, German, French and Spanish localizations.
+
 ## [1.5.0] - 2026-09-29
 
 ### Changed

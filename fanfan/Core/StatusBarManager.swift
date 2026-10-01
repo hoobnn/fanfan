@@ -35,6 +35,9 @@ struct StatusBarAnimationSettings {
 class StatusBarManager: NSObject, ObservableObject {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var isPopoverPresentationPending = false
+    private var popoverPresentationRetry: DispatchWorkItem?
+    private var remainingPopoverPresentationAttempts = 0
     private var displayLink: CADisplayLink?
     private var fallbackAnimationTimer: Timer?
     private var currentRotation: CGFloat = 0
@@ -93,8 +96,7 @@ class StatusBarManager: NSObject, ObservableObject {
     }
 
     @objc private func applicationDidResignActive(_ notification: Notification) {
-        guard popover?.isShown == true else { return }
-        popover?.performClose(nil)
+        closePopover()
     }
 
     /// Pre-render fan icons at common rotation angles for animation cache / 中文：Pre-render 风扇 图标s at common rotation angles for animation 缓存
@@ -141,6 +143,11 @@ class StatusBarManager: NSObject, ObservableObject {
         popover?.behavior = .transient
         popover?.contentSize = NSSize(width: 340, height: 580)
         popover?.delegate = self
+        // Let AppKit attach the new status item before anchoring a pending panel.
+        // 中文：等待 AppKit 挂载状态栏按钮，再显示启动期间待打开的面板。
+        DispatchQueue.main.async { [weak self] in
+            self?.presentPopoverIfReady()
+        }
     }
     
     /// Number of fan blades — matches `FanBladeView` so the menu bar icon and / 中文：Number of 风扇 blades — matches `风扇BladeView` so the menu bar 图标 and
@@ -211,7 +218,7 @@ class StatusBarManager: NSObject, ObservableObject {
     /// it eagerly. The tree contains `TimelineView(.animation)` (`FanBladeView`) / 中文：因为该视图树包含 `TimelineView(.animation)`（`FanBladeView`），
     /// which would otherwise tick at display-refresh rate as long as the / 中文：只要 `NSHostingController` 还活着，它就会按显示器刷新率持续 tick，
     /// `NSHostingController` is alive — burning ~40% CPU with the popover / 中文：在 弹出窗口 仅是视觉上关闭的情况下也是如此，
-    /// closed. We mount the controller in `togglePopover` and tear it down in / 中文：曾经导致约 40% 主线程 CPU 占用。这里改为在 `togglePopover` 中挂载，
+    /// closed. We mount the controller on show and tear it down in / 中文：曾经导致约 40% 主线程 CPU 占用。这里改为在显示时挂载，
     /// `popoverDidClose` so the SwiftUI graph only exists while visible. / 中文：在 `popoverDidClose` 中拆除，使 SwiftUI 视图树仅在可见期间存在。
     func setPopoverContent<Content: View>(_ builder: @escaping () -> Content) {
         DispatchQueue.main.async { [weak self] in
@@ -220,10 +227,13 @@ class StatusBarManager: NSObject, ObservableObject {
                       popover.contentViewController == nil else { return }
                 popover.contentViewController = NSHostingController(rootView: builder())
             }
+            self?.presentPopoverIfReady()
         }
     }
 
     private var popoverContentMounter: (() -> Void)?
+
+    var isPopoverShown: Bool { popover?.isShown == true }
     
     func updateIcon(fanSpeeds: [Int], fanMinSpeeds: [Int], fanMaxSpeeds: [Int], temperature: Double?, powerWatts: Double? = nil) {
         DispatchQueue.main.async { [weak self] in
@@ -484,25 +494,68 @@ class StatusBarManager: NSObject, ObservableObject {
     }
     
     @objc private func togglePopover() {
-        guard let button = statusItem?.button,
-              let popover = popover else {
+        if isPopoverShown {
+            closePopover()
+        } else {
+            showPopover()
+        }
+    }
+
+    /// Notification clicks open the panel even if it is already shown or its
+    /// content is still being prepared during launch.
+    /// 中文：通知点击始终显示面板；已打开时不会反向关闭，启动未就绪时保留请求。
+    func showPopover() {
+        isPopoverPresentationPending = true
+        remainingPopoverPresentationAttempts = 10
+        presentPopoverIfReady()
+    }
+
+    private func presentPopoverIfReady() {
+        guard isPopoverPresentationPending,
+              let button = statusItem?.button,
+              let popover,
+              let popoverContentMounter else { return }
+        popoverPresentationRetry?.cancel()
+        popoverPresentationRetry = nil
+        popoverContentMounter()
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        if !popover.isShown, button.window != nil {
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        }
+        guard popover.isShown else {
+            // AppKit can silently ignore show() while a new status item is
+            // settling. Only consume the request once the panel actually opens.
+            // 中文：状态栏按钮尚未就绪时 show() 可能无效，确认面板打开后才消费请求。
+            remainingPopoverPresentationAttempts -= 1
+            guard remainingPopoverPresentationAttempts > 0 else {
+                isPopoverPresentationPending = false
+                popover.contentViewController = nil
+                return
+            }
+            let retry = DispatchWorkItem { [weak self] in self?.presentPopoverIfReady() }
+            popoverPresentationRetry = retry
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: retry)
             return
         }
-        
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            popoverContentMounter?()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
-        }
+        isPopoverPresentationPending = false
+        popover.contentViewController?.view.window?.makeKey()
     }
     
     func closePopover() {
-        popover?.performClose(nil)
+        isPopoverPresentationPending = false
+        popoverPresentationRetry?.cancel()
+        popoverPresentationRetry = nil
+        if isPopoverShown {
+            popover?.performClose(nil)
+        } else {
+            popover?.contentViewController = nil
+        }
     }
     
     deinit {
+        popoverPresentationRetry?.cancel()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         stopAnimation()
