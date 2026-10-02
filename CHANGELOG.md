@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.5.4] - 2026-10-02
+
+### Fixed
+- Updating the app no longer asks to install the helper again. The helper used to exit as soon as the old app was deleted, so launchd tried to relaunch it before the new copy existed and then stopped retrying. It now waits for the new binary before restarting.
+- If an approved helper still stops responding, fanfan re-registers it once on its own instead of showing the install prompt. This also covers the update from 1.5.3, whose helper still has the old behaviour.
+
 ## [1.5.3] - 2026-10-02
 
 ### Fixed
