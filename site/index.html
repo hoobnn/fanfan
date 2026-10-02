@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fanfan：Mac 风扇控制与温度监控（免费开源）</title>
+<meta name="description" content="fanfan 是免费开源的 macOS 菜单栏风扇控制与温度监控工具：查看 CPU、GPU、SSD、电池温度，手动或按温度自动调风扇转速，支持 Apple Silicon 和 Intel Mac。">
+<link rel="canonical" href="https://hoobnn.github.io/fanfan/">
+<link rel="icon" href="logo.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="fanfan：Mac 风扇控制与温度监控（免费开源）">
+<meta property="og:description" content="fanfan 是免费开源的 macOS 菜单栏风扇控制与温度监控工具：查看 CPU、GPU、SSD、电池温度，手动或按温度自动调风扇转速，支持 Apple Silicon 和 Intel Mac。">
+<meta property="og:url" content="https://hoobnn.github.io/fanfan/">
+<meta property="og:image" content="https://hoobnn.github.io/fanfan/social-preview.png">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "fanfan", "operatingSystem": "macOS 26+", "applicationCategory": "UtilitiesApplication", "description": "fanfan 是免费开源的 macOS 菜单栏风扇控制与温度监控工具：查看 CPU、GPU、SSD、电池温度，手动或按温度自动调风扇转速，支持 Apple Silicon 和 Intel Mac。", "url": "https://hoobnn.github.io/fanfan/", "downloadUrl": "https://github.com/hoobnn/fanfan/releases/latest", "softwareVersion": "__VERSION__", "license": "https://opensource.org/licenses/MIT", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "image": "https://hoobnn.github.io/fanfan/social-preview.png", "author": {"@type": "Person", "name": "hoobnn", "url": "https://github.com/hoobnn"}}</script>
+<style>
+:root{--bg:#fbfaf7;--fg:#1d1d1f;--mut:#6e6e73;--card:#fff;--line:rgba(0,0,0,.09);--acc:#0f9b8e;--code:#f2f1ed}
+@media (prefers-color-scheme:dark){:root{--bg:#111214;--fg:#f2f2f4;--mut:#a1a1a8;--card:#1b1c1f;--line:rgba(255,255,255,.1);--code:#1f2023}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+main{max-width:920px;margin:0 auto;padding:0 20px 80px}
+header{text-align:center;padding:72px 0 40px}header img.icon{width:104px;height:104px;border-radius:22px}
+h1{font-size:44px;line-height:1.15;margin:18px 0 10px;letter-spacing:-.5px}h1 small{display:block;font-size:22px;font-weight:500;color:var(--mut);margin-top:10px;letter-spacing:0}
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px}
+.btn{display:inline-block;padding:11px 22px;border-radius:12px;text-decoration:none;font-weight:600;border:1px solid var(--line);color:var(--fg);background:var(--card)}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.meta{color:var(--mut);font-size:14px;margin-top:14px}
+pre,code{font-family:"SF Mono",Menlo,monospace;font-size:14.5px}pre{background:var(--code);padding:14px 18px;border-radius:12px;overflow-x:auto;border:1px solid var(--line)}
+code{background:var(--code);padding:1px 6px;border-radius:6px}pre code{background:none;padding:0}
+.shots{display:grid;grid-template-columns:42fr 58fr;gap:16px;margin:10px 0 30px}.shots img{width:100%;border-radius:14px;border:1px solid var(--line)}
+h2{font-size:26px;margin:48px 0 12px}h3{font-size:18px;margin:22px 0 4px}ul{padding-left:1.2em}li{margin:4px 0}
+a{color:var(--acc)}footer{color:var(--mut);font-size:14px;border-top:1px solid var(--line);margin-top:56px;padding-top:20px}
+#en{margin-top:64px;padding-top:8px;border-top:1px solid var(--line)}
+@media (max-width:640px){h1{font-size:34px}.shots{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<img class="icon" src="logo.png" alt="fanfan 图标" width="104" height="104">
+<h1>fanfan<small>Mac 风扇控制与温度监控，常驻菜单栏</small></h1>
+<div class="btns"><a class="btn p" href="https://github.com/hoobnn/fanfan/releases/latest">下载 DMG</a><a class="btn" href="https://github.com/hoobnn/fanfan">GitHub</a><a class="btn" href="#en" hreflang="en">English</a></div>
+<div class="meta">macOS 26 及以上 · Apple Silicon / Intel · 免费开源（MIT） · 当前版本 __VERSION__</div>
+</header>
+
+<div class="shots"><img src="popover.png" alt="fanfan 菜单栏面板：温度、风扇转速、60 秒温度曲线和传感器读数" loading="lazy"><img src="settings.png" alt="fanfan 设置：菜单栏显示、监控间隔、高温提醒、自定义 PID" loading="lazy"></div>
+<p>fanfan 常驻在菜单栏，显示 Mac 的温度和风扇转速。风扇可以手动定转速、按温度自动调，也可以交回给 macOS 自己管。没有第三方依赖。</p>
+<h2>安装</h2>
+<pre><code>brew tap hoobnn/tap
+brew install --cask fanfan</code></pre>
+<p>或者到 <a href="https://github.com/hoobnn/fanfan/releases/latest">GitHub Releases</a> 下载 DMG。第一次打开时点「安装助手」，再到「系统设置 › 通用 › 登录项与扩展」里允许 fanfan，不需要输管理员密码。</p>
+<h2>能做什么</h2>
+<ul>
+<li>显示风扇转速，以及 CPU、GPU、SSD、电池温度（看机型有哪些传感器），面板里有最近 60 秒的温度曲线。</li>
+<li>三种风扇模式：手动设转速、按温度自动调速、交回系统固件控制。两个风扇的 Mac 可以分别设置。</li>
+<li>自动调速可以改目标温度、最高转速和响应快慢，内置省电、均衡、性能三档。转速升快降慢，不会一会儿呼呼响一会儿又停。</li>
+<li>菜单栏可以显示温度、功耗或风扇转速百分比。</li>
+<li>温度超过设定值时发通知，可选同时切到自动调速。</li>
+<li>界面支持简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español。</li>
+</ul>
+<h2>常见问题</h2>
+<h3>调风扇转速安全吗？</h3>
+<p>fanfan 只在风扇自己上报的最低和最高转速之间设置，超出范围的请求会被直接拒绝。App 崩溃、卡住超过 10 秒或退出时，风扇自动交回 macOS 控制。</p>
+<h3>M 系列芯片的 Mac 能用吗？</h3>
+<p>能。fanfan 是 Apple Silicon 和 Intel 通用版。MacBook Air 这类没有风扇的机型只显示温度。</p>
+<h3>和 Macs Fan Control、smcFanControl 比怎么样？</h3>
+<p>核心功能一样：读 SMC 传感器、设风扇转速。fanfan 免费开源（MIT），没有第三方依赖。</p>
+<h3>为什么要允许它在后台运行？</h3>
+<p>往 SMC 写转速需要 root 权限。为了让 App 本身不用 root 跑，fanfan 只注册了一个很小的辅助进程，macOS 会让你在「登录项与扩展」里允许一次。只看温度不需要任何权限。</p>
+
+<section id="en" lang="en">
+
+<h2>fanfan: Mac fan control and temperature monitor</h2>
+<p>fanfan lives in the menu bar and shows your Mac's temperatures and fan speeds. Set a fixed fan speed, let it follow temperature, or hand control back to macOS. Free and open source (MIT), no third-party dependencies, for Apple Silicon and Intel Macs on macOS 26 or later.</p>
+<pre><code>brew tap hoobnn/tap
+brew install --cask fanfan</code></pre>
+<ul>
+<li>Fan RPM plus CPU, GPU, SSD and battery temperatures, with a 60-second chart.</li>
+<li>Manual, automatic (temperature-based) or firmware control, per fan.</li>
+<li>Presets for Power Saving, Balanced and Performance, or your own PID gains.</li>
+<li>High-temperature alerts that can switch to automatic control.</li>
+<li>If the app quits, crashes or hangs for 10 seconds, the fans go back to macOS control.</li>
+</ul>
+<p>Full documentation is in the <a href="https://github.com/hoobnn/fanfan/blob/main/README.en.md">English README</a>.</p>
+
+</section>
+<footer>fanfan 由 <a href="https://github.com/hoobnn">hoobnn</a> 开发，最早 fork 自 <a href="https://github.com/SoloTeamDev/solofan">solofan</a>。<a href="https://github.com/hoobnn/fanfan">源代码</a> · <a href="https://github.com/hoobnn/fanfan/issues">反馈问题</a> · MIT License</footer>
+</main>
+</body>
+</html>
