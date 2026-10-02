@@ -211,7 +211,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func isUserWindow(_ window: NSWindow) -> Bool {
-        window.styleMask.contains(.titled) && (window.isVisible || window.isMiniaturized)
+        guard window.styleMask.contains(.titled) else { return false }
+        if window.isMiniaturized { return true }
+        // A restored, empty SwiftUI Settings window can report itself visible
+        // while it has no usable content. It must not keep the Dock icon alive.
+        // 中文：空的 SwiftUI 设置窗口恢复后也可能报告可见；没有实际内容时不能阻止隐藏 Dock 图标。
+        guard window.isVisible, let contentSize = window.contentView?.bounds.size else { return false }
+        return contentSize.width > 0 && contentSize.height > 0
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -267,18 +273,17 @@ struct fanfanApp: App {
     @State private var showSettingsWindow = false
     
     var body: some Scene {
-        // Use MenuBarExtra for macOS 13+ or Settings with empty content / 中文：在 macOS 13+ 使用 MenuBarExtra，或提供空内容的 Settings
-        Settings {
-            Text(NSLocalizedString("app.title", comment: ""))
-                .frame(width: 0, height: 0)
-                .hidden()
-        }
-        
-        // Settings Window Scene / 中文：设置窗口场景
+        // Keep a single settings scene. An empty Settings scene still creates
+        // a titled window and can leave an invisible window holding the Dock icon.
+        // 中文：只保留真正的设置场景；空 Settings 场景仍会创建带标题的窗口，导致无形窗口占用 Dock。
         Window(NSLocalizedString("app.settings_title", comment: ""), id: "settings") {
             SettingsWindowView(isOpen: $showSettingsWindow, viewModel: appDelegate.viewModel)
         }
-        .keyboardShortcut(",", modifiers: .command)
+        // Do not create Settings on launch or windowless reactivation; an
+        // existing settings window may still be restored.
+        // 中文：启动或无窗口激活时不新建设置窗口，仍允许恢复之前打开的真实设置窗口。
+        .defaultLaunchBehavior(.suppressed)
+        .commands { SettingsCommands() }
         .defaultWindowPlacement { content, context in
             let contentSize = content.sizeThatFits(.unspecified)
             let visibleSize = context.defaultDisplay.visibleRect.size
@@ -294,6 +299,19 @@ struct fanfanApp: App {
             )
 
             return WindowPlacement(size: CGSize(width: width, height: height))
+        }
+    }
+}
+
+private struct SettingsCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button(NSLocalizedString("popover.settings", comment: "")) {
+                openWindow(id: "settings")
+            }
+            .keyboardShortcut(",", modifiers: .command)
         }
     }
 }

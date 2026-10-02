@@ -29,6 +29,58 @@ final class AppLifecycleTests: XCTestCase {
         withExtendedLifetime(delegate) {}
     }
 
+    func testVisibleEmptySettingsWindowDoesNotKeepDockIcon() async throws {
+        let window = NSWindow(
+            contentRect: .zero,
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = NSLocalizedString("app.settings_title", comment: "")
+        window.isReleasedWhenClosed = false
+        defer {
+            window.close()
+            NSApp.setActivationPolicy(.accessory)
+        }
+        NSApp.setActivationPolicy(.regular)
+        window.orderFront(nil)
+        XCTAssertTrue(window.isVisible)
+        XCTAssertEqual(window.contentView?.bounds.width, 0)
+
+        let delegate = AppDelegate()
+        delegate.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        try await settle(for: 0.7)
+
+        XCTAssertEqual(NSApp.activationPolicy(), .accessory)
+        withExtendedLifetime(delegate) {}
+    }
+
+    func testSettingsCommandOpensAUsableWindow() async throws {
+        func settingsCommands(in menu: NSMenu) -> [NSMenuItem] {
+            menu.items.flatMap { item in
+                if let submenu = item.submenu { return settingsCommands(in: submenu) }
+                return item.keyEquivalent == "," && item.keyEquivalentModifierMask.contains(.command) ? [item] : []
+            }
+        }
+        let menu = try XCTUnwrap(NSApp.mainMenu)
+        let commands = settingsCommands(in: menu)
+        XCTAssertEqual(commands.count, 1)
+        let command = try XCTUnwrap(commands.first)
+        let action = try XCTUnwrap(command.action)
+        XCTAssertTrue(NSApp.sendAction(action, to: command.target, from: command))
+        try await settle(for: 0.7)
+
+        let windows = NSApp.windows.filter { $0.styleMask.contains(.titled) && $0.isVisible }
+        defer {
+            windows.forEach { $0.close() }
+            NSApp.setActivationPolicy(.accessory)
+        }
+        XCTAssertEqual(windows.count, 1)
+        let window = try XCTUnwrap(windows.first)
+        XCTAssertGreaterThan(window.contentView?.bounds.width ?? 0, 0)
+        XCTAssertGreaterThan(window.contentView?.bounds.height ?? 0, 0)
+    }
+
     func testActivationKeepsSettingsOpenedBeforeDelayedCheck() async throws {
         let delegate = AppDelegate()
         delegate.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))

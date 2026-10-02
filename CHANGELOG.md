@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.5.2] - 2026-10-02
+
+### Fixed
+- Remove the empty Settings scene that could leave an invisible, zero-size window keeping the app in the Dock. The Settings menu, keyboard shortcut and popover button now open the same usable settings window.
+- Ignore zero-size visible windows when returning to menu-bar mode, while preserving Dock access to minimized settings windows. Settings no longer opens automatically on a windowless launch or reactivation; previously open settings can still be restored.
+
 ## [1.5.1] - 2026-10-01
 
 ### Fixed
