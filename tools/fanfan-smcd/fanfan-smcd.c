@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -799,9 +800,8 @@ static const char *handle_command(char *buffer, xpc_connection_t peer,
     return response;
 }
 
-static void cleanup(int sig)
+static void release_fans(void)
 {
-    (void)sig;
     for (int attempt = 0; attempt < 3; attempt++) {
         restore_owned_control();
         if (g_lease_state == LEASE_NONE) {
@@ -809,6 +809,12 @@ static void cleanup(int sig)
         }
         usleep(100 * 1000);
     }
+}
+
+static void cleanup(int sig)
+{
+    (void)sig;
+    release_fans();
     smc_close();
     exit(0);
 }
@@ -903,18 +909,50 @@ static void remove_legacy_daemon(void)
     unlink("/var/run/fanfan-smcd.sock");
 }
 
+/* Updaters delete the old bundle before copying the new one in. A relaunch
+ * inside that gap fails with ENOENT and launchd then stops retrying, which
+ * leaves the app asking to install the helper again. Wait until an
+ * executable has reappeared and stopped changing; give up after a minute,
+ * which is what an uninstall looks like. */
+static void wait_for_replacement(const char *path)
+{
+    struct stat last = {0};
+    int stable_polls = 0;
+    for (int poll = 0; poll < 240 && stable_polls < 4; poll++) {
+        usleep(250 * 1000);
+        struct stat now;
+        if (access(path, X_OK) != 0 || stat(path, &now) != 0) {
+            stable_polls = 0;
+            continue;
+        }
+        if (now.st_ino == last.st_ino && now.st_size == last.st_size &&
+            now.st_mtimespec.tv_sec == last.st_mtimespec.tv_sec &&
+            now.st_mtimespec.tv_nsec == last.st_mtimespec.tv_nsec) {
+            stable_polls++;
+        } else {
+            stable_polls = 0;
+        }
+        last = now;
+    }
+}
+
 /* launchd runs this binary straight out of the app bundle. When an update or
  * uninstall replaces or removes it, hand the fans back and exit; KeepAlive
  * relaunches whatever binary is there now. */
 static void watch_own_executable(void)
 {
-    char path[PATH_MAX];
-    uint32_t size = sizeof(path);
-    if (_NSGetExecutablePath(path, &size) != 0) {
+    char buffer[PATH_MAX];
+    uint32_t size = sizeof(buffer);
+    if (_NSGetExecutablePath(buffer, &size) != 0) {
+        return;
+    }
+    char *path = strdup(buffer);
+    if (path == NULL) {
         return;
     }
     int fd = open(path, O_EVTONLY);
     if (fd < 0) {
+        free(path);
         return;
     }
     dispatch_source_t source = dispatch_source_create(
@@ -928,6 +966,8 @@ static void watch_own_executable(void)
     }
     dispatch_source_set_event_handler(source, ^{
         fprintf(stderr, "fanfan-smcd: executable replaced; restarting\n");
+        release_fans();
+        wait_for_replacement(path);
         cleanup(0);
     });
     dispatch_resume(source);

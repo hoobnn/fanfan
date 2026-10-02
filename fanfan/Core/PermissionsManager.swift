@@ -21,6 +21,10 @@ class PermissionsManager: ObservableObject {
 
     private var statusGeneration = 0
     private var isChecking = false
+    /// launchd gives up on a daemon whose relaunch failed (e.g. mid-update), so
+    /// an approved helper that stays silent is re-registered once per launch.
+    /// 中文：launchd 对重启失败（如更新途中）的守护进程不再重试，已批准却无响应时每次启动自动重新注册一次。
+    private var didAttemptRepair = false
     private var approvalTimer: Timer?
     private static let helperReadyTimeout: TimeInterval = 20
     private static let helperPollInterval: TimeInterval = 0.25
@@ -75,6 +79,10 @@ class PermissionsManager: ObservableObject {
                 ) else { return }
                 self.isChecking = false
                 self.isHelperInstalled = daemonReady
+                if !daemonReady && !self.didAttemptRepair {
+                    self.didAttemptRepair = true
+                    self.installHelper { _, _ in }
+                }
             }
         }
     }
