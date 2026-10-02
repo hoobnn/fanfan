@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.5.3] - 2026-10-02
+
+### Fixed
+- Avoid an extra application activation when opening the temperature panel from a high-temperature notification, which could make the panel flash and disappear. Panel presentation now waits until the notification callback and menu tracking finish.
+- Preserve pending notification clicks during the initial focus handoff, while keeping normal dismissal and preventing a cancelled panel from reopening on later activation.
+
 ## [1.5.2] - 2026-10-02
 
 ### Fixed

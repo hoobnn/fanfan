@@ -79,6 +79,11 @@ class StatusBarManager: NSObject, ObservableObject {
     private func observeApplicationActivation() {
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(applicationDidBecomeActive(_:)),
+            name: NSApplication.didBecomeActiveNotification,
+            object: nil)
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(applicationDidResignActive(_:)),
             name: NSApplication.didResignActiveNotification,
             object: nil)
@@ -96,7 +101,15 @@ class StatusBarManager: NSObject, ObservableObject {
     }
 
     @objc private func applicationDidResignActive(_ notification: Notification) {
+        // Changing activation policy during a notification response can briefly
+        // resign activation. There is no panel to dismiss while it is pending.
+        // 中文：通知响应期间切换应用策略可能短暂失焦；尚未展示时保留打开请求。
+        guard !isPopoverPresentationPending else { return }
         closePopover()
+    }
+
+    @objc private func applicationDidBecomeActive(_ notification: Notification) {
+        enqueuePopoverPresentation()
     }
 
     /// Pre-render fan icons at common rotation angles for animation cache / 中文：Pre-render 风扇 图标s at common rotation angles for animation 缓存
@@ -146,7 +159,7 @@ class StatusBarManager: NSObject, ObservableObject {
         // Let AppKit attach the new status item before anchoring a pending panel.
         // 中文：等待 AppKit 挂载状态栏按钮，再显示启动期间待打开的面板。
         DispatchQueue.main.async { [weak self] in
-            self?.presentPopoverIfReady()
+            self?.enqueuePopoverPresentation()
         }
     }
     
@@ -227,7 +240,7 @@ class StatusBarManager: NSObject, ObservableObject {
                       popover.contentViewController == nil else { return }
                 popover.contentViewController = NSHostingController(rootView: builder())
             }
-            self?.presentPopoverIfReady()
+            self?.enqueuePopoverPresentation()
         }
     }
 
@@ -505,9 +518,20 @@ class StatusBarManager: NSObject, ObservableObject {
     /// content is still being prepared during launch.
     /// 中文：通知点击始终显示面板；已打开时不会反向关闭，启动未就绪时保留请求。
     func showPopover() {
+        guard !isPopoverShown, !isPopoverPresentationPending else { return }
         isPopoverPresentationPending = true
         remainingPopoverPresentationAttempts = 10
-        presentPopoverIfReady()
+        enqueuePopoverPresentation()
+    }
+
+    private func enqueuePopoverPresentation() {
+        guard isPopoverPresentationPending else { return }
+        // Leave notification delivery/menu tracking before creating a transient
+        // popover to avoid displaying it inside the opening interaction.
+        // 中文：离开通知回调与菜单跟踪，再显示临时面板，避免打开事件本身将其关闭。
+        RunLoop.main.perform(inModes: [.default]) { [weak self] in
+            self?.presentPopoverIfReady()
+        }
     }
 
     private func presentPopoverIfReady() {
@@ -518,9 +542,11 @@ class StatusBarManager: NSObject, ObservableObject {
         popoverPresentationRetry?.cancel()
         popoverPresentationRetry = nil
         popoverContentMounter()
-        if !NSApp.isActive {
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        // AppKit owns the activation caused by a status-item/notification click.
+        // An extra asynchronous activate() here can end the transient popover's
+        // menu session immediately after show(). A panel can be key without
+        // forcing an application activation of its own.
+        // 中文：状态栏/通知点击由系统处理激活；再次主动激活会异步打断临时面板的菜单会话。
         if !popover.isShown, button.window != nil {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
@@ -534,7 +560,7 @@ class StatusBarManager: NSObject, ObservableObject {
                 popover.contentViewController = nil
                 return
             }
-            let retry = DispatchWorkItem { [weak self] in self?.presentPopoverIfReady() }
+            let retry = DispatchWorkItem { [weak self] in self?.enqueuePopoverPresentation() }
             popoverPresentationRetry = retry
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: retry)
             return
@@ -542,7 +568,7 @@ class StatusBarManager: NSObject, ObservableObject {
         isPopoverPresentationPending = false
         popover.contentViewController?.view.window?.makeKey()
     }
-    
+
     func closePopover() {
         isPopoverPresentationPending = false
         popoverPresentationRetry?.cancel()
@@ -553,7 +579,7 @@ class StatusBarManager: NSObject, ObservableObject {
             popover?.contentViewController = nil
         }
     }
-    
+
     deinit {
         popoverPresentationRetry?.cancel()
         NotificationCenter.default.removeObserver(self)

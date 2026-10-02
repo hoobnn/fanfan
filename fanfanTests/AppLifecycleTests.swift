@@ -199,6 +199,63 @@ final class AppLifecycleTests: XCTestCase {
         withExtendedLifetime(delegate) {}
     }
 
+    func testNotificationHandoffPreservesPendingPopover() async throws {
+        let delegate = AppDelegate()
+        let manager = delegate.statusBarManager
+        defer { manager.closePopover() }
+        manager.setupStatusBar()
+        manager.setPopoverContent { Text("Notification lifecycle test").frame(width: 200, height: 80) }
+        try await settle(for: 0.1)
+        delegate.handleNotificationResponse(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            requestIdentifier: "high-temp-90"
+        )
+        XCTAssertFalse(manager.isPopoverShown, "Leave the notification callback before showing the panel")
+        // A focus handoff before presentation must not cancel the user's click.
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        try await settle(for: 1.0)
+
+        XCTAssertEqual(NSApp.activationPolicy(), .accessory)
+        XCTAssertTrue(manager.isPopoverShown)
+        withExtendedLifetime(delegate) {}
+    }
+
+    func testResignActiveClosesShownPopoverAndDoesNotReopen() async throws {
+        let manager = StatusBarManager()
+        defer { manager.closePopover() }
+        manager.setupStatusBar()
+        manager.setPopoverContent { Text("Notification lifecycle test").frame(width: 200, height: 80) }
+        manager.showPopover()
+        try await settle(for: 1.0)
+        XCTAssertTrue(manager.isPopoverShown)
+
+        // Notification Center can return focus to the previous app without
+        // activating an accessory app. Its loss-of-focus handler must still
+        // dismiss an open panel, regardless of the host's activation grant.
+        NotificationCenter.default.post(name: NSApplication.didResignActiveNotification, object: NSApp)
+        try await settle(for: 0.7)
+        XCTAssertFalse(manager.isPopoverShown)
+
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        try await settle(for: 0.7)
+        XCTAssertFalse(manager.isPopoverShown)
+    }
+
+    func testClosingPendingPopoverCancelsActivationPresentation() async throws {
+        let manager = StatusBarManager()
+        defer { manager.closePopover() }
+        manager.setupStatusBar()
+        manager.setPopoverContent { Text("Notification lifecycle test").frame(width: 200, height: 80) }
+        try await settle(for: 0.1)
+
+        manager.showPopover()
+        manager.closePopover()
+        NotificationCenter.default.post(name: NSApplication.didBecomeActiveNotification, object: NSApp)
+        try await settle(for: 1.0)
+
+        XCTAssertFalse(manager.isPopoverShown)
+    }
+
     private func makeSettingsWindow() -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(x: 200, y: 200, width: 300, height: 200),
