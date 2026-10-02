@@ -104,12 +104,12 @@ shasum -a 256 fanfan-v${VERSION}-macos.zip
 - See full list: [Issues](https://github.com/${REPO}/issues)
 
 ### 📚 Documentation
-- [User Guide](https://github.com/${REPO}/blob/main/docs/README.md)
-- [FAQ](https://github.com/${REPO}/blob/main/docs/README.md#-faq)
+- [User Guide](https://github.com/${REPO}/blob/main/README.en.md)
+- [FAQ](https://github.com/${REPO}/blob/main/README.en.md#faq)
 - [Troubleshooting](https://github.com/${REPO}/issues)
 
 ### 🤝 Contributing
-We welcome contributions! Please see our [Contributing Guide](https://github.com/${REPO}/blob/main/docs/README.md#-contributing).
+We welcome contributions! Please open an [issue](https://github.com/${REPO}/issues) or a pull request.
 
 ### 📄 License
 MIT License - see [LICENSE](https://github.com/${REPO}/blob/main/LICENSE)

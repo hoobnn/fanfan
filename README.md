@@ -1,50 +1,48 @@
 <div align="center">
 
-<img src="docs/logo.png" width="112" alt="fanfan app icon">
+<img src="docs/logo.png" width="112" alt="fanfan 应用图标">
 
-# fanfan — Mac fan control and temperature monitor
+# fanfan：Mac 风扇控制与温度监控
 
-**Open-source macOS menu bar app to monitor Mac temperatures and control fan speed — manually, automatically, or by macOS.**
+开源的 macOS 菜单栏小工具，看温度，调风扇。
 
 [![release](https://img.shields.io/github/v/release/hoobnn/fanfan?style=flat-square)](https://github.com/hoobnn/fanfan/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/hoobnn/fanfan/total?style=flat-square)](https://github.com/hoobnn/fanfan/releases)
 [![macOS](https://img.shields.io/badge/macOS-26.0%2B-black?style=flat-square&logo=apple)](https://www.apple.com/macos/)
-[![Apple Silicon + Intel](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-555?style=flat-square)](#install)
 [![Homebrew](https://img.shields.io/badge/brew-fanfan-FBB040?style=flat-square&logo=homebrew&logoColor=white)](#homebrew)
-[![Swift](https://img.shields.io/badge/Swift-6-orange?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
 [![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-English · [简体中文](README.zh.md)
+**简体中文** · [English](README.en.md)
 
 </div>
 
-fanfan is an open-source macOS menu bar app for monitoring Mac temperatures and fan speeds. Set a manual fan speed, use temperature-based automatic control, or return control to macOS. It supports Apple Silicon and Intel Macs running macOS 26 or later, and has no third-party dependencies.
+fanfan 常驻在菜单栏，显示 Mac 的温度和风扇转速。风扇可以手动定转速、按温度自动调，也可以交回给 macOS 自己管。Apple Silicon 和 Intel Mac 都能用，要求 macOS 26 及以上，没有第三方依赖。
 
 <table>
   <tr>
-    <td width="42%" align="center"><img src="docs/view/en/popover.png" alt="fanfan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
-    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="fanfan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
+    <td width="42%" align="center"><img src="docs/view/zh-Hans/popover.png" alt="fanfan 菜单栏面板：Mac 温度、风扇转速、60 秒温度曲线、CPU/GPU/SSD/电池传感器与自动调速设置"></td>
+    <td width="58%" align="center"><img src="docs/view/zh-Hans/settings.png" alt="fanfan 设置：菜单栏显示、监控间隔、高温警报、通知、自动模式切换与自定义 PID 增益"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Menu bar popover</sub></td>
-    <td align="center"><sub>Settings</sub></td>
+    <td align="center"><sub>菜单栏面板</sub></td>
+    <td align="center"><sub>设置</sub></td>
   </tr>
 </table>
 
-## Features
+## 功能
 
-- **Monitor your Mac:** See current fan RPM and CPU, GPU, SSD, and battery temperatures when those sensors are available, plus a 60-second temperature chart and a Sensors tab for detailed readings.
-- **Choose how fans run:** Use manual RPM control, temperature-based automatic control, or the Mac's own firmware control. Set each fan separately on Macs with multiple fans.
-- **Tune automatic control:** Adjust the target temperature, maximum fan speed, and response, with Power Saving, Balanced, Performance, and Custom settings. Smoothing and asymmetric ramps keep fans from audibly surging up and down.
-- **Menu bar at a glance:** Show temperature, power usage, or fan speed % in the menu bar — or nothing.
-- **High-temperature alerts:** Get notified above a threshold you set, and optionally switch to automatic control when it's hit.
-- **Advanced PID tuning:** Set custom controller gains if the presets don't fit your workload.
-- **Speaks your language:** English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français, and Español. fanfan follows the macOS system language, or pick one just for fanfan in System Settings › General › Language & Region › Applications.
-- **Keep control recoverable:** A small privileged helper writes fan speeds; if the app stops responding, its 10-second lease expires and the helper returns control to firmware. Quitting the app also hands fans back to macOS.
+- 显示风扇转速，以及 CPU、GPU、SSD、电池温度（取决于机型有哪些传感器）。面板里有最近 60 秒的温度曲线，「传感器」页能看到全部读数。
+- 三种风扇模式：手动设转速、按温度自动调速、交回系统固件控制。有两个风扇的 Mac 可以分别设置。
+- 自动调速可以改目标温度、最高转速和响应快慢，内置省电、均衡、性能三档，也可以自定义。转速变化做了平滑，升快降慢，风扇不会一会儿呼呼响一会儿又停。
+- 菜单栏可以显示温度、功耗或风扇转速百分比，也可以只放一个图标。
+- 温度超过设定值时发通知，可选同时切到自动调速。
+- 预设不合适的话，可以直接改 PID 参数。
+- 界面支持简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español。默认跟随系统语言，也可以在「系统设置 › 通用 › 语言与地区 › 应用程序」里给 fanfan 单独指定。
+- 写风扇转速的是一个单独的特权辅助进程。App 卡住超过 10 秒，或者退出、崩溃，风扇都会交回 macOS 控制。
 
-Fan controls are hidden on Macs without a fan. Available sensors and fan speed ranges depend on the Mac model.
+没有风扇的 Mac 不会显示风扇控制。能读到哪些传感器、转速范围多大，都看具体机型。
 
-## Install
+## 安装
 
 ### Homebrew
 
@@ -53,72 +51,66 @@ brew tap hoobnn/tap
 brew install --cask fanfan
 ```
 
-### Manual
+### 手动安装
 
-Download the latest DMG from [Releases](https://github.com/hoobnn/fanfan/releases/latest), or run the install script:
+到 [Releases](https://github.com/hoobnn/fanfan/releases/latest) 下载最新的 DMG，或者用安装脚本：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 ```
 
-Requires macOS 26+ (Apple Silicon or Intel). On first launch, click **Install Helper** and allow fanfan in System Settings › General › Login Items & Extensions. No administrator password is needed.
+需要 macOS 26 及以上（Apple Silicon 或 Intel）。第一次打开时点「安装助手」，再到「系统设置 › 通用 › 登录项与扩展」里允许 fanfan。不需要输管理员密码。
 
-### Uninstall
+### 卸载
 
-`brew uninstall --cask fanfan` removes the app and the helper (add `--zap` to also remove preferences). For a manual install, quit fanfan and delete it from Applications — the helper lives inside the app bundle and stops with it. The leftover fanfan entry in Login Items & Extensions can be removed there.
+`brew uninstall --cask fanfan` 会把 App 和辅助进程一起删掉，加 `--zap` 连偏好设置也清掉。手动装的，退出 fanfan 后把它从「应用程序」里删掉就行，辅助进程在 App 包里，会跟着停掉。「登录项与扩展」里如果还留着 fanfan 的条目，在那里手动移除。
 
-## FAQ
+## 常见问题
 
-**Is it safe to control Mac fan speed?**
-fanfan only sets speeds within the hardware's own limits — the helper rejects any target outside the fan's reported minimum and maximum RPM. If the app crashes, hangs, or quits, fans return to macOS firmware control automatically.
+**调风扇转速安全吗？**
+fanfan 只会在风扇自己上报的最低和最高转速之间设置，超出范围的请求辅助进程直接拒绝。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
 
-**Does it work on Apple Silicon (M-series) Macs?**
-Yes. fanfan is a universal app for Apple Silicon and Intel Macs on macOS 26 or later. Fanless Macs, such as the Apple Silicon MacBook Air, show temperatures only.
+**M 系列芯片的 Mac 能用吗？**
+能用。fanfan 是 Apple Silicon 和 Intel 通用版，要求 macOS 26 及以上。MacBook Air 这类没有风扇的机型只显示温度。
 
-**Why does it ask to run in the background?**
-Writing fan speeds to the SMC requires root. Instead of running the whole app with elevated privileges, fanfan registers a tiny root helper that macOS asks you to allow once in Login Items & Extensions. Reading temperatures needs no special permission.
+**为什么要我允许它在后台运行？**
+往 SMC 写风扇转速需要 root 权限。为了让 App 本身不用 root 跑，fanfan 只注册了一个很小的 root 辅助进程，macOS 会让你在「登录项与扩展」里允许一次。只读温度的话不需要任何权限。
 
-**Is fanfan a free alternative to Macs Fan Control or smcFanControl?**
-It covers the same core job — reading SMC sensors and setting fan speeds — as a free, MIT-licensed, open-source menu bar app with no third-party dependencies.
+**和 Macs Fan Control、smcFanControl 比怎么样？**
+核心功能一样：读 SMC 传感器、设风扇转速。fanfan 免费开源（MIT），没有第三方依赖。
 
-## How it works
+## 工作原理
 
-Writing fan speeds requires root. Instead of running the whole app as root,
-fanfan registers a tiny C LaunchDaemon (via `SMAppService`) that owns the
-SMC handle and accepts a small versioned XPC protocol for health checks,
-lease renewal, fan targets, and returning control to firmware. Only the
-fanfan app signed by its developer can connect. Fans return to firmware
-control the moment the app quits or crashes, and a 10-second lease covers an
-app that hangs.
+App 本身以普通用户身份运行，读温度直接走 IOKit。
 
-```
-fanfan.app  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶  SMC
+写风扇转速需要 root，这部分交给一个用 C 写的 LaunchDaemon（`fanfan-smcd`，通过 `SMAppService` 注册）。它持有 SMC 句柄，通过一个带版本号的小型 XPC 协议接收健康检查、租约续期、目标转速和「交回固件控制」这几类请求，而且只接受开发者签名的 fanfan 连接。App 退出或崩溃时，风扇马上交回固件；App 卡住时，10 秒租约到期后同样交回。
+
+```text
+fanfan.app  ──XPC──▶  fanfan-smcd（root）  ──IOKit──▶  SMC
 ```
 
-The app itself runs unprivileged. Temperature reads go straight through IOKit.
+## 从源码构建
 
-## Build from source
-
-Requires Xcode with the macOS 26 SDK.
+需要装有 macOS 26 SDK 的 Xcode。
 
 ```bash
-make -C tools/fanfan-smcd                                   # build the helper
+make -C tools/fanfan-smcd                                   # 构建辅助进程
 cp tools/fanfan-smcd/fanfan-smcd fanfan/Resources/fanfan-smcd
 xcodebuild -project fanfan.xcodeproj -scheme fanfan -configuration Debug build
 ```
 
-## Star History
+## Star 趋势
 
 <a href="https://star-history.com/#hoobnn/fanfan&Date">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date&theme=dark" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
+    <img alt="fanfan 的 Star 趋势图" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
   </picture>
 </a>
 
-## Acknowledgements
+## 致谢
 
-Forked from [solofan](https://github.com/SoloTeamDev/solofan) (formerly ffan). Thanks to the solofan team.
+fanfan 最早 fork 自 [solofan](https://github.com/SoloTeamDev/solofan)（原名 ffan），感谢 solofan 团队。
 
 [MIT](LICENSE) © 2026 hoobnn
