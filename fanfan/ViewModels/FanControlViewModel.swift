@@ -39,6 +39,7 @@ class FanControlViewModel: ObservableObject {
 
     // Power-strategy mirror (see FanController). / 中文：能效策略镜像（详见 FanController）。
     @Published var powerStrategy: PowerStrategy = .balanced
+    @Published private(set) var strategyPresetOverrides: [PowerStrategy: StrategyPreset] = [:]
 
     // PID gain overrides (nil = use the formula derived from aggressiveness). / 中文：PID 增益覆盖值（nil 表示使用由响应强度推导的公式）。
     @Published var pidKpCustom: Double? = nil
@@ -281,6 +282,11 @@ class FanControlViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$powerStrategy)
 
+        fanController.$strategyPresetOverrides
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$strategyPresetOverrides)
+
         fanController.$pidKpCustom
             .receive(on: DispatchQueue.main)
             .assign(to: &$pidKpCustom)
@@ -518,6 +524,18 @@ class FanControlViewModel: ObservableObject {
 
     func setPowerStrategy(_ strategy: PowerStrategy) {
         fanController.setPowerStrategy(strategy)
+    }
+
+    func preset(for strategy: PowerStrategy) -> StrategyPreset? {
+        strategyPresetOverrides[strategy] ?? strategy.defaultPreset
+    }
+
+    func setStrategyPreset(_ preset: StrategyPreset, for strategy: PowerStrategy) {
+        fanController.setStrategyPreset(preset, for: strategy)
+    }
+
+    func resetStrategyPreset(for strategy: PowerStrategy) {
+        fanController.resetStrategyPreset(for: strategy)
     }
 
     /// Override individual PID gains (pass nil to fall back to the formula). / 中文：覆盖单个 PID 增益（传入 nil 时回退到公式值）。

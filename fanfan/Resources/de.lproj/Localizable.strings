@@ -261,3 +261,16 @@
 "sensor.TI0P" = "Thunderbolt";
 "sensor.TI1P" = "Thunderbolt 2";
 "sensor.TW0P" = "WLAN-Karte";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "Strategie-Voreinstellungen";
+"settings.strategy_preset" = "Strategie";
+"settings.strategy_preset_desc" = "Welche Strategie angepasst wird";
+"settings.strategy_preset_target" = "Zieltemperatur";
+"settings.strategy_preset_target_desc" = "Temperatur, die die Lüfter halten (°C)";
+"settings.strategy_preset_max_speed" = "Max. Drehzahl";
+"settings.strategy_preset_max_speed_desc" = "Anteil des Hardware-Drehzahlbereichs";
+"settings.strategy_preset_response" = "Reaktion";
+"settings.strategy_preset_response_desc" = "Wie stark die Lüfter auf Wärme reagieren";
+"settings.strategy_preset_reset" = "Auf Standard zurücksetzen";
+"settings.strategy_custom" = "Eigene";

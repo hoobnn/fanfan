@@ -35,6 +35,7 @@ struct SettingsView: View {
     @AppStorage("autoSwitchMode")         private var autoSwitchMode = false
 
     @StateObject private var updateChecker = UpdateChecker()
+    @State private var editingStrategy: PowerStrategy = .balanced
 
     private var availableRelease: UpdateChecker.Release? {
         if case .available(let r) = updateChecker.state { return r }
@@ -48,6 +49,7 @@ struct SettingsView: View {
         Form {
             menuBarSection
             monitoringSection
+            strategyPresetsSection
             pidAdvancedSection
             generalSection
             aboutSection
@@ -137,6 +139,88 @@ struct SettingsView: View {
             .onChange(of: autoSwitchMode) { _, newValue in
                 viewModel.autoSwitchMode = newValue
             }
+        }
+    }
+
+    // MARK: - Strategy presets / 中文：策略预设
+
+    private var editingPreset: StrategyPreset {
+        viewModel.preset(for: editingStrategy) ?? StrategyPreset(targetTemp: 60, aggressiveness: 1.5, maxSpeedFraction: 0.65)
+    }
+
+    /// Writes one field of the preset being edited. / 中文：写入正在编辑的预设中的单个字段。
+    private func presetBinding(_ keyPath: WritableKeyPath<StrategyPreset, Double>) -> Binding<Double> {
+        Binding(
+            get: { editingPreset[keyPath: keyPath] },
+            set: { newValue in
+                var preset = editingPreset
+                preset[keyPath: keyPath] = newValue
+                viewModel.setStrategyPreset(preset, for: editingStrategy)
+            }
+        )
+    }
+
+    private var strategyPresetsSection: some View {
+        Section(NSLocalizedString("settings.section.strategy_presets", comment: "")) {
+            Picker(selection: $editingStrategy) {
+                ForEach(PowerStrategy.named, id: \.self) { strategy in
+                    Text(strategyName(strategy)).tag(strategy)
+                }
+            } label: {
+                rowLabel("settings.strategy_preset")
+            }
+            .pickerStyle(.segmented)
+
+            LabeledContent {
+                InlineSlider(value: presetBinding(\.targetTemp),
+                             range: StrategyPreset.targetTempRange, step: 1,
+                             format: { String(format: "%.0f°C", $0) },
+                             accent: .thermal,
+                             valueWidth: 64)
+            } label: {
+                rowLabel("settings.strategy_preset_target")
+            }
+
+            LabeledContent {
+                InlineSlider(value: presetBinding(\.maxSpeedFraction),
+                             range: StrategyPreset.maxSpeedFractionRange, step: 0.05,
+                             format: { String(format: "%.0f%%", $0 * 100) },
+                             valueWidth: 64)
+            } label: {
+                rowLabel("settings.strategy_preset_max_speed")
+            }
+
+            LabeledContent {
+                InlineSlider(
+                    value: Binding(
+                        get: { Double(ResponseScale.index(for: editingPreset.aggressiveness)) },
+                        set: { presetBinding(\.aggressiveness).wrappedValue = ResponseScale.step($0) }
+                    ),
+                    range: ResponseScale.sliderRange, step: 1,
+                    format: { ResponseScale.label(for: ResponseScale.step($0)) },
+                    showsTicks: true,
+                    valueWidth: 64
+                )
+            } label: {
+                rowLabel("settings.strategy_preset_response")
+            }
+
+            HStack {
+                Spacer()
+                Button(NSLocalizedString("settings.strategy_preset_reset", comment: "")) {
+                    viewModel.resetStrategyPreset(for: editingStrategy)
+                }
+                .disabled(viewModel.strategyPresetOverrides[editingStrategy] == nil)
+            }
+        }
+    }
+
+    private func strategyName(_ strategy: PowerStrategy) -> String {
+        switch strategy {
+        case .powerSaving: return NSLocalizedString("popover.strategy.power_saving", comment: "")
+        case .balanced:    return NSLocalizedString("popover.strategy.balanced", comment: "")
+        case .performance: return NSLocalizedString("popover.strategy.performance", comment: "")
+        case .custom:      return NSLocalizedString("settings.strategy_custom", comment: "")
         }
     }
 
@@ -361,6 +445,7 @@ private struct InlineSlider: View {
     let format: (Double) -> String
     var accent: SliderAccent = .neutral
     var showsTicks: Bool = false
+    var valueWidth: CGFloat = 48
 
     @Environment(\.colorScheme) private var scheme
 
@@ -372,9 +457,11 @@ private struct InlineSlider: View {
             Text(format(value))
                 .font(Theme.num(12, weight: .medium))
                 .foregroundStyle(Theme.text2)
-                .frame(width: 48, alignment: .trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: valueWidth, alignment: .trailing)
         }
-        .frame(width: 180)
+        .frame(width: 132 + valueWidth)
     }
 
     private var sliderTint: Color {

@@ -261,3 +261,16 @@
 "sensor.TI0P" = "Thunderbolt";
 "sensor.TI1P" = "Thunderbolt 2";
 "sensor.TW0P" = "Carte Wi-Fi";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "Préréglages de stratégie";
+"settings.strategy_preset" = "Stratégie";
+"settings.strategy_preset_desc" = "Stratégie à ajuster";
+"settings.strategy_preset_target" = "Température cible";
+"settings.strategy_preset_target_desc" = "Température que les ventilateurs visent (°C)";
+"settings.strategy_preset_max_speed" = "Vitesse max.";
+"settings.strategy_preset_max_speed_desc" = "Part de la plage de régime matérielle";
+"settings.strategy_preset_response" = "Réactivité";
+"settings.strategy_preset_response_desc" = "Intensité de la réaction des ventilateurs à la chaleur";
+"settings.strategy_preset_reset" = "Rétablir les valeurs par défaut";
+"settings.strategy_custom" = "Personnalisé";

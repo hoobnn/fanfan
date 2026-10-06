@@ -194,11 +194,11 @@ struct ControlsCard: View, Equatable {
             LabeledSlider(
                 label: NSLocalizedString("popover.response", comment: ""),
                 value: Binding(
-                    get: { Double(responseIndex(for: snapshot.autoAggressiveness)) },
-                    set: { viewModel.setAutoAggressiveness(responseStep($0)) }
+                    get: { Double(ResponseScale.index(for: snapshot.autoAggressiveness)) },
+                    set: { viewModel.setAutoAggressiveness(ResponseScale.step($0)) }
                 ),
-                range: 0...Double(responseSteps.count - 1), step: 1,
-                format: { responseLabel(for: responseStep($0)) },
+                range: ResponseScale.sliderRange, step: 1,
+                format: { ResponseScale.label(for: ResponseScale.step($0)) },
                 showsTicks: true
             )
         }
@@ -306,38 +306,6 @@ struct ControlsCard: View, Equatable {
         return lo...hi
     }
 
-    private func responseLabel(for v: Double) -> String {
-        if v <= 0.3 { return NSLocalizedString("popover.response.min_override",  comment: "") }
-        if v <= 0.8 { return NSLocalizedString("popover.response.quiet",         comment: "") }
-        if v <= 1.2 { return NSLocalizedString("popover.response.balanced",      comment: "") }
-        if v <= 1.8 { return NSLocalizedString("popover.response.auto",          comment: "") }
-        if v <= 2.3 { return NSLocalizedString("popover.response.performance",   comment: "") }
-        if v <= 2.7 { return NSLocalizedString("popover.response.aggressive",    comment: "") }
-        return NSLocalizedString("popover.response.max_override", comment: "")
-    }
-
-    /// One representative aggressiveness value per response label — the slider / 中文：One representative aggressiveness 值 per response label — the 滑杆
-    /// snaps to exactly these notches instead of a continuous 0...3 range. / 中文：精确吸附到这些档位，而不是使用连续的 0...3 范围。
-    private let responseSteps: [Double] = [0.0, 0.6, 1.0, 1.5, 2.0, 2.5, 3.0]
-
-    /// Maps a stored aggressiveness value back to its notch index, using the / 中文：Maps a stored aggressiveness 值 back to its notch index, using the
-    /// same thresholds as `responseLabel(for:)` so the round-trip is stable. / 中文：使用与 `responseLabel(for:)` 相同的阈值，确保往返转换稳定。
-    private func responseIndex(for v: Double) -> Int {
-        if v <= 0.3 { return 0 }
-        if v <= 0.8 { return 1 }
-        if v <= 1.2 { return 2 }
-        if v <= 1.8 { return 3 }
-        if v <= 2.3 { return 4 }
-        if v <= 2.7 { return 5 }
-        return 6
-    }
-
-    /// Resolves a slider position (0...6) to its representative value. / 中文：Resolves a 滑杆 position (0...6) to its representative 值.
-    private func responseStep(_ sliderValue: Double) -> Double {
-        let i = min(max(Int(sliderValue.rounded()), 0), responseSteps.count - 1)
-        return responseSteps[i]
-    }
-
     private func modeLabel(_ mode: ControlMode) -> String {
         switch mode {
         case .manual:
@@ -368,6 +336,46 @@ struct ControlsCard: View, Equatable {
                 perFanDraft[index] = nil
             }
         }
+    }
+}
+
+// MARK: - ResponseScale / 中文：响应档位
+
+/// The response slider's notches, shared by the popover and the strategy / 中文：响应滑杆的档位，供 popover 与设置里的
+/// preset editor in Settings. / 中文：策略预设编辑器共用。
+enum ResponseScale {
+    /// One representative aggressiveness value per response label — the slider / 中文：每个响应标签对应一个代表性响应强度值——滑杆
+    /// snaps to exactly these notches instead of a continuous 0...3 range. / 中文：精确吸附到这些档位，而不是使用连续的 0...3 范围。
+    static let steps: [Double] = [0.0, 0.6, 1.0, 1.5, 2.0, 2.5, 3.0]
+
+    static var sliderRange: ClosedRange<Double> { 0...Double(steps.count - 1) }
+
+    static func label(for v: Double) -> String {
+        if v <= 0.3 { return NSLocalizedString("popover.response.min_override",  comment: "") }
+        if v <= 0.8 { return NSLocalizedString("popover.response.quiet",         comment: "") }
+        if v <= 1.2 { return NSLocalizedString("popover.response.balanced",      comment: "") }
+        if v <= 1.8 { return NSLocalizedString("popover.response.auto",          comment: "") }
+        if v <= 2.3 { return NSLocalizedString("popover.response.performance",   comment: "") }
+        if v <= 2.7 { return NSLocalizedString("popover.response.aggressive",    comment: "") }
+        return NSLocalizedString("popover.response.max_override", comment: "")
+    }
+
+    /// Maps a stored aggressiveness value back to its notch index, using the / 中文：把已存储的响应强度映射回档位索引，
+    /// same thresholds as `label(for:)` so the round-trip is stable. / 中文：使用与 `label(for:)` 相同的阈值，确保往返转换稳定。
+    static func index(for v: Double) -> Int {
+        if v <= 0.3 { return 0 }
+        if v <= 0.8 { return 1 }
+        if v <= 1.2 { return 2 }
+        if v <= 1.8 { return 3 }
+        if v <= 2.3 { return 4 }
+        if v <= 2.7 { return 5 }
+        return 6
+    }
+
+    /// Resolves a slider position (0...6) to its representative value. / 中文：把滑杆位置（0...6）解析为其代表值。
+    static func step(_ sliderValue: Double) -> Double {
+        let i = min(max(Int(sliderValue.rounded()), 0), steps.count - 1)
+        return steps[i]
     }
 }
 

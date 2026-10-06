@@ -261,3 +261,16 @@
 "sensor.TI0P" = "Thunderbolt";
 "sensor.TI1P" = "Thunderbolt 2";
 "sensor.TW0P" = "無線網卡";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "策略預設";
+"settings.strategy_preset" = "策略";
+"settings.strategy_preset_desc" = "選擇要調整的策略";
+"settings.strategy_preset_target" = "目標溫度";
+"settings.strategy_preset_target_desc" = "風扇盡量維持的溫度（°C）";
+"settings.strategy_preset_max_speed" = "最高轉速";
+"settings.strategy_preset_max_speed_desc" = "佔硬體轉速範圍的比例";
+"settings.strategy_preset_response" = "回應";
+"settings.strategy_preset_response_desc" = "風扇對溫度變化的反應強度";
+"settings.strategy_preset_reset" = "恢復預設";
+"settings.strategy_custom" = "自訂";

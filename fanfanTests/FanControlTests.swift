@@ -20,6 +20,10 @@ final class FanControlTests: XCTestCase {
         "autoMaxSpeed",
         "autoAggressiveness",
         "powerStrategy",
+        "powerStrategyPresetLayout",
+        "strategyPreset.powerSaving",
+        "strategyPreset.balanced",
+        "strategyPreset.performance",
         "pidKpCustom",
         "pidKiCustom",
         "pidKdCustom"
@@ -159,36 +163,38 @@ final class FanControlTests: XCTestCase {
         // preset (target temp + response notch). / 中文：填好核心自动参数（目标温度 + 响应档位）。
         controller.setPowerStrategy(.powerSaving)
         XCTAssertEqual(controller.powerStrategy, .powerSaving)
-        XCTAssertEqual(controller.autoThreshold, PowerStrategy.powerSaving.targetTemp!)
-        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.powerSaving.aggressiveness!)
+        XCTAssertEqual(controller.autoThreshold, PowerStrategy.powerSaving.defaultPreset!.targetTemp)
+        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.powerSaving.defaultPreset!.aggressiveness)
 
         controller.setPowerStrategy(.performance)
-        XCTAssertEqual(controller.autoThreshold, PowerStrategy.performance.targetTemp!)
-        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.performance.aggressiveness!)
+        XCTAssertEqual(controller.autoThreshold, PowerStrategy.performance.defaultPreset!.targetTemp)
+        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.performance.defaultPreset!.aggressiveness)
     }
 
-    func testManualTuneFlipsStrategyToCustom() {
-        let monitor = SystemMonitor()
-        let controller = FanController(systemMonitor: monitor)
-
+    func testUserPresetOverridesDefaultAndPersists() {
+        let controller = FanController(systemMonitor: SystemMonitor())
         controller.setPowerStrategy(.balanced)
-        XCTAssertEqual(controller.powerStrategy, .balanced)
 
-        // Hand-tuning any auto slider leaves the named presets behind. / 中文：手动调任一自动滑块即离开具名预设。
-        controller.setAutoThreshold(63)
-        XCTAssertEqual(controller.powerStrategy, .custom)
+        // Retuning the active strategy applies at once and survives a relaunch. / 中文：调整生效中的策略会立即应用，并在重启后保留。
+        let tuned = StrategyPreset(targetTemp: 70, aggressiveness: 1.0, maxSpeedFraction: 0.5)
+        controller.setStrategyPreset(tuned, for: .balanced)
+        XCTAssertEqual(controller.powerStrategy, .balanced)
+        XCTAssertEqual(controller.autoThreshold, 70)
+        XCTAssertEqual(controller.autoAggressiveness, 1.0)
+
+        let reloaded = FanController(systemMonitor: SystemMonitor())
+        XCTAssertEqual(reloaded.preset(for: .balanced), tuned)
+
+        reloaded.resetStrategyPreset(for: .balanced)
+        XCTAssertEqual(reloaded.preset(for: .balanced), PowerStrategy.balanced.defaultPreset)
+        XCTAssertNil(reloaded.strategyPresetOverrides[.balanced])
     }
 
-    func testPowerStrategyPersists() {
-        let monitor = SystemMonitor()
-        let controller = FanController(systemMonitor: monitor)
-
-        controller.setPowerStrategy(.performance)
-        XCTAssertEqual(controller.powerStrategy, .performance)
-
-        // A freshly constructed controller reads the persisted value. / 中文：新建的控制器会读取已持久化的值。
-        let reloaded = FanController(systemMonitor: SystemMonitor())
-        XCTAssertEqual(reloaded.powerStrategy, .performance)
+    func testLegacyStrategyLabelMigratesToTierHoldingItsValues() {
+        XCTAssertEqual(FanController.migratedStrategy(.powerSaving, fromLayout: 0), .balanced)
+        XCTAssertEqual(FanController.migratedStrategy(.balanced, fromLayout: 0), .performance)
+        XCTAssertEqual(FanController.migratedStrategy(.performance, fromLayout: 0), .custom)
+        XCTAssertEqual(FanController.migratedStrategy(.powerSaving, fromLayout: 2), .powerSaving)
     }
 
     func testUserDefaultsManager() {

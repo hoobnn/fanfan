@@ -17,43 +17,50 @@ enum ControlMode: String, CaseIterable {
 }
 
 /// Auto-mode efficiency strategy — a one-tap preset over the three core auto / 中文：自动模式能效策略——对三个核心自动参数
-/// parameters. Each case carries its target temperature, response notch, and / 中文：的一键预设。每个档位带有目标温度、响应档位，
-/// the fraction of the hardware RPM span to use as the ceiling. `.custom` is the / 中文：以及作为转速上限的硬件转速区间占比。`.custom`
-/// state a hand-dragged slider lands in — it carries no preset values. / 中文：是手动拖动滑块后落入的状态——不携带任何预设值。
+/// parameters. Each named case resolves to a `StrategyPreset` the user can / 中文：的一键预设。每个具名档位对应一份用户可在设置里
+/// retune in Settings. `.custom` is the state a hand-dragged slider lands in — / 中文：重新调整的 `StrategyPreset`。`.custom` 是手动拖动
+/// it carries no preset values. / 中文：滑块后落入的状态——不携带任何预设值。
 enum PowerStrategy: String, CaseIterable {
     case powerSaving
     case balanced
     case performance
     case custom
 
+    /// The strategies that own an editable preset, in display order. / 中文：拥有可编辑预设的策略，按显示顺序排列。
+    static let named: [PowerStrategy] = [.powerSaving, .balanced, .performance]
+
+    /// Shipped values, used until the user retunes the preset. / 中文：出厂参数，用户未调整预设前使用。
+    var defaultPreset: StrategyPreset? {
+        switch self {
+        case .powerSaving: return StrategyPreset(targetTemp: 80, aggressiveness: 0.6, maxSpeedFraction: 0.2)
+        case .balanced:    return StrategyPreset(targetTemp: 75, aggressiveness: 0.6, maxSpeedFraction: 0.35)
+        case .performance: return StrategyPreset(targetTemp: 60, aggressiveness: 1.5, maxSpeedFraction: 0.65)
+        case .custom:      return nil
+        }
+    }
+}
+
+/// The three core auto parameters a named strategy fills in. / 中文：具名策略填入的三个核心自动参数。
+struct StrategyPreset: Equatable, Codable {
     /// Target temperature the PID loop steers toward (°C). / 中文：PID 控制环逼近的目标温度（°C）。
-    var targetTemp: Double? {
-        switch self {
-        case .powerSaving: return 75
-        case .balanced:    return 60
-        case .performance: return 50
-        case .custom:      return nil
-        }
-    }
-
+    var targetTemp: Double
     /// Response aggressiveness notch (matches the response slider steps). / 中文：响应强度档位（对应响应滑杆档位）。
-    var aggressiveness: Double? {
-        switch self {
-        case .powerSaving: return 0.6
-        case .balanced:    return 1.5
-        case .performance: return 2.5
-        case .custom:      return nil
-        }
-    }
-
+    var aggressiveness: Double
     /// Fraction of the [min, max] hardware RPM span used as the auto ceiling. / 中文：作为自动转速上限的 [min, max] 硬件转速区间占比。
-    var maxSpeedFraction: Double? {
-        switch self {
-        case .powerSaving: return 0.35
-        case .balanced:    return 0.65
-        case .performance: return 1.0
-        case .custom:      return nil
-        }
+    var maxSpeedFraction: Double
+
+    static let targetTempRange: ClosedRange<Double> = 40...90
+    static let aggressivenessRange: ClosedRange<Double> = 0...3
+    static let maxSpeedFractionRange: ClosedRange<Double> = 0.05...1
+
+    /// Same preset with every field pulled into its valid range. / 中文：把每个字段夹回有效范围后的同一预设。
+    var clamped: StrategyPreset {
+        func clamp(_ v: Double, _ r: ClosedRange<Double>) -> Double { min(r.upperBound, max(r.lowerBound, v)) }
+        return StrategyPreset(
+            targetTemp: clamp(targetTemp, Self.targetTempRange),
+            aggressiveness: clamp(aggressiveness, Self.aggressivenessRange),
+            maxSpeedFraction: clamp(maxSpeedFraction, Self.maxSpeedFractionRange)
+        )
     }
 }
 
@@ -80,6 +87,10 @@ class FanController: ObservableObject {
     // speed, response). It always applies — there is no plugged/battery branch — / 中文：响应）的一键预设。它始终生效——不再区分接电/电池——
     // and `.custom` means the user dragged a slider so no preset is highlighted. / 中文：`.custom` 表示用户拖动过滑块，因而没有预设被高亮。
     @Published var powerStrategy: PowerStrategy = .balanced
+    /// User-tuned values for each named strategy; missing entries use the shipped default. / 中文：每个具名策略的用户调整值；缺失时使用出厂默认值。
+    @Published private(set) var strategyPresetOverrides: [PowerStrategy: StrategyPreset] = [:]
+    /// Bumped when the preset layout changes meaning, so stored labels can be migrated. / 中文：预设布局含义变化时递增，以便迁移已存储的策略标签。
+    private static let presetLayoutVersion = 2
 
     @Published var isControlEnabled = false
     @Published var lastWriteSuccess = false
@@ -1145,8 +1156,36 @@ class FanController: ObservableObject {
 
         if let raw = defaults.string(forKey: "powerStrategy"),
            let strategy = PowerStrategy(rawValue: raw) {
-            powerStrategy = strategy
+            powerStrategy = Self.migratedStrategy(
+                strategy,
+                fromLayout: defaults.integer(forKey: "powerStrategyPresetLayout")
+            )
         }
+
+        for strategy in PowerStrategy.named {
+            if let data = defaults.data(forKey: Self.presetDefaultsKey(strategy)),
+               let preset = try? JSONDecoder().decode(StrategyPreset.self, from: data) {
+                strategyPresetOverrides[strategy] = preset.clamped
+            }
+        }
+    }
+
+    /// Layout 1 shipped Saving 75 °C / Balanced 60 °C / Performance 50 °C. Layout 2 / 中文：布局 1 为 省电 75 °C / 均衡 60 °C / 性能 50 °C。布局 2
+    /// shifted each set up one tier and added a quieter Saving, so a stored label / 中文：把每组参数上移一档并新增更安静的省电档，因此
+    /// is moved to whichever tier now holds the values it was running — an / 中文：已存储的标签迁到现在持有其原参数的档位——
+    /// upgrade must not change how loud the fans are. / 中文：升级不应改变风扇的响度。
+    nonisolated static func migratedStrategy(_ stored: PowerStrategy, fromLayout layout: Int) -> PowerStrategy {
+        guard layout < presetLayoutVersion else { return stored }
+        switch stored {
+        case .powerSaving: return .balanced
+        case .balanced:    return .performance
+        case .performance: return .custom  // its values match no current preset / 中文：其参数不再对应任何预设
+        case .custom:      return .custom
+        }
+    }
+
+    private static func presetDefaultsKey(_ strategy: PowerStrategy) -> String {
+        "strategyPreset.\(strategy.rawValue)"
     }
 
     func resetToSystemControl() {
@@ -1165,6 +1204,15 @@ class FanController: ObservableObject {
         defaults.set(autoMaxSpeed, forKey: "autoMaxSpeed")
         defaults.set(autoAggressiveness, forKey: "autoAggressiveness")
         defaults.set(powerStrategy.rawValue, forKey: "powerStrategy")
+        defaults.set(Self.presetLayoutVersion, forKey: "powerStrategyPresetLayout")
+        for strategy in PowerStrategy.named {
+            if let preset = strategyPresetOverrides[strategy],
+               let data = try? JSONEncoder().encode(preset) {
+                defaults.set(data, forKey: Self.presetDefaultsKey(strategy))
+            } else {
+                defaults.removeObject(forKey: Self.presetDefaultsKey(strategy))
+            }
+        }
 
         if let v = pidKpCustom { defaults.set(v, forKey: "pidKpCustom") } else { defaults.removeObject(forKey: "pidKpCustom") }
         if let v = pidKiCustom { defaults.set(v, forKey: "pidKiCustom") } else { defaults.removeObject(forKey: "pidKiCustom") }
@@ -1212,22 +1260,23 @@ class FanController: ObservableObject {
         }
     }
 
+    /// The values a named strategy applies: the user's tuning, else the shipped default. / 中文：具名策略实际套用的参数：优先用户调整值，否则出厂默认。
+    func preset(for strategy: PowerStrategy) -> StrategyPreset? {
+        strategyPresetOverrides[strategy] ?? strategy.defaultPreset
+    }
+
     /// Apply a named efficiency strategy, filling the three core auto parameters. / 中文：套用具名能效策略，填好三个核心自动参数。
     /// `.custom` is a no-op marker the manual sliders flip into. / 中文：`.custom` 是手动滑块切入的空标记。
     func setPowerStrategy(_ strategy: PowerStrategy) {
         powerStrategy = strategy
 
-        if let temp = strategy.targetTemp {
-            autoThreshold = max(40, min(90, temp))
-        }
-        if let agg = strategy.aggressiveness {
-            autoAggressiveness = max(0, min(3, agg))
-        }
-        if let fraction = strategy.maxSpeedFraction {
+        if let preset = preset(for: strategy)?.clamped {
+            autoThreshold = preset.targetTemp
+            autoAggressiveness = preset.aggressiveness
             // Map the fraction onto this machine's [min, max] RPM span, snapping / 中文：把占比映射到本机 [min, max] 转速区间，
             // to 50-rpm steps to match the slider. / 中文：吸附到 50 rpm 档位以匹配滑杆。
             let span = Double(unifiedMaxClamp - unifiedMinClamp)
-            let target = Double(unifiedMinClamp) + fraction * span
+            let target = Double(unifiedMinClamp) + preset.maxSpeedFraction * span
             autoMaxSpeed = clampUnified(Int((target / 50).rounded()) * 50)
         }
 
@@ -1236,5 +1285,23 @@ class FanController: ObservableObject {
             resetPIDState()
             updateAutoControl()
         }
+    }
+
+    /// Retune a named strategy. If it is the active one, the new values take / 中文：重新调整某个具名策略。若它正在生效，
+    /// effect right away. / 中文：新参数立即生效。
+    func setStrategyPreset(_ preset: StrategyPreset, for strategy: PowerStrategy) {
+        guard let shipped = strategy.defaultPreset else { return }
+        let value = preset.clamped
+        strategyPresetOverrides[strategy] = value == shipped ? nil : value
+        if powerStrategy == strategy {
+            setPowerStrategy(strategy)
+        } else {
+            saveSettings()
+        }
+    }
+
+    func resetStrategyPreset(for strategy: PowerStrategy) {
+        guard let shipped = strategy.defaultPreset else { return }
+        setStrategyPreset(shipped, for: strategy)
     }
 }

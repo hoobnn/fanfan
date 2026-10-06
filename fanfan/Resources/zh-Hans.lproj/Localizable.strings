@@ -261,3 +261,16 @@
 "sensor.TI0P" = "雷雳接口";
 "sensor.TI1P" = "雷雳接口 2";
 "sensor.TW0P" = "无线网卡";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "策略预设";
+"settings.strategy_preset" = "策略";
+"settings.strategy_preset_desc" = "选择要调整的策略";
+"settings.strategy_preset_target" = "目标温度";
+"settings.strategy_preset_target_desc" = "风扇尽量维持的温度（°C）";
+"settings.strategy_preset_max_speed" = "最高转速";
+"settings.strategy_preset_max_speed_desc" = "占硬件转速范围的比例";
+"settings.strategy_preset_response" = "响应";
+"settings.strategy_preset_response_desc" = "风扇对温度变化的反应强度";
+"settings.strategy_preset_reset" = "恢复默认";
+"settings.strategy_custom" = "自定义";

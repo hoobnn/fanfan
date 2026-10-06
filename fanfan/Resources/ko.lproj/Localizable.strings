@@ -261,3 +261,16 @@
 "sensor.TI0P" = "Thunderbolt";
 "sensor.TI1P" = "Thunderbolt 2";
 "sensor.TW0P" = "Wi-Fi 카드";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "전략 프리셋";
+"settings.strategy_preset" = "전략";
+"settings.strategy_preset_desc" = "조정할 전략 선택";
+"settings.strategy_preset_target" = "목표 온도";
+"settings.strategy_preset_target_desc" = "팬이 유지하려는 온도(°C)";
+"settings.strategy_preset_max_speed" = "최대 속도";
+"settings.strategy_preset_max_speed_desc" = "하드웨어 RPM 범위 대비 비율";
+"settings.strategy_preset_response" = "응답";
+"settings.strategy_preset_response_desc" = "온도 변화에 대한 팬의 반응 강도";
+"settings.strategy_preset_reset" = "기본값으로 재설정";
+"settings.strategy_custom" = "사용자 지정";

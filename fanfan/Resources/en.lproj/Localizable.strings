@@ -211,3 +211,16 @@
 "sensor.category.system" = "System";
 "sensor.category.ambient" = "Ambient";
 "sensor.generic" = "%@ Sensor";
+
+/* Strategy presets */
+"settings.section.strategy_presets" = "Strategy Presets";
+"settings.strategy_preset" = "Strategy";
+"settings.strategy_preset_desc" = "Which strategy to tune";
+"settings.strategy_preset_target" = "Target Temperature";
+"settings.strategy_preset_target_desc" = "Temperature the fans hold toward (°C)";
+"settings.strategy_preset_max_speed" = "Max Speed";
+"settings.strategy_preset_max_speed_desc" = "Share of the hardware RPM range";
+"settings.strategy_preset_response" = "Response";
+"settings.strategy_preset_response_desc" = "How hard the fans react to heat";
+"settings.strategy_preset_reset" = "Reset to Defaults";
+"settings.strategy_custom" = "Custom";
