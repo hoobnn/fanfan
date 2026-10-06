@@ -2,6 +2,14 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.6.0] - 2026-10-06
+
+### Added
+- Each auto-mode strategy (Power Saving, Balanced, Performance) can now be retuned in Settings › Strategy Presets: target temperature, max speed and response, with a reset to the shipped values.
+
+### Changed
+- The strategy tiers moved up one step: Performance now uses the former Balanced values (60 °C, 65 % max speed), Balanced the former Power Saving values (75 °C, 35 %), and a new, quieter Power Saving runs at 80 °C with a 20 % ceiling. Existing settings keep their current values; the former Performance tier shows as Custom.
+
 ## [1.5.4] - 2026-10-02
 
 ### Fixed
