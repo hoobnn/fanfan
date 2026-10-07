@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "温度を確認する頻度（秒）";
 "settings.high_temp_alert" = "高温警告";
 "settings.high_temp_alert_desc" = "警告のしきい値温度（°C）";
+"settings.protection_max" = "高温保護の上限";
+"settings.protection_max_desc" = "85°C を超えると設定した最高回転数を超えて回転し、最大でハードウェア上限のこの割合まで上がります（95°C で到達）。";
 "settings.notifications" = "通知";
 "settings.notifications_desc" = "高温時に警告を表示します";
 "settings.auto_mode_switching" = "自動モード切り替え";

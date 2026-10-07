@@ -518,6 +518,10 @@ class FanControlViewModel: ObservableObject {
         fanController.setAutoMaxSpeed(speed)
     }
     
+    func setProtectionMaxFraction(_ fraction: Double) {
+        fanController.setProtectionMaxFraction(fraction)
+    }
+
     func setAutoAggressiveness(_ value: Double) {
         fanController.setAutoAggressiveness(value)
     }

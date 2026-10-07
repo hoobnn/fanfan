@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "检查温度的频率（秒）";
 "settings.high_temp_alert" = "高温警报";
 "settings.high_temp_alert_desc" = "警报阈值温度（°C）";
+"settings.protection_max" = "高温保护上限";
+"settings.protection_max_desc" = "超过 85°C 时风扇可突破你设的最高转速，最多到硬件上限的这个比例（95°C 时达到）";
 "settings.notifications" = "通知";
 "settings.notifications_desc" = "显示高温事件警报";
 "settings.auto_mode_switching" = "自动模式切换";

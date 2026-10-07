@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "Frecuencia de lectura de temperaturas (segundos)";
 "settings.high_temp_alert" = "Alerta de temperatura";
 "settings.high_temp_alert_desc" = "Umbral de alerta (°C)";
+"settings.protection_max" = "Límite de protección térmica";
+"settings.protection_max_desc" = "Por encima de 85 °C el ventilador puede superar tu velocidad máxima, hasta esta fracción del máximo del hardware (alcanzada a 95 °C).";
 "settings.notifications" = "Notificaciones";
 "settings.notifications_desc" = "Avisar cuando la temperatura sea alta";
 "settings.auto_mode_switching" = "Cambio automático de modo";

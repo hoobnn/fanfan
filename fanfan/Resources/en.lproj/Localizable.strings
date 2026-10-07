@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "How often to check temperatures (seconds)";
 "settings.high_temp_alert" = "High Temp Alert";
 "settings.high_temp_alert_desc" = "Alert threshold temperature (°C)";
+"settings.protection_max" = "Thermal Protection Limit";
+"settings.protection_max_desc" = "Above 85°C the fan may exceed your max speed, up to this share of the hardware maximum (reached at 95°C).";
 "settings.notifications" = "Notifications";
 "settings.notifications_desc" = "Show alerts for high temperature events";
 "settings.auto_mode_switching" = "Auto Mode Switching";

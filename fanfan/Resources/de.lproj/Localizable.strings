@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "Wie oft Temperaturen geprüft werden (Sekunden)";
 "settings.high_temp_alert" = "Hitzewarnung";
 "settings.high_temp_alert_desc" = "Schwellenwert für die Warnung (°C)";
+"settings.protection_max" = "Grenze des Hitzeschutzes";
+"settings.protection_max_desc" = "Über 85°C darf der Lüfter deine Höchstdrehzahl überschreiten, bis zu diesem Anteil des Hardware-Maximums (bei 95°C erreicht).";
 "settings.notifications" = "Mitteilungen";
 "settings.notifications_desc" = "Bei hohen Temperaturen warnen";
 "settings.auto_mode_switching" = "Automatisch umschalten";

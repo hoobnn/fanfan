@@ -640,6 +640,25 @@ final class FanControlTests: XCTestCase {
         )
     }
 
+    /// The protection limit caps the critical override, but never below the
+    /// user's own ceiling.
+    func testCriticalOverrideStopsAtProtectionLimit() {
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                3_600, fanMin: 1_200, fanMax: 6_500,
+                autoCeiling: 3_600, isCritical: true, protectionFraction: 0.8
+            ),
+            5_200
+        )
+        XCTAssertEqual(
+            FanController.clampFanTarget(
+                6_000, fanMin: 1_200, fanMax: 6_500,
+                autoCeiling: 6_000, isCritical: true, protectionFraction: 0.5
+            ),
+            6_000
+        )
+    }
+
     /// Below the ceiling nothing changes, and the fan floor still wins.
     func testClampFanTargetHonoursFloorAndCeiling() {
         XCTAssertEqual(

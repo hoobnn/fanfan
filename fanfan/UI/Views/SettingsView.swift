@@ -33,6 +33,7 @@ struct SettingsView: View {
     @AppStorage("enableNotifications")    private var enableNotifications = true
     @AppStorage("highTempAlert")          private var highTempAlert = 85.0
     @AppStorage("autoSwitchMode")         private var autoSwitchMode = false
+    @AppStorage("protectionMaxFraction")  private var protectionMaxFraction = FanController.defaultProtectionMaxFraction
 
     @StateObject private var updateChecker = UpdateChecker()
     @State private var editingStrategy: PowerStrategy = .balanced
@@ -124,6 +125,17 @@ struct SettingsView: View {
                     }
             } label: {
                 rowLabel("settings.high_temp_alert")
+            }
+
+            LabeledContent {
+                InlineSlider(value: $protectionMaxFraction,
+                             range: FanController.protectionMaxFractionRange, step: 0.05,
+                             format: { String(format: "%.0f%%", $0 * 100) })
+                    .onChange(of: protectionMaxFraction) { _, newValue in
+                        viewModel.setProtectionMaxFraction(newValue)
+                    }
+            } label: {
+                rowLabel("settings.protection_max")
             }
 
             Toggle(isOn: $enableNotifications) {

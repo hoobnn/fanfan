@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "온도를 확인하는 주기(초)";
 "settings.high_temp_alert" = "고온 알림";
 "settings.high_temp_alert_desc" = "알림 기준 온도(°C)";
+"settings.protection_max" = "고온 보호 상한";
+"settings.protection_max_desc" = "85°C를 넘으면 설정한 최고 속도를 넘어 하드웨어 최대치의 이 비율까지 올라갑니다(95°C에서 도달).";
 "settings.notifications" = "알림";
 "settings.notifications_desc" = "고온 발생 시 알림을 표시합니다";
 "settings.auto_mode_switching" = "자동 모드 전환";

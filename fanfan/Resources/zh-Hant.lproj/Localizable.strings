@@ -49,6 +49,8 @@
 "settings.monitoring_interval_desc" = "檢查溫度的頻率（秒）";
 "settings.high_temp_alert" = "高溫警示";
 "settings.high_temp_alert_desc" = "警示門檻溫度（°C）";
+"settings.protection_max" = "高溫保護上限";
+"settings.protection_max_desc" = "超過 85°C 時風扇可突破你設定的最高轉速，最多到硬體上限的這個比例（95°C 時達到）";
 "settings.notifications" = "通知";
 "settings.notifications_desc" = "發生高溫事件時顯示警示";
 "settings.auto_mode_switching" = "自動切換模式";

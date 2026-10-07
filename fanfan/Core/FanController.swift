@@ -105,6 +105,13 @@ class FanController: ObservableObject {
     /// 中文：高温保护抬升上限期间的实际上限，否则为 nil。让唯一一处合法越过用户
     /// 上限的行为可解释，而不是看起来像 App 无视自己的设置。
     @Published var thermalProtectionCeiling: Int?
+    /// Share of the hardware maximum thermal protection may lift the ceiling
+    /// to, the critical temperature included. Never lowers the user ceiling.
+    /// 中文：高温保护（含临界温度）最多可把上限抬到硬件上限的多少比例；
+    /// 不会低于用户上限。
+    @Published private(set) var protectionMaxFraction: Double = FanController.defaultProtectionMaxFraction
+    nonisolated static let defaultProtectionMaxFraction: Double = 0.8
+    nonisolated static let protectionMaxFractionRange: ClosedRange<Double> = 0.5...1.0
     /// Largest target RPM last applied (used for auto-mode hysteresis). / 中文：Largest 目标 RPM last applied (used for auto-模式 滞回).
     @Published var lastAppliedSpeed: Int = 0
 
@@ -162,11 +169,13 @@ class FanController: ObservableObject {
     /// hardware maximum, so protection buys exactly the RPM the temperature
     /// calls for instead of jumping straight to full speed. At
     /// `criticalTemperature` — close to where the SoC throttles — the ceiling is
-    /// the hardware maximum and the ramp is bypassed, because at that point
-    /// noise has stopped being the thing worth optimising.
+    /// the protection maximum (`protectionMaxFraction` of the hardware maximum)
+    /// and the ramp is bypassed, because at that point noise has stopped being
+    /// the thing worth optimising.
     /// 中文：高温保护带。低于 `protectionOnsetTemperature` 时用户上限绝对生效；
-    /// 在保护带内上限平滑抬升至硬件上限，按温度取所需转速，而非一步拉满。
-    /// 到 `criticalTemperature`（接近降频点）才用满硬件上限并跳过缓升。
+    /// 在保护带内上限平滑抬升至保护上限，按温度取所需转速，而非一步拉满。
+    /// 到 `criticalTemperature`（接近降频点）直接用保护上限（硬件上限 ×
+    /// `protectionMaxFraction`）并跳过缓升。
     private static let protectionOnsetTemperature: Double = 85
     private static let criticalTemperature: Double = 95
 
@@ -822,7 +831,7 @@ class FanController: ObservableObject {
         let userCeiling = min(autoMaxSpeed, unifiedMaxClamp)
         let autoCeiling = Self.softCeiling(
             userCeiling: autoMaxSpeed,
-            hardwareMax: unifiedMaxClamp,
+            hardwareMax: Self.protectionMax(unifiedMaxClamp, fraction: protectionMaxFraction),
             safetyTemperature: safetyTemperature
         )
         thermalProtectionCeiling = autoCeiling > userCeiling ? autoCeiling : nil
@@ -855,7 +864,8 @@ class FanController: ObservableObject {
                 fanMin: minRPM(for: i),
                 fanMax: maxRPM(for: i),
                 autoCeiling: autoCeiling,
-                isCritical: isCritical
+                isCritical: isCritical,
+                protectionFraction: protectionMaxFraction
             ))
         }
 
@@ -884,7 +894,8 @@ class FanController: ObservableObject {
                     fanMin: minRPM(for: i),
                     fanMax: maxRPM(for: i),
                     autoCeiling: autoCeiling,
-                    isCritical: isCritical
+                    isCritical: isCritical,
+                    protectionFraction: protectionMaxFraction
                 ))
             }
 
@@ -1077,20 +1088,32 @@ class FanController: ObservableObject {
         return max(ceiling, min(hardwareMax, Int(lifted.rounded())))
     }
 
+    /// The protection maximum: `fraction` of the hardware maximum.
+    /// 中文：保护上限，即硬件上限的 `fraction` 比例。
+    nonisolated static func protectionMax(_ hardwareMax: Int, fraction: Double) -> Int {
+        let clamped = min(max(fraction, protectionMaxFractionRange.lowerBound),
+                          protectionMaxFractionRange.upperBound)
+        return Int((Double(hardwareMax) * clamped).rounded())
+    }
+
     /// The per-fan target clamp, shared by the pre-ramp and post-ramp loops so
-    /// the ceiling rule cannot drift apart between them again. Only a critical
-    /// temperature may exceed the user ceiling, and then only up to the fan's
-    /// own hardware maximum.
+    /// the ceiling rule cannot drift apart between them again. A critical
+    /// temperature pins each fan to its own protection maximum (never below
+    /// the auto ceiling, never above the fan's hardware maximum).
     /// 中文：per-fan 目标夹取，供缓升前后两处共用，避免上限规则再次分叉。
-    /// 只有临界温度可以超越用户上限，且最高只到该风扇的硬件上限。
+    /// 临界温度时每个风扇直接取自身保护上限（不低于自动上限、不高于硬件上限）。
     nonisolated static func clampFanTarget(
         _ speed: Int,
         fanMin: Int,
         fanMax: Int,
         autoCeiling: Int,
-        isCritical: Bool
+        isCritical: Bool,
+        protectionFraction: Double = 1.0
     ) -> Int {
-        if isCritical { return fanMax }
+        if isCritical {
+            let cap = max(autoCeiling, protectionMax(fanMax, fraction: protectionFraction))
+            return max(fanMin, min(fanMax, cap))
+        }
         let cap = min(fanMax, autoCeiling)
         return max(fanMin, min(speed, cap))
     }
@@ -1150,6 +1173,11 @@ class FanController: ObservableObject {
             }
         }
 
+        if let saved = defaults.object(forKey: "protectionMaxFraction") as? Double,
+           Self.protectionMaxFractionRange.contains(saved) {
+            protectionMaxFraction = saved
+        }
+
         pidKpCustom = defaults.object(forKey: "pidKpCustom") as? Double
         pidKiCustom = defaults.object(forKey: "pidKiCustom") as? Double
         pidKdCustom = defaults.object(forKey: "pidKdCustom") as? Double
@@ -1203,6 +1231,7 @@ class FanController: ObservableObject {
         defaults.set(autoThreshold, forKey: "autoThreshold")
         defaults.set(autoMaxSpeed, forKey: "autoMaxSpeed")
         defaults.set(autoAggressiveness, forKey: "autoAggressiveness")
+        defaults.set(protectionMaxFraction, forKey: "protectionMaxFraction")
         defaults.set(powerStrategy.rawValue, forKey: "powerStrategy")
         defaults.set(Self.presetLayoutVersion, forKey: "powerStrategyPresetLayout")
         for strategy in PowerStrategy.named {
@@ -1225,6 +1254,15 @@ class FanController: ObservableObject {
         saveSettings()
         if mode == .automatic {
             resetPIDState()
+            updateAutoControl()
+        }
+    }
+
+    func setProtectionMaxFraction(_ fraction: Double) {
+        protectionMaxFraction = min(max(fraction, Self.protectionMaxFractionRange.lowerBound),
+                                    Self.protectionMaxFractionRange.upperBound)
+        saveSettings()
+        if mode == .automatic {
             updateAutoControl()
         }
     }
