@@ -2,6 +2,14 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [1.7.0] - 2026-10-07
+
+### Added
+- Settings › Monitoring › Thermal Protection Limit: how far thermal protection may push the fans past your max speed, as a share of the hardware maximum (50–100 %).
+
+### Changed
+- Thermal protection now stops at 80 % of the hardware maximum by default, even at 95 °C, instead of running the fans at full speed. Set the limit to 100 % for the previous behaviour.
+
 ## [1.6.0] - 2026-10-06
 
 ### Added
