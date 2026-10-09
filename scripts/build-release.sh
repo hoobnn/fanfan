@@ -147,6 +147,7 @@ RELEASE_APP="$RELEASE_DIR/${APP_NAME}.app"
 rm -rf "$RELEASE_APP"
 cp -R "$BUILT_APP" "$RELEASE_APP"
 echo "   ✓ staged: $RELEASE_APP"
+"$PROJECT_DIR/scripts/strip-sparkle-xpc.sh" "$RELEASE_APP"
 
 # --- sign --------------------------------------------------------------------
 
@@ -165,6 +166,18 @@ else
     echo "❌ daemon binary not found in app bundle — Xcode resource copy may have changed"
     exit 1
 fi
+
+# Sparkle, innermost first (same order as release.yml's inner-binaries).
+SPARKLE="$RELEASE_APP/Contents/Frameworks/Sparkle.framework"
+for target in \
+    "$SPARKLE/Versions/B/Autoupdate" \
+    "$SPARKLE/Versions/B/Updater.app" \
+    "$SPARKLE"; do
+    codesign --force --timestamp --options runtime \
+        --sign "$SIGN_IDENTITY" \
+        "$target"
+done
+echo "   ✓ signed Sparkle"
 
 # Then the app itself with hardened runtime + entitlements.
 codesign --force --timestamp --options runtime \

@@ -70,4 +70,15 @@ mkdir -p release
 rm -rf release/fanfan.app
 cp -R "$BUILT_APP" release/fanfan.app
 
-echo "✅ Staged: release/fanfan.app"
+STAGED_APP="release/fanfan.app"
+SPARKLE="$STAGED_APP/Contents/Frameworks/Sparkle.framework"
+./scripts/strip-sparkle-xpc.sh "$STAGED_APP"
+
+# Stripping broke the ad-hoc seals; re-seal so the staged app stands on its
+# own. The release workflow re-signs everything with Developer ID afterwards.
+codesign --force --sign - "$SPARKLE"
+codesign --force --sign - --preserve-metadata=identifier,entitlements,flags,runtime \
+  "$STAGED_APP"
+codesign --verify --deep --strict "$STAGED_APP"
+
+echo "✅ Staged: $STAGED_APP"
