@@ -1,8 +1,9 @@
 name: Build and Release
 
 # v* tag: tests → build, sign, notarize and publish the GitHub Release →
-# update the Homebrew cask. A manual run on a branch builds and notarizes
-# (artifacts on the workflow run) without publishing anything.
+# update the Homebrew cask and redeploy Pages with a fresh Sparkle appcast.
+# A manual run on a branch builds and notarizes (artifacts on the workflow
+# run) without publishing anything.
 on:
   push:
     tags:
@@ -31,12 +32,20 @@ jobs:
       app-path: release/fanfan.app
       build-command: ./scripts/ci-build.sh && ./scripts/release-notes.sh
       artifact-basename: fanfan
-      # The daemon must carry its own signature before the outer bundle is sealed.
-      inner-binaries: Contents/Resources/fanfan-smcd
+      # Nested code must carry its own signature before the outer bundle is
+      # sealed, innermost first. ci-build.sh strips Sparkle's XPC services,
+      # which a non-sandboxed app never uses.
+      inner-binaries: |
+        Contents/Resources/fanfan-smcd
+        Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate
+        Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app
+        Contents/Frameworks/Sparkle.framework
       entitlements: fanfan/Resources/fanfan.entitlements
       make-dmg: true
       dmg-volume-name: fanfan
       release-notes-file: release_notes.md
+      # Signs the zip with SPARKLE_ED_PRIVATE_KEY for in-app updates.
+      sparkle: true
       # fanfan targets macOS 26.0; the default macos-15 runner cannot build it.
       runs-on: macos-26
     secrets: inherit
@@ -51,3 +60,16 @@ jobs:
       artifact-basename: fanfan
       version: ${{ needs.release.outputs.version }}
     secrets: inherit
+
+  # Releases published with GITHUB_TOKEN do not trigger other workflows, so
+  # pages.yml's `release: published` never fires for them. Call it directly to
+  # rebuild appcast.xml from the new release.
+  pages:
+    name: Update appcast
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

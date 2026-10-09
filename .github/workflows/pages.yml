@@ -7,6 +7,8 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  # release.yml calls this after publishing, to refresh the appcast.
+  workflow_call:
 
 permissions:
   contents: read
@@ -36,6 +38,12 @@ jobs:
           cp docs/logo.png docs/social-preview.png docs/view/zh-Hans/popover.png docs/view/zh-Hans/settings.png _site/
           version=$(gh release view --json tagName --jq '.tagName | ltrimstr("v")')
           sed -i "s/__VERSION__/${version}/g" _site/index.html
+      # Sparkle feed (SUFeedURL), rebuilt from the releases on every deploy.
+      - uses: hoobnn/ci-workflows/.github/actions/sparkle-appcast@v1
+        with:
+          output: _site/appcast.xml
+          artifact-basename: fanfan
+          title: fanfan
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
