@@ -16,7 +16,7 @@
 
 </div>
 
-fanfan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固定转速、按温度自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上，无第三方依赖。
+fanfan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固定转速、按温度自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上。
 
 <table>
   <tr>
@@ -38,6 +38,7 @@ fanfan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固�
 - 温度超过设定值时发送通知，并可选择同时切换到自动调速。
 - 预设不满足需要时，可直接调整 PID 参数。
 - 界面支持简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español。默认跟随系统语言，也可以在「系统设置 › 通用 › 语言与地区 › 应用程序」里给 fanfan 单独指定。
+- 内置应用内更新：默认在后台检查新版本，发现后提示一键安装并重启，也可以在「设置 › 关于」里手动检查或关闭自动检查。
 - 风扇转速由独立的特权辅助进程写入。App 无响应超过 10 秒、退出或崩溃时，风扇都会交还 macOS 控制。
 
 无风扇机型不显示风扇控制。可读取的传感器和转速范围因机型而异。
@@ -61,6 +62,10 @@ curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.
 
 需要 macOS 26 及以上（Apple Silicon 或 Intel）。首次打开时点击「安装助手」，然后在「系统设置 › 通用 › 登录项与扩展」中允许 fanfan。无需输入管理员密码。
 
+### 更新
+
+fanfan 会自动检查更新（基于 [Sparkle](https://sparkle-project.org)，更新包经 EdDSA 签名校验），也可以在「设置 › 关于」里点「检查」。安装新版本后辅助进程会自动切换到新版本，不需要重新允许。Homebrew 安装的版本也可以用 `brew upgrade --cask fanfan` 更新。
+
 ### 卸载
 
 `brew uninstall --cask fanfan` 会同时删除 App 和辅助进程，加 `--zap` 可一并清除偏好设置。手动安装的版本，退出 fanfan 后从「应用程序」中删除即可；辅助进程位于 App 包内，会随之停止。如果「登录项与扩展」中仍有 fanfan 条目，请在那里手动移除。
@@ -77,7 +82,7 @@ fanfan 只在风扇上报的最低与最高转速之间设置，超出范围的�
 向 SMC 写入风扇转速需要 root 权限。为避免 App 本身以 root 运行，fanfan 注册了一个精简的 root 辅助进程，macOS 会要求在「登录项与扩展」中允许一次。仅读取温度不需要额外权限。
 
 **与 Macs Fan Control、smcFanControl 有何区别？**
-核心功能相同：读取 SMC 传感器、设置风扇转速。fanfan 免费开源（MIT），无第三方依赖。
+核心功能相同：读取 SMC 传感器、设置风扇转速。fanfan 免费开源（MIT），唯一的第三方依赖是负责应用内更新的 Sparkle。
 
 ## 工作原理
 

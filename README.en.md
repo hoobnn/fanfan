@@ -16,7 +16,7 @@ An open-source macOS menu bar app for monitoring temperatures and controlling fa
 
 </div>
 
-fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. You can pin the fans to a fixed speed, let fanfan adjust them by temperature, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later and has no third-party dependencies.
+fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. You can pin the fans to a fixed speed, let fanfan adjust them by temperature, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later.
 
 <table>
   <tr>
@@ -38,6 +38,7 @@ fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 - A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time.
 - Custom PID gains when none of the presets fit your workload.
 - English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français and Español. fanfan follows the system language, or you can set its language on its own in System Settings › General › Language & Region › Applications.
+- Built-in updates: fanfan checks for new versions in the background and offers to install them and relaunch. You can also check by hand, or turn automatic checks off, in Settings › About.
 - Fan speeds are written by a separate privileged helper. If the app hangs for more than 10 seconds, quits or crashes, the fans go back to macOS control.
 
 Fan controls are hidden on Macs without a fan. Which sensors you see and the available speed range depend on the model.
@@ -61,6 +62,10 @@ curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.
 
 Requires macOS 26 or later (Apple Silicon or Intel). On first launch, click **Install Helper**, then allow fanfan in System Settings › General › Login Items & Extensions. No administrator password needed.
 
+### Update
+
+fanfan checks for updates on its own (via [Sparkle](https://sparkle-project.org); updates are verified with an EdDSA signature), or click **Check** in Settings › About. The helper switches to the new version by itself after an update, with no need to allow it again. If you installed with Homebrew, `brew upgrade --cask fanfan` works too.
+
 ### Uninstall
 
 `brew uninstall --cask fanfan` removes the app and the helper; add `--zap` to remove preferences too. If you installed it manually, quit fanfan and delete it from Applications. The helper lives inside the app bundle and stops with it. If a fanfan entry is still listed under Login Items & Extensions, remove it there.
@@ -77,7 +82,7 @@ Yes. It's a universal app for Apple Silicon and Intel on macOS 26 or later. Fanl
 Writing fan speeds to the SMC needs root. So that the app itself doesn't run as root, fanfan registers a small root helper, and macOS asks you to allow it once in Login Items & Extensions. Reading temperatures needs no extra permission.
 
 **How does it compare with Macs Fan Control or smcFanControl?**
-It does the same core job: read SMC sensors and set fan speeds. fanfan is free, open source (MIT) and has no third-party dependencies.
+It does the same core job: read SMC sensors and set fan speeds. fanfan is free and open source (MIT); its only third-party dependency is Sparkle, for in-app updates.
 
 ## How it works
 

@@ -4,7 +4,7 @@
 
 ## 项目概况
 
-`fanfan` 是控制 Mac 风扇转速的 macOS 菜单栏应用（Swift 5 语言模式 + Swift 6 approachable-concurrency / SwiftUI on AppKit 菜单栏生命周期），目标 **macOS 26+**，Apple Silicon 或 Intel，**无任何第三方 Swift 依赖**。
+`fanfan` 是控制 Mac 风扇转速的 macOS 菜单栏应用（Swift 5 语言模式 + Swift 6 approachable-concurrency / SwiftUI on AppKit 菜单栏生命周期），目标 **macOS 26+**，Apple Silicon 或 Intel，**唯一的第三方依赖是 Sparkle 2**（SwiftPM，应用内更新）。
 
 仓库另含一个以 root LaunchDaemon 运行的 **C 守护进程**（`fanfan-smcd`）。Swift 应用不带特权，所有 root-only 的 SMC 写入都经 XPC 交给它。
 
@@ -23,7 +23,7 @@ fanfan.app (user)  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶ 
 - XPC Mach service `com.hoobnn.fanfan.helper`（同时是 launchd label）。守护进程对每个连接设置签名要求：只接受团队 `8FUPL8QHFH` 签名、identifier 为 `com.hoobnn.fanfan` 或 `com.hoobnn.fanfan.debug` 的客户端；Release 版应用反向校验守护进程（identifier `fanfan-smcd`），Debug 版因守护进程是 ad-hoc 签名而跳过。
 - 手动控制基于租约：SET 活跃时应用每 3 秒续租；10 秒无活动则守护进程恢复固件 AUTO。租约同时绑定在发起 SET 的连接上：应用退出或崩溃、连接失效时立即恢复 AUTO。应用端因此必须保持单条长连接。
 - 由 `SMAppService.daemon(plistName:)` 注册，用户在系统设置「登录项与扩展」里批准一次，无需密码。plist 在 App 内 `Contents/Library/LaunchDaemons/com.hoobnn.fanfan.helper.plist`（源文件 `tools/fanfan-smcd/`，经 Xcode「Copy LaunchDaemon」阶段拷入），`BundleProgram` 指向 `Contents/Resources/fanfan-smcd`，launchd 直接从 App Bundle 运行它。
-- 守护进程监视自身可执行文件：App 被更新或删除时先交还风扇再退出，由 `KeepAlive` 拉起新二进制。
+- 守护进程监视自身可执行文件：App 被更新或删除时先交还风扇再退出，由 `KeepAlive` 拉起新二进制。Sparkle 更新是先原子交换 App 目录、重启 App 后再删除旧包，删除旧包时守护进程收到 `DELETE` 事件，此时同一路径已是新二进制，所以无需额外处理；App 端续租失败会自动重新下发控制。
 - 1.4 之前的版本手工安装系统 LaunchDaemon（`com.hoobnn.fanfan.smcd`、`/Library/PrivilegedHelperTools/fanfan-smcd`、Unix socket）。新守护进程启动时会 bootout 并删除这些旧文件。
 - **不要在没有充分理由的情况下新增提权提示或跨 XPC 的命令** —— 这个经过审计的最小接口面是刻意为之的安全属性。
 
@@ -36,6 +36,7 @@ fanfan.app (user)  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶ 
 - `Theme.swift` —— 设计规则严格执行：**温度是唯一的颜色**。UI 全单色，温度升高时一层几乎不可见的暖色从 popover 顶部渗入。新增 UI 一律从 `Theme` 取色，不要硬编码。
 - `SystemMonitor.swift` —— IOKit 传感器 / SMC 读取器，SMC 键位目录在这里。
 - `StatusBarManager.swift` —— 四种状态栏显示模式由 `StatusBarDisplayModeChanged` 通知驱动。
+- `AppUpdater.swift` —— 包装 Sparkle 的 `SPUStandardUpdaterController`。`SUFeedURL`、`SUPublicEDKey`、`SUEnableAutomaticChecks` 写在 `fanfan/Info.plist`（与 `GENERATE_INFOPLIST_FILE` 合并，已从同步文件夹的 target 成员中排除）。Debug 构建不启动更新器：bundle ID 不同但 feed 相同，会被"更新"成正式版。弹出 Sparkle 窗口前先把应用提升为 `.regular` 并激活，窗口关闭后由 `AppDelegate` 退回菜单栏模式。Sparkle 用 Apple Event 请求退出，`applicationShouldTerminate` 只拦 Dock / ⌘Q，因此不会挡住"安装并重启"。
 - 本地化字符串在 `fanfan/Resources/<lang>.lproj/Localizable.strings`（en、zh-Hans、zh-Hant、ja、ko、de、fr、es），用 `NSLocalizedString`，新增或修改键时所有语言必须同步。`sensor.<SMC 键>` 只在非英文文件里出现，英文名直接取自 `SystemMonitor` 的键位目录。新增语言还要加进 `project.pbxproj` 的 `knownRegions`。
 
 ## 构建、运行、测试
@@ -72,7 +73,9 @@ Debug 版（`com.hoobnn.fanfan.debug`）与正式版注册的是同一个 label 
 ./scripts/build-release.sh 1.2.3
 ```
 
-需要 `Developer ID Application: HAOBIN WU (8FUPL8QHFH)` 证书和名为 `fanfan-notarize` 的 `notarytool` 钥匙串配置（`NOTARY_PROFILE=…` 可覆盖）。产物在 `releases/`。CI 经 `.github/workflows/release.yml` 在 `v*` tag 上跑同一套流水线（先复用 `ci.yml` 跑单元测试，再签名公证发布，最后经 `ci-workflows` 的 `homebrew-cask.yml` 同步 cask）；平时推送 main 和 PR 只跑 `ci.yml`。
+需要 `Developer ID Application: HAOBIN WU (8FUPL8QHFH)` 证书和名为 `fanfan-notarize` 的 `notarytool` 钥匙串配置（`NOTARY_PROFILE=…` 可覆盖）。产物在 `releases/`。CI 经 `.github/workflows/release.yml` 在 `v*` tag 上跑同一套流水线（先复用 `ci.yml` 跑单元测试，再签名公证发布，最后经 `ci-workflows` 的 `homebrew-cask.yml` 同步 cask，并调用 `pages.yml` 重新生成 Sparkle appcast）；平时推送 main 和 PR 只跑 `ci.yml`。
+
+Sparkle 相关：`ci-build.sh` 用 `scripts/strip-sparkle-xpc.sh` 删掉 `Sparkle.framework` 里的 `XPCServices`（非沙盒应用用不到，且 CI 重签会丢掉 Downloader.xpc 的 entitlements）；`release.yml` 的 `inner-binaries` 按 daemon → Autoupdate → Updater.app → Sparkle.framework 的顺序先签内层；`sparkle: true` 让共享工作流用 secret `SPARKLE_ED_PRIVATE_KEY` 签 zip 并发布 `.zip.sparkle.json`；`pages.yml` 用 `sparkle-appcast` action 从 Releases 生成 `appcast.xml`（不进仓库）。Sparkle 按 `CFBundleVersion` 比较版本，所以每次发版必须递增 `CURRENT_PROJECT_VERSION`。tag 触发的 `pages` 任务要求 `github-pages` 环境的部署策略允许 `v*` tag。
 
 推 tag 前按顺序：
 
@@ -108,7 +111,7 @@ Co-Authored-By: Codex <noreply@openai.com>
 ## 值得记住的约定
 
 - **macOS 26 + Swift 5 语言模式** —— 已启用 approachable-concurrency，但完整的 Swift 6 严格并发迁移还需先把 SMC worker 与 main-actor 上的 observable 门面隔离。
-- **不加第三方 SDK。** 精简依赖面是刻意为之。
+- **除 Sparkle 外不加第三方 SDK。** 精简依赖面是刻意为之。
 - **无风扇的 Mac 真实存在。** 部分 MacBook Air 报告没有风扇，UI 完全隐藏控制项而非显示假滑块。不要假定 `fanCount > 0`。
 - **支持逐风扇非对称控制。** 多风扇机器每个风扇有独立滑块 / 目标值，数据结构已如此建模，重构时保留。
 - Mach Service / LaunchDaemon 名称 `com.hoobnn.fanfan.helper` —— 在 plist、守护进程源码、`SMCDaemonClient`、Homebrew cask 及任何新工具中保持一致。旧名 `com.hoobnn.fanfan.smcd` 只用于迁移清理。
