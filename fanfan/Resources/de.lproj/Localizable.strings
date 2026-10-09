@@ -17,18 +17,11 @@
 /* About / Updates */
 "settings.version" = "Version";
 "settings.version_desc" = "Installierte App-Version und Build";
+"settings.auto_check_updates" = "Automatisch nach Updates suchen";
+"settings.auto_check_updates_desc" = "Im Hintergrund nach neuen Versionen suchen und die Installation anbieten";
 "settings.check_updates" = "Nach Updates suchen";
-"settings.check_updates_desc" = "Mit dem neuesten Release auf GitHub vergleichen";
+"settings.check_updates_desc" = "Neue Version direkt in der App laden und installieren";
 "settings.check_updates.button" = "Prüfen";
-"settings.check_updates.checking" = "Wird geprüft …";
-"settings.check_updates.up_to_date" = "Du verwendest die neueste Version";
-"settings.check_updates.failed_format" = "Prüfung fehlgeschlagen: %@";
-
-"update.alert.title" = "Update verfügbar";
-"update.alert.message_header_format" = "Version %@ ist verfügbar (installiert: %@).";
-"update.alert.download" = "Herunterladen";
-"update.alert.later" = "Später";
-"update.error.network" = "Netzwerkfehler";
 
 "settings.pid_override" = "Eigene Verstärkung";
 "settings.pid_override_desc" = "Aus: Werte werden aus der Reaktionsstufe berechnet";

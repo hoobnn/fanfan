@@ -282,12 +282,6 @@ final class FanControlTests: XCTestCase {
         XCTAssertNil(SMCDaemonClient.pingVersion(from: "OKAY pong 2 idle"))
     }
 
-    func testVersionComparisonHandlesUnevenComponents() {
-        XCTAssertTrue(UpdateChecker.isVersion("1.2.1", newerThan: "1.2"))
-        XCTAssertFalse(UpdateChecker.isVersion("1.2.0", newerThan: "1.2"))
-        XCTAssertFalse(UpdateChecker.isVersion("1.1.9", newerThan: "1.2.0"))
-    }
-
     func testHelperReadinessPollingCoversLaunchdThrottle() {
         var elapsed = 0.0
         var checks = 0

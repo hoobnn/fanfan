@@ -17,18 +17,11 @@
 /* 關於 / 更新 */
 "settings.version" = "版本";
 "settings.version_desc" = "目前安裝的 App 版本與建置編號";
+"settings.auto_check_updates" = "自動檢查更新";
+"settings.auto_check_updates_desc" = "在背景檢查新版本，發現後提示安裝";
 "settings.check_updates" = "檢查更新";
-"settings.check_updates_desc" = "與 GitHub 上的最新版本比較";
+"settings.check_updates_desc" = "在 App 內下載並安裝新版本";
 "settings.check_updates.button" = "檢查";
-"settings.check_updates.checking" = "檢查中…";
-"settings.check_updates.up_to_date" = "目前已是最新版本";
-"settings.check_updates.failed_format" = "檢查失敗：%@";
-
-"update.alert.title" = "有可用的更新";
-"update.alert.message_header_format" = "新版本 %@ 已推出（目前為 %@）。";
-"update.alert.download" = "下載";
-"update.alert.later" = "稍後";
-"update.error.network" = "網路錯誤";
 
 "settings.pid_override" = "使用自訂增益";
 "settings.pid_override_desc" = "關閉時依回應檔位自動推導 Kp/Ki/Kd";

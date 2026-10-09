@@ -26,6 +26,7 @@ enum SettingsWindowLayout {
 
 struct SettingsView: View {
     @ObservedObject var viewModel: FanControlViewModel
+    @ObservedObject var updater: AppUpdater
 
     @AppStorage("launchAtLogin")          private var launchAtLogin = false
     @AppStorage("statusBarDisplayMode")   private var statusBarDisplayMode = "temperature"
@@ -35,13 +36,7 @@ struct SettingsView: View {
     @AppStorage("autoSwitchMode")         private var autoSwitchMode = false
     @AppStorage("protectionMaxFraction")  private var protectionMaxFraction = FanController.defaultProtectionMaxFraction
 
-    @StateObject private var updateChecker = UpdateChecker()
     @State private var editingStrategy: PowerStrategy = .balanced
-
-    private var availableRelease: UpdateChecker.Release? {
-        if case .available(let r) = updateChecker.state { return r }
-        return nil
-    }
 
     var body: some View {
         // Native grouped form: the macOS 26 inset-group look, row separators, / 中文：原生分组表单：macOS 26 的内嵌分组外观、行分隔线、
@@ -62,23 +57,6 @@ struct SettingsView: View {
                minHeight: SettingsWindowLayout.minSize.height,
                idealHeight: SettingsWindowLayout.idealSize.height,
                maxHeight: SettingsWindowLayout.maxSize.height)
-        .alert(
-            NSLocalizedString("update.alert.title", comment: ""),
-            isPresented: Binding(
-                get: { availableRelease != nil },
-                set: { if !$0 { updateChecker.dismissAvailable() } }
-            ),
-            presenting: availableRelease,
-            actions: { release in
-                Button(NSLocalizedString("update.alert.download", comment: "")) {
-                    NSWorkspace.shared.open(release.htmlURL)
-                }
-                Button(NSLocalizedString("update.alert.later", comment: ""), role: .cancel) {}
-            },
-            message: { release in
-                Text(updateAlertMessage(for: release))
-            }
-        )
     }
 
     // MARK: - Sections / 中文：分区
@@ -363,18 +341,19 @@ struct SettingsView: View {
                 rowLabel("settings.version")
             }
 
+            Toggle(isOn: $updater.automaticallyChecksForUpdates) {
+                rowLabel("settings.auto_check_updates")
+            }
+
+            // Sparkle shows its own progress, result and install windows.
+            // 中文：检查进度、结果和安装界面都由 Sparkle 自己的窗口展示。
             LabeledContent {
-                Button(action: { Task { await updateChecker.check() } }) {
-                    if updateChecker.state == .checking {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text(NSLocalizedString("settings.check_updates.button", comment: ""))
-                    }
+                Button(NSLocalizedString("settings.check_updates.button", comment: "")) {
+                    updater.checkForUpdates()
                 }
-                .disabled(updateChecker.state == .checking)
+                .disabled(!updater.canCheckForUpdates)
             } label: {
-                Text(NSLocalizedString("settings.check_updates", comment: ""))
-                Text(checkUpdatesDescription)
+                rowLabel("settings.check_updates")
             }
         }
     }
@@ -388,34 +367,10 @@ struct SettingsView: View {
     }
 
     private var versionDisplay: String {
-        let v = updateChecker.currentVersion
-        let b = updateChecker.currentBuild
+        let info = Bundle.main.infoDictionary
+        let v = info?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let b = info?["CFBundleVersion"] as? String ?? ""
         return b.isEmpty ? v : "\(v) (\(b))"
-    }
-
-    private var checkUpdatesDescription: String {
-        switch updateChecker.state {
-        case .checking:
-            return NSLocalizedString("settings.check_updates.checking", comment: "")
-        case .upToDate:
-            return NSLocalizedString("settings.check_updates.up_to_date", comment: "")
-        case .failed(let msg):
-            return String(format: NSLocalizedString("settings.check_updates.failed_format", comment: ""), msg)
-        case .idle, .available:
-            return NSLocalizedString("settings.check_updates_desc", comment: "")
-        }
-    }
-
-    private func updateAlertMessage(for release: UpdateChecker.Release) -> String {
-        let header = String(
-            format: NSLocalizedString("update.alert.message_header_format", comment: ""),
-            release.version,
-            updateChecker.currentVersion
-        )
-        let trimmed = release.notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return header }
-        let capped = trimmed.count > 700 ? String(trimmed.prefix(700)) + "…" : trimmed
-        return "\(header)\n\n\(capped)"
     }
 
 }
@@ -425,9 +380,10 @@ struct SettingsView: View {
 struct SettingsWindowView: View {
     @Binding var isOpen: Bool
     let viewModel: FanControlViewModel
+    let updater: AppUpdater
 
     var body: some View {
-        SettingsView(viewModel: viewModel)
+        SettingsView(viewModel: viewModel, updater: updater)
             .onAppear {
                 if let window = NSApplication.shared.windows.first(where: {
                     $0.title == NSLocalizedString("app.settings_title", comment: "")

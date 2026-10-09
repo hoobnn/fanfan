@@ -17,18 +17,11 @@
 /* 关于 / 更新 */
 "settings.version" = "版本";
 "settings.version_desc" = "当前安装的应用版本与构建号";
+"settings.auto_check_updates" = "自动检查更新";
+"settings.auto_check_updates_desc" = "在后台检查新版本，发现后提示安装";
 "settings.check_updates" = "检查更新";
-"settings.check_updates_desc" = "与 GitHub 上的最新版本进行比较";
+"settings.check_updates_desc" = "在应用内下载并安装新版本";
 "settings.check_updates.button" = "检查";
-"settings.check_updates.checking" = "检查中…";
-"settings.check_updates.up_to_date" = "当前已是最新版本";
-"settings.check_updates.failed_format" = "检查失败：%@";
-
-"update.alert.title" = "发现新版本";
-"update.alert.message_header_format" = "新版本 %@ 已发布（当前 %@）。";
-"update.alert.download" = "下载";
-"update.alert.later" = "稍后";
-"update.error.network" = "网络错误";
 
 "settings.pid_override" = "使用自定义增益";
 "settings.pid_override_desc" = "关闭则按响应档自动推导 Kp/Ki/Kd";

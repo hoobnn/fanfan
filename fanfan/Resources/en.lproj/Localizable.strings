@@ -17,18 +17,11 @@
 /* About / Updates */
 "settings.version" = "Version";
 "settings.version_desc" = "Installed app version and build";
+"settings.auto_check_updates" = "Automatically Check for Updates";
+"settings.auto_check_updates_desc" = "Check for updates in the background and offer to install them";
 "settings.check_updates" = "Check for Updates";
-"settings.check_updates_desc" = "Compare against the latest GitHub release";
+"settings.check_updates_desc" = "Download and install a new version from within the app";
 "settings.check_updates.button" = "Check";
-"settings.check_updates.checking" = "Checking…";
-"settings.check_updates.up_to_date" = "You're on the latest version";
-"settings.check_updates.failed_format" = "Check failed: %@";
-
-"update.alert.title" = "Update Available";
-"update.alert.message_header_format" = "Version %@ is available (you have %@).";
-"update.alert.download" = "Download";
-"update.alert.later" = "Later";
-"update.error.network" = "Network error";
 
 "settings.pid_override" = "Custom Gains";
 "settings.pid_override_desc" = "Off uses formula derived from Response level";

@@ -17,18 +17,11 @@
 /* 情報 / アップデート */
 "settings.version" = "バージョン";
 "settings.version_desc" = "インストール済みのバージョンとビルド";
+"settings.auto_check_updates" = "アップデートを自動的に確認";
+"settings.auto_check_updates_desc" = "バックグラウンドで新しいバージョンを確認し、見つかったらインストールを提案します";
 "settings.check_updates" = "アップデートを確認";
-"settings.check_updates_desc" = "GitHub の最新リリースと比較します";
+"settings.check_updates_desc" = "アプリ内で新しいバージョンをダウンロードしてインストールします";
 "settings.check_updates.button" = "確認";
-"settings.check_updates.checking" = "確認中…";
-"settings.check_updates.up_to_date" = "最新バージョンです";
-"settings.check_updates.failed_format" = "確認に失敗しました：%@";
-
-"update.alert.title" = "アップデートがあります";
-"update.alert.message_header_format" = "バージョン %@ が利用可能です（現在 %@）。";
-"update.alert.download" = "ダウンロード";
-"update.alert.later" = "あとで";
-"update.error.network" = "ネットワークエラー";
 
 "settings.pid_override" = "カスタムゲイン";
 "settings.pid_override_desc" = "オフの場合、応答レベルから Kp/Ki/Kd を自動算出します";

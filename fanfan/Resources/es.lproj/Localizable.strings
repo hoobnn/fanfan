@@ -17,18 +17,11 @@
 /* About / Updates */
 "settings.version" = "Versión";
 "settings.version_desc" = "Versión y compilación de la app instalada";
+"settings.auto_check_updates" = "Buscar actualizaciones automáticamente";
+"settings.auto_check_updates_desc" = "Buscar nuevas versiones en segundo plano y ofrecer instalarlas";
 "settings.check_updates" = "Buscar actualizaciones";
-"settings.check_updates_desc" = "Comparar con la última versión en GitHub";
+"settings.check_updates_desc" = "Descargar e instalar la nueva versión desde la app";
 "settings.check_updates.button" = "Buscar";
-"settings.check_updates.checking" = "Buscando…";
-"settings.check_updates.up_to_date" = "Tienes la última versión";
-"settings.check_updates.failed_format" = "Error al buscar: %@";
-
-"update.alert.title" = "Actualización disponible";
-"update.alert.message_header_format" = "La versión %@ está disponible (tienes la %@).";
-"update.alert.download" = "Descargar";
-"update.alert.later" = "Más tarde";
-"update.error.network" = "Error de red";
 
 "settings.pid_override" = "Ganancias personalizadas";
 "settings.pid_override_desc" = "Desactivado: Kp/Ki/Kd se derivan del nivel de respuesta";

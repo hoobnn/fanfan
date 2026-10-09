@@ -17,18 +17,11 @@
 /* About / Updates */
 "settings.version" = "버전";
 "settings.version_desc" = "설치된 앱 버전 및 빌드";
+"settings.auto_check_updates" = "업데이트 자동 확인";
+"settings.auto_check_updates_desc" = "백그라운드에서 새 버전을 확인하고 설치를 제안합니다";
 "settings.check_updates" = "업데이트 확인";
-"settings.check_updates_desc" = "GitHub의 최신 릴리스와 비교합니다";
+"settings.check_updates_desc" = "앱 안에서 새 버전을 다운로드하고 설치합니다";
 "settings.check_updates.button" = "확인";
-"settings.check_updates.checking" = "확인 중…";
-"settings.check_updates.up_to_date" = "최신 버전을 사용하고 있습니다";
-"settings.check_updates.failed_format" = "확인 실패: %@";
-
-"update.alert.title" = "업데이트 가능";
-"update.alert.message_header_format" = "버전 %@을(를) 사용할 수 있습니다(현재 %@).";
-"update.alert.download" = "다운로드";
-"update.alert.later" = "나중에";
-"update.error.network" = "네트워크 오류";
 
 "settings.pid_override" = "사용자 지정 게인";
 "settings.pid_override_desc" = "끄면 응답 수준에 따라 Kp/Ki/Kd를 자동으로 계산합니다";

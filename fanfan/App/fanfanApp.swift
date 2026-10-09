@@ -14,6 +14,7 @@ import UserNotifications
 class AppDelegate: NSObject, NSApplicationDelegate {
     let statusBarManager = StatusBarManager()
     lazy var viewModel = FanControlViewModel()
+    let updater = AppUpdater()
     private var iconUpdateTimer: Timer?
     private var displayModeObserver: NSObjectProtocol?
     private var windowCloseObserver: NSObjectProtocol?
@@ -277,7 +278,11 @@ struct fanfanApp: App {
         // a titled window and can leave an invisible window holding the Dock icon.
         // 中文：只保留真正的设置场景；空 Settings 场景仍会创建带标题的窗口，导致无形窗口占用 Dock。
         Window(NSLocalizedString("app.settings_title", comment: ""), id: "settings") {
-            SettingsWindowView(isOpen: $showSettingsWindow, viewModel: appDelegate.viewModel)
+            SettingsWindowView(
+                isOpen: $showSettingsWindow,
+                viewModel: appDelegate.viewModel,
+                updater: appDelegate.updater
+            )
         }
         // Do not create Settings on launch or windowless reactivation; an
         // existing settings window may still be restored.
