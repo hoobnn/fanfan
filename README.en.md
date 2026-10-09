@@ -4,7 +4,7 @@
 
 # fanfan: Mac fan control and temperature monitor
 
-A small open-source macOS menu bar app that shows your Mac's temperatures and lets you set fan speed.
+An open-source macOS menu bar app for monitoring temperatures and controlling fan speed.
 
 [![release](https://img.shields.io/github/v/release/hoobnn/fanfan?style=flat-square)](https://github.com/hoobnn/fanfan/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/hoobnn/fanfan/total?style=flat-square)](https://github.com/hoobnn/fanfan/releases)
@@ -33,10 +33,10 @@ fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 
 - Fan RPM plus CPU, GPU, SSD and battery temperatures, depending on which sensors your Mac has. The popover shows the last 60 seconds as a chart, and the Sensors tab lists every reading.
 - Three fan modes: a fixed RPM, automatic control based on temperature, or the Mac's own firmware control. On Macs with two fans you can set each one separately.
-- Automatic mode lets you change the target temperature, the maximum speed and how quickly it reacts. There are Power Saving, Balanced and Performance presets, or your own settings. Speed changes are smoothed (fast up, slow down) so the fans don't keep surging.
+- Automatic mode lets you change the target temperature, the maximum speed and how quickly it reacts. There are Power Saving, Balanced and Performance presets, or your own settings. Speed changes are smoothed (fast up, slow down) to avoid constant surging.
 - The menu bar item can show temperature, power draw, fan speed as a percentage, or just the icon.
 - A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time.
-- Custom PID gains if none of the presets suit your workload.
+- Custom PID gains when none of the presets fit your workload.
 - English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français and Español. fanfan follows the system language, or you can set its language on its own in System Settings › General › Language & Region › Applications.
 - Fan speeds are written by a separate privileged helper. If the app hangs for more than 10 seconds, quits or crashes, the fans go back to macOS control.
 
