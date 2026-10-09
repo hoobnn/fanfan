@@ -2,7 +2,7 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
-## [Unreleased]
+## [1.8.0] - 2026-10-09
 
 ### Added
 - In-app updates through Sparkle. fanfan checks for new versions in the background and offers to install them and relaunch; Settings › About gains an Automatically Check for Updates switch, and Check now downloads and installs the update instead of opening the releases page. Updates are verified with an EdDSA signature.
