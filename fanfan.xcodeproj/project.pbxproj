@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F0A1C0022FB7000000000002 /* com.hoobnn.fanfan.helper.plist in Copy LaunchDaemon */ = {isa = PBXBuildFile; fileRef = F0A1C0012FB7000000000001 /* com.hoobnn.fanfan.helper.plist */; };
+		5A0B1E032FB8000000000003 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0B1E022FB8000000000002 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -40,6 +41,16 @@
 		F0A1C0012FB7000000000001 /* com.hoobnn.fanfan.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = com.hoobnn.fanfan.helper.plist; path = "tools/fanfan-smcd/com.hoobnn.fanfan.helper.plist"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5A0B1E062FB8000000000006 /* Exceptions for "fanfan" folder in "fanfan" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D127C6E12F14343F00456D59 /* fanfan */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2596D7592FB6BD55006A53A9 /* fanfanTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -48,6 +59,9 @@
 		};
 		D127C6E42F14343F00456D59 /* fanfan */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5A0B1E062FB8000000000006 /* Exceptions for "fanfan" folder in "fanfan" target */,
+			);
 			path = fanfan;
 			sourceTree = "<group>";
 		};
@@ -65,6 +79,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A0B1E032FB8000000000003 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,6 +149,7 @@
 			);
 			name = fanfan;
 			packageProductDependencies = (
+				5A0B1E022FB8000000000002 /* Sparkle */,
 			);
 			productName = fanfan;
 			productReference = D127C6E22F14343F00456D59 /* fanfan.app */;
@@ -174,6 +190,9 @@
 			);
 			mainGroup = D127C6D92F14343F00456D59;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5A0B1E012FB8000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D127C6E32F14343F00456D59 /* Products */;
 			projectDirPath = "";
@@ -412,6 +431,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = fanfan/Info.plist;
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -454,6 +474,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = fanfan/Info.plist;
 				INFOPLIST_KEY_LSUIElement = NO;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -511,6 +532,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A0B1E012FB8000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5A0B1E022FB8000000000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0B1E012FB8000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D127C6DA2F14343F00456D59 /* Project object */;
 }
