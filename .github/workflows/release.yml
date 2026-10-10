@@ -42,7 +42,7 @@ jobs:
         Contents/Frameworks/Sparkle.framework
       entitlements: fanfan/Resources/fanfan.entitlements
       make-dmg: true
-      dmg-volume-name: fanfan
+      dmg-volume-name: FanFan
       release-notes-file: release_notes.md
       # Signs the zip with SPARKLE_ED_PRIVATE_KEY for in-app updates.
       sparkle: true

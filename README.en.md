@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" width="112" alt="fanfan app icon">
+<img src="docs/logo.png" width="112" alt="FanFan app icon">
 
-# fanfan
+# FanFan
 
 An open-source macOS menu bar app for monitoring temperatures and controlling fan speed.
 
@@ -16,12 +16,12 @@ An open-source macOS menu bar app for monitoring temperatures and controlling fa
 
 </div>
 
-fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. You can pin the fans to a fixed speed, let fanfan adjust them by temperature, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later.
+FanFan sits in the menu bar and shows your Mac's temperatures and fan speeds. You can pin the fans to a fixed speed, let FanFan adjust them by temperature, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later.
 
 <table>
   <tr>
-    <td width="42%" align="center"><img src="docs/view/en/popover.png" alt="fanfan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
-    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="fanfan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
+    <td width="42%" align="center"><img src="docs/view/en/popover.png" alt="FanFan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
+    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="FanFan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
   </tr>
   <tr>
     <td align="center"><sub>Menu bar popover</sub></td>
@@ -37,8 +37,8 @@ fanfan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 - The menu bar item can show temperature, power draw, fan speed as a percentage, or just the icon.
 - A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time.
 - Custom PID gains when none of the presets fit your workload.
-- English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français and Español. fanfan follows the system language, or you can set its language on its own in System Settings › General › Language & Region › Applications.
-- Built-in updates: fanfan checks for new versions in the background and offers to install them and relaunch. You can also check by hand, or turn automatic checks off, in Settings › About.
+- English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français and Español. FanFan follows the system language, or you can set its language on its own in System Settings › General › Language & Region › Applications.
+- Built-in updates: FanFan checks for new versions in the background and offers to install them and relaunch. You can also check by hand, or turn automatic checks off, in Settings › About.
 - Fan speeds are written by a separate privileged helper. If the app hangs for more than 10 seconds, quits or crashes, the fans go back to macOS control.
 
 Fan controls are hidden on Macs without a fan. Which sensors you see and the available speed range depend on the model.
@@ -60,7 +60,7 @@ Download the latest DMG from [Releases](https://github.com/hoobnn/fanfan/release
 curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 ```
 
-Requires macOS 26 or later (Apple Silicon or Intel). On first launch, click **Install Helper**, then allow fanfan in System Settings › General › Login Items & Extensions. No administrator password needed.
+Requires macOS 26 or later (Apple Silicon or Intel). On first launch, click **Install Helper**, then allow FanFan in System Settings › General › Login Items & Extensions. No administrator password needed.
 
 ### Update
 
@@ -73,22 +73,22 @@ fanfan checks for updates on its own (via [Sparkle](https://sparkle-project.org)
 ## FAQ
 
 **Is it safe to change fan speed?**
-fanfan only sets speeds between the minimum and maximum RPM the fan reports, and the helper rejects anything outside that range. If the app crashes, hangs or quits, the fans go back to macOS firmware control.
+FanFan only sets speeds between the minimum and maximum RPM the fan reports, and the helper rejects anything outside that range. If the app crashes, hangs or quits, the fans go back to macOS firmware control.
 
 **Does it work on Apple Silicon (M-series) Macs?**
 Yes. It's a universal app for Apple Silicon and Intel on macOS 26 or later. Fanless models such as the MacBook Air only show temperatures.
 
 **Why does it ask to run in the background?**
-Writing fan speeds to the SMC needs root. So that the app itself doesn't run as root, fanfan registers a small root helper, and macOS asks you to allow it once in Login Items & Extensions. Reading temperatures needs no extra permission.
+Writing fan speeds to the SMC needs root. So that the app itself doesn't run as root, FanFan registers a small root helper, and macOS asks you to allow it once in Login Items & Extensions. Reading temperatures needs no extra permission.
 
 **How does it compare with Macs Fan Control or smcFanControl?**
-It does the same core job: read SMC sensors and set fan speeds. fanfan is free and open source (MIT); its only third-party dependency is Sparkle, for in-app updates.
+It does the same core job: read SMC sensors and set fan speeds. FanFan is free and open source (MIT); its only third-party dependency is Sparkle, for in-app updates.
 
 ## How it works
 
 The app runs as your normal user and reads temperatures directly through IOKit.
 
-Writing fan speeds needs root, so that part is a small LaunchDaemon written in C (`fanfan-smcd`, registered with `SMAppService`). It holds the SMC handle and takes a few kinds of requests over a small versioned XPC protocol: health checks, lease renewal, fan targets, and handing control back to firmware. Only the fanfan app signed by its developer can connect. When the app quits or crashes, the fans go back to firmware right away; if the app hangs, the 10-second lease runs out and the same thing happens.
+Writing fan speeds needs root, so that part is a small LaunchDaemon written in C (`fanfan-smcd`, registered with `SMAppService`). It holds the SMC handle and takes a few kinds of requests over a small versioned XPC protocol: health checks, lease renewal, fan targets, and handing control back to firmware. Only the FanFan app signed by its developer can connect. When the app quits or crashes, the fans go back to firmware right away; if the app hangs, the 10-second lease runs out and the same thing happens.
 
 ```text
 fanfan.app  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶  SMC
@@ -110,13 +110,13 @@ xcodebuild -project fanfan.xcodeproj -scheme fanfan -configuration Debug build
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date&theme=dark" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
-    <img alt="fanfan star history chart" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
+    <img alt="FanFan star history chart" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
   </picture>
 </a>
 
 ## Acknowledgements
 
-fanfan started as a fork of [solofan](https://github.com/SoloTeamDev/solofan) (formerly ffan). Thanks to the solofan team.
+FanFan started as a fork of [solofan](https://github.com/SoloTeamDev/solofan) (formerly ffan). Thanks to the solofan team.
 
 ## License
 

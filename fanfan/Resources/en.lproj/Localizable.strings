@@ -2,7 +2,7 @@
 "settings.title" = "Settings";
 "settings.close" = "Close Settings";
 "settings.changes_apply" = "Changes apply immediately";
-"settings.fanfan_title" = "fanfan Settings";
+"settings.fanfan_title" = "FanFan Settings";
 "settings.customize" = "Customize your fan control experience";
 "settings.close_shortcut" = "Close (Cmd+W)";
 "settings.all_changes_apply" = "All changes apply immediately without restarting the app";
@@ -71,7 +71,7 @@
 /* Helper Installation */
 "popover.helper_required" = "Helper Tool Required";
 "popover.helper_required_desc" = "Fan control needs a background helper. Allow it once in System Settings — no password required.";
-"popover.helper_approval_desc" = "Turn on fanfan in System Settings › General › Login Items & Extensions to finish setup.";
+"popover.helper_approval_desc" = "Turn on FanFan in System Settings › General › Login Items & Extensions to finish setup.";
 "popover.install_helper" = "Install Helper";
 "popover.open_login_items" = "Open System Settings";
 
@@ -180,8 +180,8 @@
 "controls.apply_failed" = "Could not apply the fan setting. Check the helper and try again.";
 
 /* App */
-"app.title" = "fanfan - Fan Control";
-"app.settings_title" = "fanfan Settings";
+"app.title" = "FanFan - Fan Control";
+"app.settings_title" = "FanFan Settings";
 
 /* Hero Card */
 "hero.max_temp" = "MAX TEMP";

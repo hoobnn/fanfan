@@ -145,7 +145,7 @@ class StatusBarManager: NSObject, ObservableObject {
         // Placeholder until the first sample lands — same width as a real reading. / 中文：首个采样到来前的占位，与真实读数等宽。
         button.title = "\u{2007}--°"
         button.imagePosition = .imageLeft
-        button.toolTip = "fanfan"
+        button.toolTip = "FanFan"
         
         // Handle button click / 中文：处理按钮点击。
         button.action = #selector(togglePopover)

@@ -51,7 +51,7 @@ RELEASE_NOTES="releases/RELEASE_NOTES_${VERSION}.md"
 mkdir -p releases
 
 cat > "$RELEASE_NOTES" << 'EOF'
-## 🌬️ fanfan v${VERSION} - macOS Fan Control
+## 🌬️ FanFan v${VERSION} - macOS Fan Control
 
 ### ✨ Features
 - 🌡️ Real-time CPU/GPU temperature monitoring
@@ -79,7 +79,7 @@ open /Applications/fanfan.app
 1. Download **fanfan-v${VERSION}-macos.zip** or **fanfan-v${VERSION}-macos.dmg**
 2. Unzip/Mount and move `fanfan.app` to `/Applications`
 3. **First launch**: Right-click → Open (to bypass Gatekeeper)
-4. **Enable fan control**: launch fanfan and click **Install Helper** when prompted.
+4. **Enable fan control**: launch FanFan and click **Install Helper** when prompted.
 
 ### 📋 Requirements
 - macOS 26.0 or later
@@ -118,7 +118,7 @@ MIT License - see [LICENSE](https://github.com/${REPO}/blob/main/LICENSE)
 
 **Full Changelog**: https://github.com/${REPO}/compare/v0.9.0...${TAG}
 
-**⭐ If you find fanfan useful, please star the repo!**
+**⭐ If you find FanFan useful, please star the repo!**
 EOF
 
 # Replace template variables
@@ -152,7 +152,7 @@ done
 
 gh release create "$TAG" \
     --repo "$REPO" \
-    --title "fanfan v${VERSION} - macOS Fan Control" \
+    --title "FanFan v${VERSION} - macOS Fan Control" \
     --notes-file "$RELEASE_NOTES" \
     "${ASSETS[@]}"
 

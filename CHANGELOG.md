@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [Unreleased]
+
+### Changed
+- The product name is now written FanFan in the app, its menus and alerts, the installer volume and the website.
+
 ## [1.8.0] - 2026-10-09
 
 ### Added

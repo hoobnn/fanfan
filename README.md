@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" width="112" alt="fanfan 应用图标">
+<img src="docs/logo.png" width="112" alt="FanFan 应用图标">
 
-# fanfan
+# FanFan
 
 开源的 macOS 菜单栏工具，用于监控温度和调节风扇转速。
 
@@ -16,12 +16,12 @@
 
 </div>
 
-fanfan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固定转速、按温度自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上。
+FanFan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固定转速、按温度自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上。
 
 <table>
   <tr>
-    <td width="42%" align="center"><img src="docs/view/zh-Hans/popover.png" alt="fanfan 菜单栏面板：Mac 温度、风扇转速、60 秒温度曲线、CPU/GPU/SSD/电池传感器与自动调速设置"></td>
-    <td width="58%" align="center"><img src="docs/view/zh-Hans/settings.png" alt="fanfan 设置：菜单栏显示、监控间隔、高温警报、通知、自动模式切换与自定义 PID 增益"></td>
+    <td width="42%" align="center"><img src="docs/view/zh-Hans/popover.png" alt="FanFan 菜单栏面板：Mac 温度、风扇转速、60 秒温度曲线、CPU/GPU/SSD/电池传感器与自动调速设置"></td>
+    <td width="58%" align="center"><img src="docs/view/zh-Hans/settings.png" alt="FanFan 设置：菜单栏显示、监控间隔、高温警报、通知、自动模式切换与自定义 PID 增益"></td>
   </tr>
   <tr>
     <td align="center"><sub>菜单栏面板</sub></td>
@@ -37,7 +37,7 @@ fanfan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固�
 - 菜单栏可显示温度、功耗或风扇转速百分比，也可以只显示图标。
 - 温度超过设定值时发送通知，并可选择同时切换到自动调速。
 - 预设不满足需要时，可直接调整 PID 参数。
-- 界面支持简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español。默认跟随系统语言，也可以在「系统设置 › 通用 › 语言与地区 › 应用程序」里给 fanfan 单独指定。
+- 界面支持简体中文、繁體中文、English、日本語、한국어、Deutsch、Français、Español。默认跟随系统语言，也可以在「系统设置 › 通用 › 语言与地区 › 应用程序」里给 FanFan 单独指定。
 - 内置应用内更新：默认在后台检查新版本，发现后提示一键安装并重启，也可以在「设置 › 关于」里手动检查或关闭自动检查。
 - 风扇转速由独立的特权辅助进程写入。App 无响应超过 10 秒、退出或崩溃时，风扇都会交还 macOS 控制。
 
@@ -60,7 +60,7 @@ brew install --cask fanfan
 curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 ```
 
-需要 macOS 26 及以上（Apple Silicon 或 Intel）。首次打开时点击「安装助手」，然后在「系统设置 › 通用 › 登录项与扩展」中允许 fanfan。无需输入管理员密码。
+需要 macOS 26 及以上（Apple Silicon 或 Intel）。首次打开时点击「安装助手」，然后在「系统设置 › 通用 › 登录项与扩展」中允许 FanFan。无需输入管理员密码。
 
 ### 更新
 
@@ -73,22 +73,22 @@ fanfan 会自动检查更新（基于 [Sparkle](https://sparkle-project.org)，�
 ## 常见问题
 
 **调风扇转速安全吗？**
-fanfan 只在风扇上报的最低与最高转速之间设置，超出范围的请求会被辅助进程拒绝。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
+FanFan 只在风扇上报的最低与最高转速之间设置，超出范围的请求会被辅助进程拒绝。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
 
 **M 系列芯片的 Mac 能用吗？**
-支持。fanfan 是 Apple Silicon 与 Intel 通用版本，要求 macOS 26 及以上。MacBook Air 等无风扇机型仅显示温度。
+支持。FanFan 是 Apple Silicon 与 Intel 通用版本，要求 macOS 26 及以上。MacBook Air 等无风扇机型仅显示温度。
 
 **为什么需要允许后台运行？**
-向 SMC 写入风扇转速需要 root 权限。为避免 App 本身以 root 运行，fanfan 注册了一个精简的 root 辅助进程，macOS 会要求在「登录项与扩展」中允许一次。仅读取温度不需要额外权限。
+向 SMC 写入风扇转速需要 root 权限。为避免 App 本身以 root 运行，FanFan 注册了一个精简的 root 辅助进程，macOS 会要求在「登录项与扩展」中允许一次。仅读取温度不需要额外权限。
 
 **与 Macs Fan Control、smcFanControl 有何区别？**
-核心功能相同：读取 SMC 传感器、设置风扇转速。fanfan 免费开源（MIT），唯一的第三方依赖是负责应用内更新的 Sparkle。
+核心功能相同：读取 SMC 传感器、设置风扇转速。FanFan 免费开源（MIT），唯一的第三方依赖是负责应用内更新的 Sparkle。
 
 ## 工作原理
 
 App 本身以普通用户身份运行，读温度直接走 IOKit。
 
-写入风扇转速需要 root 权限，这部分由一个 C 语言编写的 LaunchDaemon（`fanfan-smcd`，通过 `SMAppService` 注册）负责。它持有 SMC 句柄，通过一个带版本号的小型 XPC 协议接收健康检查、租约续期、目标转速和「交回固件控制」这几类请求，而且只接受开发者签名的 fanfan 连接。App 退出或崩溃时，风扇立即交还固件控制；App 无响应时，10 秒租约到期后同样交还。
+写入风扇转速需要 root 权限，这部分由一个 C 语言编写的 LaunchDaemon（`fanfan-smcd`，通过 `SMAppService` 注册）负责。它持有 SMC 句柄，通过一个带版本号的小型 XPC 协议接收健康检查、租约续期、目标转速和「交回固件控制」这几类请求，而且只接受开发者签名的 FanFan 连接。App 退出或崩溃时，风扇立即交还固件控制；App 无响应时，10 秒租约到期后同样交还。
 
 ```text
 fanfan.app  ──XPC──▶  fanfan-smcd（root）  ──IOKit──▶  SMC
@@ -110,13 +110,13 @@ xcodebuild -project fanfan.xcodeproj -scheme fanfan -configuration Debug build
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date&theme=dark" />
     <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
-    <img alt="fanfan 的 Star 趋势图" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
+    <img alt="FanFan 的 Star 趋势图" src="https://api.star-history.com/svg?repos=hoobnn/fanfan&type=Date" />
   </picture>
 </a>
 
 ## 致谢
 
-fanfan 最早 fork 自 [solofan](https://github.com/SoloTeamDev/solofan)（原名 ffan），感谢 solofan 团队。
+FanFan 最早 fork 自 [solofan](https://github.com/SoloTeamDev/solofan)（原名 ffan），感谢 solofan 团队。
 
 ## 许可证
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# fanfan Quick Installation Script
+# FanFan Quick Installation Script
 # Usage: curl -fsSL https://raw.githubusercontent.com/hoobnn/fanfan/main/scripts/install.sh | bash
 
 set -euo pipefail
@@ -13,7 +13,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "🌬️  fanfan Installation"
+echo "🌬️  FanFan Installation"
 echo "====================="
 echo ""
 
@@ -29,7 +29,7 @@ if [[ ! "$LATEST_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; 
     exit 1
 fi
 
-echo "📥 Downloading fanfan $LATEST_VERSION..."
+echo "📥 Downloading FanFan $LATEST_VERSION..."
 ARCHIVE_NAME="fanfan-${LATEST_VERSION#v}-macOS.zip"
 ARCHIVE="$INSTALL_TMP_DIR/$ARCHIVE_NAME"
 CHECKSUM="$ARCHIVE.sha256"
@@ -83,7 +83,7 @@ trap - EXIT
 echo ""
 echo "✅ Installation complete!"
 echo "🚀 Launching fanfan..."
-echo "   Click Install Helper, then allow fanfan in"
+echo "   Click Install Helper, then allow FanFan in"
 echo "   System Settings › General › Login Items & Extensions."
 echo ""
 

@@ -2,7 +2,7 @@
 "settings.title" = "설정";
 "settings.close" = "설정 닫기";
 "settings.changes_apply" = "변경 사항이 즉시 적용됩니다";
-"settings.fanfan_title" = "fanfan 설정";
+"settings.fanfan_title" = "FanFan 설정";
 "settings.customize" = "팬 제어 환경을 원하는 대로 설정하세요";
 "settings.close_shortcut" = "닫기 (Cmd+W)";
 "settings.all_changes_apply" = "모든 변경 사항은 앱을 재시작하지 않아도 즉시 적용됩니다";
@@ -71,7 +71,7 @@
 /* Helper Installation */
 "popover.helper_required" = "도우미 도구 필요";
 "popover.helper_required_desc" = "팬을 제어하려면 백그라운드 도우미가 필요합니다. 시스템 설정에서 한 번만 허용하면 되며 암호는 필요하지 않습니다.";
-"popover.helper_approval_desc" = "설정을 완료하려면 시스템 설정 › 일반 › 로그인 항목 및 확장 프로그램에서 fanfan을 켜세요.";
+"popover.helper_approval_desc" = "설정을 완료하려면 시스템 설정 › 일반 › 로그인 항목 및 확장 프로그램에서 FanFan을 켜세요.";
 "popover.install_helper" = "도우미 설치";
 "popover.open_login_items" = "시스템 설정 열기";
 
@@ -180,8 +180,8 @@
 "controls.apply_failed" = "팬 설정을 적용하지 못했습니다. 도우미를 확인한 후 다시 시도하세요.";
 
 /* App */
-"app.title" = "fanfan - 팬 제어";
-"app.settings_title" = "fanfan 설정";
+"app.title" = "FanFan - 팬 제어";
+"app.settings_title" = "FanFan 설정";
 
 /* Hero Card: units kept in English for the monospace readout style */
 "hero.max_temp" = "최고 온도";

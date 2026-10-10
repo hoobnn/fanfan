@@ -71,7 +71,7 @@
 /* Helper Installation */
 "popover.helper_required" = "Hilfsprogramm erforderlich";
 "popover.helper_required_desc" = "Die Lüftersteuerung benötigt ein Hilfsprogramm im Hintergrund. Erlaube es einmal in den Systemeinstellungen – kein Passwort nötig.";
-"popover.helper_approval_desc" = "Aktiviere fanfan unter „Systemeinstellungen › Allgemein › Anmeldeobjekte & Erweiterungen“, um die Einrichtung abzuschließen.";
+"popover.helper_approval_desc" = "Aktiviere FanFan unter „Systemeinstellungen › Allgemein › Anmeldeobjekte & Erweiterungen“, um die Einrichtung abzuschließen.";
 "popover.install_helper" = "Hilfsprogramm installieren";
 "popover.open_login_items" = "Systemeinstellungen öffnen";
 
@@ -180,7 +180,7 @@
 "controls.apply_failed" = "Die Lüftereinstellung konnte nicht angewendet werden. Prüfe das Hilfsprogramm und versuche es erneut.";
 
 /* App */
-"app.title" = "fanfan – Lüftersteuerung";
+"app.title" = "FanFan – Lüftersteuerung";
 "app.settings_title" = "fanfan-Einstellungen";
 
 /* Hero Card: units kept in English for the monospace readout style */

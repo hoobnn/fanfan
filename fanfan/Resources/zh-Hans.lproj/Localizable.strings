@@ -2,7 +2,7 @@
 "settings.title" = "设置";
 "settings.close" = "关闭设置";
 "settings.changes_apply" = "更改立即生效";
-"settings.fanfan_title" = "fanfan 设置";
+"settings.fanfan_title" = "FanFan 设置";
 "settings.customize" = "自定义您的风扇控制体验";
 "settings.close_shortcut" = "关闭 (Cmd+W)";
 "settings.all_changes_apply" = "所有更改立即生效，无需重启应用";
@@ -71,7 +71,7 @@
 /* 安装助手 */
 "popover.helper_required" = "需要助手工具";
 "popover.helper_required_desc" = "控制风扇需要一个后台助手，在系统设置里允许一次即可，无需输入密码。";
-"popover.helper_approval_desc" = "请在 系统设置 › 通用 › 登录项与扩展 中打开 fanfan 以完成设置。";
+"popover.helper_approval_desc" = "请在 系统设置 › 通用 › 登录项与扩展 中打开 FanFan 以完成设置。";
 "popover.install_helper" = "安装助手";
 "popover.open_login_items" = "打开系统设置";
 
@@ -180,8 +180,8 @@
 "controls.apply_failed" = "风扇设置未能生效，请检查辅助程序后重试。";
 
 /* 应用 */
-"app.title" = "fanfan - 风扇控制";
-"app.settings_title" = "fanfan 设置";
+"app.title" = "FanFan - 风扇控制";
+"app.settings_title" = "FanFan 设置";
 
 /* 主卡片：单位保留英文，更符合 monospace 数显风格 */
 "hero.max_temp" = "最高温度";

@@ -1,10 +1,10 @@
-# Release Notes Template for fanfan
+# Release Notes Template for FanFan
 
 ## v1.0.0 - Initial Release (2026-01-12)
 
 ### 🎉 First Public Release!
 
-**fanfan** is now available! A lightweight, powerful macOS fan control application with real-time temperature monitoring.
+**FanFan** is now available! A lightweight, powerful macOS fan control application with real-time temperature monitoring.
 
 ---
 
@@ -27,7 +27,7 @@ unzip fanfan.zip && mv fanfan.app /Applications/ && rm fanfan.zip
 ```
 
 **Enable Fan Control:**
-Launch fanfan and click **Install Helper** when prompted. This installs the privileged fan daemon.
+Launch FanFan and click **Install Helper** when prompted. This installs the privileged fan daemon.
 
 ### 📥 Downloads
 
@@ -117,7 +117,7 @@ MIT License - free and open source forever
 
 ---
 
-**🌟 Enjoying fanfan? Please star the repo and share with others!**
+**🌟 Enjoying FanFan? Please star the repo and share with others!**
 
 **Questions?** Open an [issue](https://github.com/USERNAME/fanfan/issues)
 

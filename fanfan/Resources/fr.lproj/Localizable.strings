@@ -2,7 +2,7 @@
 "settings.title" = "Réglages";
 "settings.close" = "Fermer les réglages";
 "settings.changes_apply" = "Les modifications s’appliquent immédiatement";
-"settings.fanfan_title" = "Réglages de fanfan";
+"settings.fanfan_title" = "Réglages de FanFan";
 "settings.customize" = "Personnalisez le contrôle de vos ventilateurs";
 "settings.close_shortcut" = "Fermer (Cmd+W)";
 "settings.all_changes_apply" = "Toutes les modifications s’appliquent immédiatement, sans redémarrer l’app";
@@ -71,7 +71,7 @@
 /* Helper Installation */
 "popover.helper_required" = "Outil d’assistance requis";
 "popover.helper_required_desc" = "Le contrôle des ventilateurs nécessite un assistant en arrière-plan. Autorisez-le une fois dans Réglages Système, sans mot de passe.";
-"popover.helper_approval_desc" = "Activez fanfan dans Réglages Système › Général › Ouverture et extensions pour terminer la configuration.";
+"popover.helper_approval_desc" = "Activez FanFan dans Réglages Système › Général › Ouverture et extensions pour terminer la configuration.";
 "popover.install_helper" = "Installer l’assistant";
 "popover.open_login_items" = "Ouvrir Réglages Système";
 
@@ -180,8 +180,8 @@
 "controls.apply_failed" = "Impossible d’appliquer le réglage du ventilateur. Vérifiez l’assistant et réessayez.";
 
 /* App */
-"app.title" = "fanfan - Contrôle des ventilateurs";
-"app.settings_title" = "Réglages de fanfan";
+"app.title" = "FanFan - Contrôle des ventilateurs";
+"app.settings_title" = "Réglages de FanFan";
 
 /* Hero Card: units stay English to match the monospace readout style */
 "hero.max_temp" = "TEMP MAX";

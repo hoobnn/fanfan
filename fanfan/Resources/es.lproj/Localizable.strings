@@ -2,7 +2,7 @@
 "settings.title" = "Ajustes";
 "settings.close" = "Cerrar ajustes";
 "settings.changes_apply" = "Los cambios se aplican al instante";
-"settings.fanfan_title" = "Ajustes de fanfan";
+"settings.fanfan_title" = "Ajustes de FanFan";
 "settings.customize" = "Personaliza el control de los ventiladores";
 "settings.close_shortcut" = "Cerrar (Cmd+W)";
 "settings.all_changes_apply" = "Todos los cambios se aplican al instante, sin reiniciar la app";
@@ -71,7 +71,7 @@
 /* Helper Installation */
 "popover.helper_required" = "Se necesita el asistente";
 "popover.helper_required_desc" = "El control de ventiladores necesita un asistente en segundo plano. Permítelo una vez en Ajustes del Sistema, sin contraseña.";
-"popover.helper_approval_desc" = "Activa fanfan en Ajustes del Sistema › General › Ítems de inicio y extensiones para terminar la configuración.";
+"popover.helper_approval_desc" = "Activa FanFan en Ajustes del Sistema › General › Ítems de inicio y extensiones para terminar la configuración.";
 "popover.install_helper" = "Instalar asistente";
 "popover.open_login_items" = "Abrir Ajustes del Sistema";
 
@@ -180,8 +180,8 @@
 "controls.apply_failed" = "No se pudo aplicar el ajuste del ventilador. Revisa el asistente e inténtalo de nuevo.";
 
 /* App */
-"app.title" = "fanfan - Control de ventiladores";
-"app.settings_title" = "Ajustes de fanfan";
+"app.title" = "FanFan - Control de ventiladores";
+"app.settings_title" = "Ajustes de FanFan";
 
 /* Hero Card: units stay English to match the monospace readout style */
 "hero.max_temp" = "TEMP MÁX";

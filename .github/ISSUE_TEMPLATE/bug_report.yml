@@ -10,7 +10,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: fanfan version · 版本
+      label: FanFan version · 版本
       placeholder: "1.3.2"
     validations:
       required: true
