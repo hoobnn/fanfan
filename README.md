@@ -118,4 +118,6 @@ xcodebuild -project fanfan.xcodeproj -scheme fanfan -configuration Debug build
 
 fanfan 最早 fork 自 [solofan](https://github.com/SoloTeamDev/solofan)（原名 ffan），感谢 solofan 团队。
 
-[MIT](LICENSE) © 2026 hoobnn
+## 许可证
+
+[MIT](LICENSE) © 2026 hoobnn。可自由使用、修改和分发，需保留版权声明。
