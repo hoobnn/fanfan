@@ -1,0 +1,12 @@
+{
+  // 与仓库 README 样式保持一致的 markdownlint 配置
+  "default": true,
+  // 中文正文按语义断行，不做硬折行；表格与长 URL 同理
+  "MD013": false,
+  // 页首用 <div align="center"> 居中，截图用 <picture>、<details> 等
+  "MD033": { "allowed_elements": ["div", "img", "picture", "source", "sub", "sup", "details", "summary", "table", "tr", "td", "th", "br", "a", "p"] },
+  // 首行是居中用的 <div>，标题在其中
+  "MD041": false,
+  // 不同章节下允许同名小标题（如「更新」「用法」）
+  "MD024": { "siblings_only": true }
+}
