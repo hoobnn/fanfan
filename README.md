@@ -2,7 +2,7 @@
 
 <img src="docs/logo.png" width="112" alt="fanfan 应用图标">
 
-# fanfan：Mac 风扇控制与温度监控
+# fanfan
 
 开源的 macOS 菜单栏工具，用于监控温度和调节风扇转速。
 

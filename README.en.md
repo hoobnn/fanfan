@@ -2,7 +2,7 @@
 
 <img src="docs/logo.png" width="112" alt="fanfan app icon">
 
-# fanfan: Mac fan control and temperature monitor
+# fanfan
 
 An open-source macOS menu bar app for monitoring temperatures and controlling fan speed.
 
