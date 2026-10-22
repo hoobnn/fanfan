@@ -162,6 +162,7 @@ class FanController: ObservableObject {
     private var nextTemperatureFailsafeRetryAt: Date?
     private var reapplyGeneration = 0
     private var commandGeneration = 0
+    private var systemRestoreRetryCount = 0
     private static let maxWakeReapplyAttempts = 5
 
     /// Thermal-protection band. Below `protectionOnsetTemperature` the user's
@@ -450,6 +451,7 @@ class FanController: ObservableObject {
 
     func setMode(_ newMode: ControlMode) {
         commandGeneration &+= 1
+        systemRestoreRetryCount = 0
         pendingFanTargets = nil
         resetTemperatureFailsafeRestoreState()
         // Bumping the generation retires every in-flight result, so the status / 中文：递增 generation 会作废所有在途结果，
@@ -535,6 +537,7 @@ class FanController: ObservableObject {
             DispatchQueue.main.async {
                 guard generation == self.commandGeneration else { return }
                 if allSuccess {
+                    self.systemRestoreRetryCount = 0
                     self.isControlEnabled = false
                     self.applyDidFail = false
                     self.statusMessage = "Automatic mode restored"
@@ -544,9 +547,28 @@ class FanController: ObservableObject {
                     self.applyDidFail = true
                     self.statusMessage = "Failed to restore auto mode"
                     print("Fan Control: Failed to restore auto mode")
+                    self.scheduleSystemRestoreRetry(generation: generation)
                 }
                 completion?(allSuccess)
             }
+        }
+    }
+
+    /// The daemon can finish restoring fans after a failed/timed-out AUTO.
+    /// Reconfirm through AUTO so its verified success clears the stale banner;
+    /// an idle PING alone does not establish who currently owns the hardware.
+    /// 中文：辅助进程可能在 AUTO 失败或超时后才恢复成功；重新发送 AUTO 确认，
+    /// 收到成功后再清除错误。切换模式或新的恢复请求会使旧重试失效。
+    private func scheduleSystemRestoreRetry(generation: Int) {
+        guard mode == .system else { return }
+        systemRestoreRetryCount = min(systemRestoreRetryCount + 1, 5)
+        let delay = min(30.0, pow(2.0, Double(systemRestoreRetryCount)))
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self,
+                  self.commandGeneration == generation,
+                  self.mode == .system,
+                  self.applyDidFail else { return }
+            self.restoreAutomaticControl()
         }
     }
 
@@ -555,6 +577,7 @@ class FanController: ObservableObject {
     /// unlock), so sending them inline is fine and leaves the fans with the / 中文：（写 mode 0 + Ftst 0，无需解锁），内联发送即可，
     /// firmware instead of stuck at the last manual target after quit. / 中文：使退出后风扇交还固件，而非卡在最后的手动转速。
     func restoreAutomaticControlSync() {
+        systemRestoreRetryCount = 0
         pendingFanTargets = nil
         resetTemperatureFailsafeRestoreState()
         reapplyGeneration &+= 1
