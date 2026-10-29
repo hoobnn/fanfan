@@ -73,6 +73,8 @@
 /* Ftst unlock timing. Observed ~7.8 s on M4 Pro; leave generous headroom. */
 #define UNLOCK_TIMEOUT_MS 12000
 #define UNLOCK_STEP_MS    100
+#define MODE_CHANGE_TIMEOUT_MS 1000
+#define MODE_CHANGE_POLL_MS      20
 
 static io_connect_t g_conn = 0;
 static volatile sig_atomic_t g_should_exit = 0;
@@ -101,6 +103,7 @@ static uint64_t g_next_restore_attempt_ms = 0;
 static uint64_t g_restore_retry_delay_ms = 1000;
 
 static kern_return_t set_fan_auto(int fan);
+static void schedule_restore_retry(int fan);
 static uint64_t monotonic_milliseconds(void);
 static void restore_owned_control(void);
 static int has_outstanding_manual_control(void);
@@ -406,6 +409,32 @@ static void reconcile_startup_control(void)
     }
 }
 
+/* A successful write acknowledges the command, not an immediate readback.
+ * M1 firmware can keep returning the previous mode for a short interval.
+ * Wait on the serial SMC queue before writing a target or confirming AUTO.
+ * Shutdown may cancel acquisition, but must still finish its own handoff. */
+static kern_return_t wait_for_fan_mode(const char *key, int manual, unsigned timeout_ms)
+{
+    uint64_t started = monotonic_milliseconds();
+    unsigned waited = 0;
+    while (1) {
+        if (manual && g_should_exit) return kIOReturnAborted;
+        UInt8 mode = 0;
+        if (smc_read_u8(key, &mode) == 0 && (manual ? mode == 1 : mode != 1)) {
+            return kIOReturnSuccess;
+        }
+        uint64_t now = monotonic_milliseconds();
+        if (waited >= timeout_ms ||
+            (started != 0 && now != 0 && now - started >= timeout_ms)) {
+            return kIOReturnTimeout;
+        }
+        unsigned step = timeout_ms - waited;
+        if (step > MODE_CHANGE_POLL_MS) step = MODE_CHANGE_POLL_MS;
+        usleep(step * 1000);
+        waited += step;
+    }
+}
+
 /*
  * Ensure fan <fan> is in manual mode (F<n>Md = 1), applying the Ftst unlock if a
  * direct mode write is rejected. Idempotent and self-healing: it re-asserts
@@ -444,16 +473,20 @@ static kern_return_t ensure_manual(int fan)
     /* Try a direct mode write — succeeds on M1/M5 with no unlock needed. */
     kern_return_t direct_write = smc_write_u8(mkey, 1, &res);
     if (direct_write == kIOReturnSuccess) {
-        if (smc_read_u8(mkey, &cur) == 0 && cur == 1) {
-            g_manual[fan] = 1;
+        g_manual[fan] = 1;
+        g_restore_pending[fan] = 1;
+        kern_return_t verified = wait_for_fan_mode(mkey, 1, MODE_CHANGE_TIMEOUT_MS);
+        if (verified == kIOReturnSuccess) {
             g_restore_pending[fan] = 0;
             return kIOReturnSuccess;
         }
         /* The write may have succeeded even though verification failed. Never
-         * continue as if firmware still owned the fan. */
-        g_restore_pending[fan] = 1;
+         * continue as if firmware still owned the fan. The pending flag makes
+         * set_fan_auto cancel the queued write, and it schedules its own retry
+         * on failure; doing so here would flip the global lease and restore
+         * every other fan the client still holds manual. */
         (void)set_fan_auto(fan);
-        return kIOReturnError;
+        return verified;
     }
 
     /* Locked (mode 3). Without Ftst there is no unlock path on this hardware. */
@@ -493,15 +526,23 @@ static kern_return_t ensure_manual(int fan)
         res = 0;
         kern_return_t wr = smc_write_u8(mkey, 1, &res);
         if (wr == kIOReturnSuccess) {
-            g_restore_pending[fan] = 1;
-        }
-        if (wr == kIOReturnSuccess && smc_read_u8(mkey, &cur) == 0 && cur == 1) {
             g_manual[fan] = 1;
-            g_restore_pending[fan] = 0;
-            return kIOReturnSuccess;
+            g_restore_pending[fan] = 1;
+            now = monotonic_milliseconds();
+            unsigned elapsed = started_at != 0 && now != 0 ? (unsigned)(now - started_at) : (unsigned)waited;
+            unsigned remaining = elapsed < UNLOCK_TIMEOUT_MS ? UNLOCK_TIMEOUT_MS - elapsed : 0;
+            unsigned timeout = remaining < MODE_CHANGE_TIMEOUT_MS ? remaining : MODE_CHANGE_TIMEOUT_MS;
+            if (wait_for_fan_mode(mkey, 1, timeout) == kIOReturnSuccess) {
+                g_restore_pending[fan] = 0;
+                return kIOReturnSuccess;
+            }
+            waited += (int)timeout;
         }
-        usleep(UNLOCK_STEP_MS * 1000);
-        waited += UNLOCK_STEP_MS;
+        if (waited >= UNLOCK_TIMEOUT_MS) break;
+        unsigned step = UNLOCK_TIMEOUT_MS - waited;
+        if (step > UNLOCK_STEP_MS) step = UNLOCK_STEP_MS;
+        usleep(step * 1000);
+        waited += (int)step;
     }
     // We may have partially acquired manual mode while a verification read was
     // failing. Best-effort rollback keeps a failed SET from leaving stale control.
@@ -573,22 +614,37 @@ static kern_return_t set_fan_auto(int fan)
     char mkey[8];
     fan_mode_key(fan, mkey, sizeof(mkey));
 
-    /* Only act if the fan is actually in manual mode; AUTO is otherwise a no-op. */
+    /* Also cancel a queued manual write which has not appeared in readback yet.
+     * Otherwise a failed acquisition can read the old mode 0 here, clear its
+     * pending flag, and leave the delayed mode 1 unowned when it finally lands.
+     * A pending acquisition may still read the old 0 or 3. A confirmed fan
+     * reading 3 (pending cleared) was reclaimed by firmware, e.g. after sleep
+     * reset Ftst; leave it untouched. Mode 0 is accepted while Ftst=1, so a
+     * firmware rejection (0x82) over mode 3 with Ftst read back as 0 means no
+     * manual write can have been accepted: firmware owns the fan. Any other
+     * failure stays pending and is retried. */
     UInt8 cur = 0;
     uint8_t res = 0;
     if (smc_read_u8(mkey, &cur) != 0) {
         schedule_restore_retry(fan);
         return kIOReturnError;
     }
-    if (cur == 1) {
+    if (cur == 1 || g_restore_pending[fan] || (cur == 0 && g_manual[fan])) {
+        res = SMC_RESULT_OK;
         kern_return_t result = smc_write_u8(mkey, 0, &res); /* accepted while Ftst=1 */
-        if (result != kIOReturnSuccess) {
+        UInt8 ftst = 1;
+        if (result != kIOReturnSuccess && cur != 0 && cur != 1 &&
+            res == SMC_RESULT_BAD_COMMAND &&
+            (!g_ftst_avail || (smc_read_u8("Ftst", &ftst) == 0 && ftst == 0))) {
+            result = kIOReturnSuccess;
+        } else if (result != kIOReturnSuccess) {
             schedule_restore_retry(fan);
             return result;
         }
-        if (smc_read_u8(mkey, &cur) != 0 || cur == 1) {
+        result = wait_for_fan_mode(mkey, 0, MODE_CHANGE_TIMEOUT_MS);
+        if (result != kIOReturnSuccess) {
             schedule_restore_retry(fan);
-            return kIOReturnError;
+            return result;
         }
     }
     g_manual[fan] = 0;

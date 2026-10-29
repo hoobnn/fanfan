@@ -40,6 +40,12 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      - name: Test system-control recovery without hardware access
+        run: bash scripts/test-system-restore.sh
+
+      - name: Test delayed SMC mode transitions without hardware access
+        run: bash scripts/test-smc-mode-transition.sh
+
       - name: 🧪 Run unit tests
         run: |
           set -euo pipefail
