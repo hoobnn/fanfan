@@ -2,6 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.1.1] - 2026-10-29
+
+### Fixed
+- Manual fan control no longer fails on Macs (such as M1 Max) whose firmware takes a moment to apply a fan-mode change.
+- "Failed to restore auto mode" now clears on its own once the helper recovers, instead of staying until you switch modes.
+
 ## [2.1.0] - 2026-10-28
 
 ### Added
