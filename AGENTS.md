@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-本文件为 Claude Code (claude.ai/code) 在本仓库中工作时提供指引。
+本文件为 AI 编程代理（Claude Code、Codex）在本仓库中工作时提供指引。
 
 ## 项目概况
 
@@ -103,7 +103,7 @@ Sparkle 相关：`ci-build.sh` 用 `scripts/strip-sparkle-xpc.sh` 删掉 `Sparkl
 AI 协助的提交**应当**带 `Co-Authored-By` trailer，按实际干活的工具署名，只用一条：
 
 ```
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Co-Authored-By: <当前会话 system-reminder 给出的 Claude 署名行，不写死模型名>
 Co-Authored-By: Codex <noreply@openai.com>
 ```
 
