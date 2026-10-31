@@ -80,53 +80,21 @@ struct PopoverView: View {
 
     // MARK: - Header / 中文：头部
 
+    /// Just the centered page switcher; the full-page states without tabs / 中文：只放居中的页面切换器；没有标签页的整页状态
+    /// show the title instead. / 中文：改为显示标题。
     private var header: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 18, height: 18)
-                    .accessibilityHidden(true)
-
+        Group {
+            if showsTabs {
+                tabBar
+            } else {
                 Text(NSLocalizedString("popover.title", comment: ""))
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.text1)
-
-                Spacer()
-
-                GlassEffectContainer(spacing: 6) {
-                    HStack(spacing: 6) {
-                        headerButton(
-                            systemImage: "gearshape",
-                            title: NSLocalizedString("popover.settings", comment: "")
-                        ) {
-                            openWindow(id: "settings")
-                        }
-                        headerButton(
-                            systemImage: "power",
-                            title: NSLocalizedString("popover.quit_app", comment: "")
-                        ) {
-                            showingQuitConfirm = true
-                        }
-                    }
-                }
-            }
-            // Indent title + buttons to sit on the same vertical baseline as
-            // card content below (popover edge + 22pt). Negative trailing
-            // padding pulls the close button back so its glyph reads as
-            // anchored to the card-content right edge rather than floating
-            // inside it.
-            .padding(.leading, 12)
-            .padding(.trailing, 8)
-
-            if showsTabs {
-                tabBar
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 10)
-        .padding(.top, 8)
-        .padding(.bottom, showsTabs ? 8 : 10)
+        .padding(.vertical, 8)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Theme.separator(scheme))
@@ -224,19 +192,17 @@ struct PopoverView: View {
         }
     }
 
-    /// Icon-only header control. Glass buttons respond to the pointer on / 中文：仅图标的头部按钮。玻璃按钮在 macOS 27
-    /// macOS 27; the title backs both the tooltip and VoiceOver. / 中文：上会跟随指针反馈；title 同时用作提示与 VoiceOver 标签。
-    private func headerButton(systemImage: String,
+    /// Icon-only footer control, as light as the footer text beside it; the / 中文：仅图标的底栏按钮，和旁边的底栏文字一样轻；
+    /// title backs both the tooltip and VoiceOver. / 中文：title 同时用作提示与 VoiceOver 标签。
+    private func footerButton(systemImage: String,
                               title: String,
                               action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 11.5, weight: .medium))
-                .frame(width: 14, height: 14)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 16, height: 16)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .controlSize(.small)
+        .buttonStyle(FooterIconButtonStyle())
         .help(title)
         .accessibilityLabel(title)
     }
@@ -328,12 +294,28 @@ struct PopoverView: View {
             Text(version)
                 .font(Theme.num(10, weight: .medium))
                 .foregroundStyle(Theme.text3)
+
+            HStack(spacing: 2) {
+                footerButton(
+                    systemImage: "slider.horizontal.3",
+                    title: NSLocalizedString("popover.settings", comment: "")
+                ) {
+                    openWindow(id: "settings")
+                }
+                footerButton(
+                    systemImage: "power",
+                    title: NSLocalizedString("popover.quit_app", comment: "")
+                ) {
+                    showingQuitConfirm = true
+                }
+            }
         }
-        // Align with the card-content baseline (22pt) so the footer reads
-        // as belonging to the content column rather than floating between
-        // the popover edge and the cards.
-        .padding(.horizontal, 22)
-        .padding(.vertical, 8)
+        // Toggle and buttons align with the card content (22pt); the buttons'
+        // hit areas overhang by their own inset so the glyphs sit on that line.
+        // 中文：开关与按钮都对齐卡片内容（22pt）；按钮点击区向外多出自身内边距，图标本身落在这条线上。
+        .padding(.leading, 22)
+        .padding(.trailing, 22 - FooterIconButtonStyle.inset)
+        .padding(.vertical, 6)
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.separator(scheme)).frame(height: 0.5)
         }
@@ -464,6 +446,29 @@ struct PopoverView: View {
             AppDelegate.isQuitConfirmed = true
             NSApplication.shared.terminate(nil)
         }
+    }
+}
+
+// MARK: - Footer icon button / 中文：底栏图标按钮
+
+/// Monochrome glyph that darkens on hover and press, with a faint rounded / 中文：单色图标，悬停与按下时加深，
+/// backing while pressed. / 中文：按下时衬一层淡淡的圆角底。
+private struct FooterIconButtonStyle: ButtonStyle {
+    static let inset: CGFloat = 4
+
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(hovering || configuration.isPressed ? Theme.text1 : Theme.text2)
+            .padding(Self.inset)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Theme.fill2(scheme).opacity(configuration.isPressed ? 1 : hovering ? 0.6 : 0))
+            )
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
     }
 }
 
