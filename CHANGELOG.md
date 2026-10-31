@@ -2,6 +2,19 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.2.0] - 2026-10-31
+
+### Added
+- Overview and Sensors now slide side by side: click the page switcher, or swipe left and right with two fingers on the trackpad.
+- The page switcher uses a Liquid Glass thumb that follows your swipe, and the popover header shows the app icon.
+
+### Changed
+- Switching between Overview and Sensors no longer resizes the popover.
+- The popover now appears immediately, without its open animation.
+
+### Fixed
+- The Response slider no longer flashes a lighter track every time the popover opens.
+
 ## [2.1.2] - 2026-10-31
 
 ### Security
