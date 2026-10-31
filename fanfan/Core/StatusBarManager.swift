@@ -162,6 +162,12 @@ class StatusBarManager: NSObject, ObservableObject {
         // Create popover / 中文：Create 弹出窗口
         popover = NSPopover()
         popover?.behavior = .transient
+        // No open animation: the first frame of the popover's spring-in renders
+        // the system slider tracks near its bottom edge too light, so the
+        // response slider visibly flashed on every open.
+        // 中文：关掉出场动画：popover 弹簧出场的第一帧会把靠近底边的系统滑杆轨道
+        // 画得偏浅，每次打开「响应」滑杆都会闪一下。
+        popover?.animates = false
         popover?.contentSize = NSSize(width: 340, height: 580)
         popover?.delegate = self
         // Let AppKit attach the new status item before anchoring a pending panel.

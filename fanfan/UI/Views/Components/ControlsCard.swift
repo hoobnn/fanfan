@@ -62,7 +62,17 @@ struct ControlsCard: View, Equatable {
     @State private var manualApplyTask: Task<Void, Never>?
     @State private var perFanDraft: [Int: Double] = [:]
     @State private var perFanApplyTasks: [Int: Task<Void, Never>] = [:]
-    @State private var selectedMode: ControlMode = .manual
+    @State private var selectedMode: ControlMode
+
+    /// Seeds `selectedMode` from the snapshot so the first layout pass already / 中文：用 snapshot 初始化 `selectedMode`，让首次布局就是
+    /// has the live mode. The popover rebuilds this view on every open, and / 中文：当前模式。popover 每次打开都重建本视图，
+    /// syncing only in `onAppear` let the first pass lay out the manual / 中文：只在 `onAppear` 同步时，首次布局会按手动模式计算
+    /// controls and size the popover for them. / 中文：并据此定 popover 尺寸。
+    init(snapshot: ControlsSnapshot, viewModel: FanControlViewModel) {
+        self.snapshot = snapshot
+        self.viewModel = viewModel
+        _selectedMode = State(initialValue: snapshot.controlMode)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -86,9 +96,6 @@ struct ControlsCard: View, Equatable {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .themedCard(scheme)
-        .onAppear {
-            selectedMode = snapshot.controlMode
-        }
         .onChange(of: snapshot.controlMode) { _, newMode in
             selectedMode = newMode
         }
