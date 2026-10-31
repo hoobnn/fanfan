@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.2.1] - 2026-10-31
+
+### Fixed
+- Sliders and segmented controls no longer flash a lighter color while switching between Overview and Sensors.
+
 ## [2.2.0] - 2026-10-31
 
 ### Added
