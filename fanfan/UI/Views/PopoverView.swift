@@ -20,12 +20,11 @@ struct PopoverView: View {
 
     @State private var showingQuitConfirm = false
     @State private var installError: String?
-    @State private var selectedTab: Tab = .overview
+    @State private var selectedTab: Tab? = .overview
     @State private var tempHistory: [Double] = []
     @State private var historyTimer: Timer?
-    /// Live trackpad swipe distance in points; 0 when no swipe is in flight. / 中文：触控板横扫的实时位移（pt）；没有手势时为 0。
-    @State private var swipeOffset: CGFloat = 0
-    @State private var swipeMonitor: Any?
+    /// Live horizontal scroll offset of the pager, drives the switcher puck. / 中文：分页器的实时横向滚动位置，驱动切换器滑块。
+    @State private var pagerOffset: CGFloat = 0
 
     enum Tab: Int, CaseIterable { case overview, sensors }
 
@@ -156,29 +155,40 @@ struct PopoverView: View {
         }
     }
 
-    /// Both pages side by side, slid horizontally. Overview grows to fit and / 中文：两页并排、横向滑动。概览按内容自适应高度并决定
-    /// sets the popover height; Sensors rides in its overlay, so it gets the / 中文：popover 高度；传感器页放在它的 overlay 里，自动获得同样高度
-    /// same height and scrolls inside it. Switching pages never resizes the / 中文：并在其中滚动。翻页不改变 popover 尺寸，滑动动画因此不会
-    /// popover, so the slide can't fight NSPopover's own resize animation. / 中文：和 NSPopover 自身的尺寸动画打架。
+    /// Both pages in a paging horizontal scroll view: clicks animate the scroll / 中文：两页放在分页的横向滚动视图里：点击时以动画滚动，
+    /// position, and trackpad swipes, rubber-banding and snapping come from the / 中文：触控板横扫、橡皮筋和吸附都由系统滚动视图提供。
+    /// system scroll view. Pages must not be moved with `offset`: system / 中文：页面不能用 `offset` 移动：系统控件被变换移动时
+    /// controls under an animated transform lose their glass backdrop, so every / 中文：会丢失玻璃背景，滑杆轨道和分段控件在每次切换时
+    /// slider track and segmented control flashed light on each switch. / 中文：都会闪成浅色。
+    ///
+    /// Overview sets the height; Sensors reports an ideal height of zero and / 中文：概览决定高度；传感器页理想高度报 0，
+    /// fills whatever Overview gives it, so paging never resizes the popover. / 中文：填满概览给出的高度，翻页因此不会改变 popover 尺寸。
     private var pager: some View {
-        overviewTab
-            .padding(10)
-            .frame(width: Self.width)
-            // Fanless Macs have a short Overview; keep the Sensors page usable. / 中文：无风扇 Mac 的概览很矮，给传感器页留出可用高度。
-            .frame(minHeight: 420, alignment: .top)
-            // Pin to the ideal height: a min-only frame is vertically flexible, / 中文：锁定为理想高度：只设 minHeight 的 frame 纵向可伸缩，
-            // and NSPopover then falls back to its default 580 pt content size. / 中文：NSPopover 会退回默认的 580 pt 内容高度。
-            .fixedSize(horizontal: false, vertical: true)
-            .allowsHitTesting(selectedTab == .overview)
-            .overlay(alignment: .topLeading) {
+        ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 0) {
+                overviewTab
+                    .padding(10)
+                    .frame(width: Self.width)
+                    // Fanless Macs have a short Overview; keep the Sensors page usable. / 中文：无风扇 Mac 的概览很矮，给传感器页留出可用高度。
+                    .frame(minHeight: 420, alignment: .top)
+                    // Pin to the ideal height: a min-only frame is vertically flexible, / 中文：锁定为理想高度：只设 minHeight 的 frame 纵向可伸缩，
+                    // and NSPopover then falls back to its default 580 pt content size. / 中文：NSPopover 会退回默认的 580 pt 内容高度。
+                    .fixedSize(horizontal: false, vertical: true)
+                    .id(Tab.overview)
                 sensorsPage
                     .frame(width: Self.width)
-                    .offset(x: Self.width)
-                    .allowsHitTesting(selectedTab == .sensors)
+                    .frame(minHeight: 0, idealHeight: 0, maxHeight: .infinity)
+                    .id(Tab.sensors)
             }
-            .offset(x: pageOffset)
-            .frame(width: Self.width, alignment: .leading)
-            .clipped()
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $selectedTab)
+        .scrollIndicators(.never)
+        .scrollEdgeEffectHidden(true, for: .horizontal)
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, x in
+            pagerOffset = x
+        }
     }
 
     private var sensorsPage: some View {
@@ -191,26 +201,13 @@ struct PopoverView: View {
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
 
-    /// Resting position of the selected page plus the live swipe, rubber- / 中文：选中页的静止位置加上实时横扫位移，越过首尾页时
-    /// banded past the first and last page. / 中文：做橡皮筋阻尼。
-    private var pageOffset: CGFloat {
-        let base = -CGFloat(selectedTab.rawValue) * Self.width
-        let raw = base + swipeOffset
-        let lo = -CGFloat(Tab.allCases.count - 1) * Self.width
-        if raw > 0  { return raw * 0.3 }
-        if raw < lo { return lo + (raw - lo) * 0.3 }
-        return raw
-    }
-
     private var pageProgress: CGFloat {
-        let p = -pageOffset / Self.width
-        return min(max(p, 0), CGFloat(Tab.allCases.count - 1))
+        min(max(pagerOffset / Self.width, 0), CGFloat(Tab.allCases.count - 1))
     }
 
     private func select(_ tab: Tab) {
         withAnimation(.smooth(duration: 0.32)) {
             selectedTab = tab
-            swipeOffset = 0
         }
     }
 
@@ -225,74 +222,6 @@ struct PopoverView: View {
         ) { index in
             if let tab = Tab(rawValue: index) { select(tab) }
         }
-    }
-
-    // MARK: - Trackpad swipe / 中文：触控板横扫
-
-    /// Two-finger horizontal swipes page between Overview and Sensors, the / 中文：双指横扫在概览与传感器之间翻页，内容跟手移动，
-    /// content following the fingers. Vertical-leading gestures pass through / 中文：以纵向为主的手势原样放行给传感器列表滚动。
-    /// to the sensor list. SwiftUI has no trackpad-scroll gesture on macOS, / 中文：macOS 上 SwiftUI 没有触控板滚动手势，
-    /// hence the local event monitor. / 中文：所以用本地事件监听。
-    private func startSwipeMonitor() {
-        guard swipeMonitor == nil else { return }
-        var axisLocked: Bool?        // true = horizontal, false = vertical / 中文：true = 横向，false = 纵向
-        var travel = CGSize.zero
-        var swallowMomentum = false
-        swipeMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            // Only the popover's own window; leave Settings untouched. / 中文：只处理 popover 自己的窗口，不影响设置窗口。
-            guard event.hasPreciseScrollingDeltas, showsTabs,
-                  let window = event.window,
-                  String(describing: type(of: window)).contains("Popover")
-            else { return event }
-
-            if event.momentumPhase != [] {
-                if event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
-                    let swallow = swallowMomentum
-                    swallowMomentum = false
-                    return swallow ? nil : event
-                }
-                return swallowMomentum ? nil : event
-            }
-
-            if event.phase.contains(.began) || event.phase.contains(.mayBegin) {
-                axisLocked = nil
-                travel = .zero
-                swallowMomentum = false
-            }
-            // Content follows the fingers under either scroll direction setting. / 中文：无论滚动方向设置如何，内容都跟着手指走。
-            let dx = event.isDirectionInvertedFromDevice ? event.scrollingDeltaX : -event.scrollingDeltaX
-
-            if axisLocked == nil {
-                travel.width += abs(event.scrollingDeltaX)
-                travel.height += abs(event.scrollingDeltaY)
-                if travel.width + travel.height > 4 {
-                    axisLocked = travel.width > travel.height * 1.2
-                }
-            }
-            guard axisLocked == true else { return event }
-
-            if event.phase.contains(.changed) || event.phase.contains(.began) {
-                swipeOffset = min(max(swipeOffset + dx, -Self.width), Self.width)
-            }
-            if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
-                let threshold = Self.width * 0.18
-                var target = selectedTab
-                if swipeOffset < -threshold, let next = Tab(rawValue: selectedTab.rawValue + 1) {
-                    target = next
-                } else if swipeOffset > threshold, let prev = Tab(rawValue: selectedTab.rawValue - 1) {
-                    target = prev
-                }
-                select(target)
-                axisLocked = nil
-                swallowMomentum = true
-            }
-            return nil
-        }
-    }
-
-    private func stopSwipeMonitor() {
-        if let monitor = swipeMonitor { NSEvent.removeMonitor(monitor) }
-        swipeMonitor = nil
     }
 
     /// Icon-only header control. Glass buttons respond to the pointer on / 中文：仅图标的头部按钮。玻璃按钮在 macOS 27
@@ -481,7 +410,6 @@ struct PopoverView: View {
         // Resume the full sensor scan only now that its data is on screen. / 中文：现在数据可见了才恢复全传感器扫描。
         viewModel.setSensorScanActive(true)
         startHistoryTimer()
-        startSwipeMonitor()
     }
 
     private func onDisappear() {
@@ -495,7 +423,6 @@ struct PopoverView: View {
         viewModel.setSensorScanActive(false)
         historyTimer?.invalidate()
         historyTimer = nil
-        stopSwipeMonitor()
     }
 
     private func startHistoryTimer() {
