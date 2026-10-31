@@ -213,23 +213,3 @@ extension View {
         modifier(Theme.CardSurface(scheme: scheme, cornerRadius: cornerRadius))
     }
 }
-
-// MARK: - Picker styles / 中文：选择器样式
-
-extension View {
-    /// Page-switching picker: the macOS 27 `.tabs` style where available, / 中文：页面切换选择器：可用时用 macOS 27 的 `.tabs` 样式，
-    /// the segmented control on macOS 26. The compiler check keeps Xcode 26 / 中文：macOS 26 上回退为分段控件。编译器判断让 Xcode 26
-    /// toolchains (without the macOS 27 SDK symbol) building. / 中文：工具链（SDK 里没有该符号）也能编译。
-    @ViewBuilder
-    func tabsPickerStyle() -> some View {
-        #if compiler(>=6.4)
-        if #available(macOS 27, *) {
-            pickerStyle(.tabs)
-        } else {
-            pickerStyle(.segmented)
-        }
-        #else
-        pickerStyle(.segmented)
-        #endif
-    }
-}
