@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.1.2] - 2026-10-31
+
+### Security
+- Update the development tooling dependency fast-uri to 3.1.9 to address URI parsing and normalization vulnerabilities. The fan-control application and helper behavior are unchanged.
+
 ## [2.1.1] - 2026-10-29
 
 ### Fixed
