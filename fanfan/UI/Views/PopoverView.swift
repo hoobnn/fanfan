@@ -164,7 +164,9 @@ struct PopoverView: View {
             sensorsTab
                 .padding(10)
         }
-        .scrollIndicators(.hidden)
+        // `.never`, not `.hidden`: `.hidden` still shows a legacy scroller when / 中文：用 `.never` 而非 `.hidden`：系统设为「始终显示滚动条」
+        // the system is set to always show scroll bars (or a mouse is attached). / 中文：或接了鼠标时，`.hidden` 仍会显示老式滚动条。
+        .scrollIndicators(.never)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollEdgeEffectStyle(.soft, for: .bottom)
     }
