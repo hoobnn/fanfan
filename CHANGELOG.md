@@ -2,6 +2,11 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.2.3] - 2026-11-03
+
+### Fixed
+- The Sensors page no longer shows a scroll bar when a mouse is connected or macOS is set to always show scroll bars.
+
 ## [2.2.2] - 2026-10-31
 
 ### Changed
