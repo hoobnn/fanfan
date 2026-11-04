@@ -2,7 +2,9 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
-## [2.3.0] - 2026-11-04
+## [2.3.1] - 2026-11-04
+
+2.3.0 was tagged but never published; 2.3.1 is the first release with these changes.
 
 ### Added
 - Automatic mode follows a temperature-to-speed curve for each strategy. In Settings › Strategy, drag a point to reshape the curve (dragging past a neighbour pushes it along), double-click to add a point, fine-tune the selected point, and undo or redo edits.
