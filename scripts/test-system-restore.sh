@@ -10,6 +10,8 @@ xcrun swiftc -swift-version 5 \
     -module-cache-path "$TEST_BUILD_DIR/module-cache" \
     "$PROJECT_DIR/fanfan/Core/FanController.swift" \
     "$PROJECT_DIR/fanfan/Core/FanRPMBounds.swift" \
+    "$PROJECT_DIR/fanfan/Core/FanStrategy.swift" \
+    "$PROJECT_DIR/fanfan/Core/FanSchedule.swift" \
     "$PROJECT_DIR/scripts/tests/SystemRestoreRegression.swift" \
     -o "$TEST_BUILD_DIR/system-restore-tests"
 
