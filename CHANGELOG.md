@@ -2,6 +2,23 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.3.0] - 2026-11-04
+
+### Added
+- Automatic mode follows a temperature-to-speed curve for each strategy. In Settings › Strategy, drag a point to reshape the curve (dragging past a neighbour pushes it along), double-click to add a point, fine-tune the selected point, and undo or redo edits.
+- Create your own strategies next to Power Saving, Balanced and Performance, rename them, and delete the ones you no longer need. Built-in strategies can be restored to their shipped curves.
+- Schedule: switch the fan mode and strategy at set times, every day, on weekdays or on weekends. A time missed while the Mac was asleep or FanFan was closed is applied at the next check.
+- Thermal protection limit: above 85°C the fans may exceed your maximum speed, up to the share of the hardware maximum you choose.
+
+### Changed
+- Settings is a larger window with a sidebar: General, Monitoring & Alerts, Strategy, Schedule and About.
+- Popover cards and the Settings and Quit buttons use macOS Liquid Glass.
+- "Target Temp" in the popover is now "Ramp Start", the temperature where the fans begin to speed up.
+- When there are more strategies than fit, the popover's strategy picker becomes a menu.
+
+### Removed
+- PID tuning and the Response setting. Automatic mode uses the strategy curves instead.
+
 ## [2.2.3] - 2026-11-03
 
 ### Fixed
