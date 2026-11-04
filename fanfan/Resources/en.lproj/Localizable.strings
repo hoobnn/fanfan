@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "Menu Bar";
 "settings.section.monitoring" = "Monitoring & Alerts";
 "settings.section.general" = "General";
-"settings.section.advanced_pid" = "Advanced PID Tuning";
 "settings.section.about" = "About";
 
 /* About / Updates */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "Download and install a new version from within the app";
 "settings.check_updates.button" = "Check";
 
-"settings.pid_override" = "Custom Gains";
-"settings.pid_override_desc" = "Off uses formula derived from Response level";
-"settings.pid_kp" = "Kp Proportional";
-"settings.pid_kp_desc" = "RPM contributed per °C of error";
-"settings.pid_ki" = "Ki Integral";
-"settings.pid_ki_desc" = "How fast to remove steady-state offset";
-"settings.pid_kd" = "Kd Derivative";
-"settings.pid_kd_desc" = "Predictive response to temperature trend";
-"settings.pid_reset" = "Reset to Defaults";
 
 /* Settings Items */
 "settings.launch_at_login" = "Launch at Login";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "Power Saving";
 "popover.strategy.balanced" = "Balanced";
 "popover.strategy.performance" = "Performance";
-"popover.threshold" = "Target Temp";
+"popover.threshold" = "Ramp Start";
 "popover.max_speed" = "Max Speed";
-"popover.response" = "Response";
 
 /* Response Levels */
-"popover.response.min_override" = "Min Override";
-"popover.response.quiet" = "Quiet";
-"popover.response.balanced" = "Balanced";
-"popover.response.auto" = "Auto";
-"popover.response.performance" = "Performance";
-"popover.response.aggressive" = "Aggressive";
-"popover.response.max_override" = "Max Override";
 
 /* Control Modes */
 "popover.mode.manual" = "Manual";
@@ -213,12 +195,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "Strategy Presets";
 "settings.strategy_preset" = "Strategy";
-"settings.strategy_preset_desc" = "Which strategy to tune";
-"settings.strategy_preset_target" = "Target Temperature";
-"settings.strategy_preset_target_desc" = "Temperature the fans hold toward (°C)";
-"settings.strategy_preset_max_speed" = "Max Speed";
-"settings.strategy_preset_max_speed_desc" = "Share of the hardware RPM range";
-"settings.strategy_preset_response" = "Response";
-"settings.strategy_preset_response_desc" = "How hard the fans react to heat";
 "settings.strategy_preset_reset" = "Reset to Defaults";
 "settings.strategy_custom" = "Custom";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "Custom";
+"settings.strategy_new" = "New Strategy";
+"settings.strategy_delete" = "Delete";
+"settings.strategy_delete_title" = "Delete “%@”?";
+"settings.strategy_delete_message" = "Schedule entries that use it will fall back to the active strategy.";
+"settings.strategy_name" = "Name";
+"settings.strategy_name_desc" = "Leave empty to restore the built-in name";
+"settings.strategy_activate" = "Make Active";
+"settings.strategy_in_use" = "In Use";
+"settings.strategy_state_custom" = "Custom strategy";
+"settings.strategy_state_modified" = "Adjusted from the shipped values";
+"settings.strategy_state_shipped" = "Matches the shipped values";
+"settings.strategy_curve_desc" = "In automatic mode, edits to the active strategy apply immediately.";
+"settings.strategy_new_name" = "New Strategy %d";
+"settings.strategy_list_footer" = "Click a strategy to edit its curve. “Make Active” picks the one the fans follow in automatic mode.";
+"settings.strategy_editor_header" = "Editing “%@”";
+"settings.section.schedule" = "Schedule";
+"settings.schedule_footer" = "Switches mode at each time. A time missed while asleep or quit is applied at the next check.";
+"settings.schedule_add" = "Add Time";
+"settings.schedule_remove" = "Remove Time";
+"settings.schedule_days.every" = "Every Day";
+"settings.schedule_days.weekdays" = "Weekdays";
+"settings.schedule_days.weekends" = "Weekends";
+"settings.schedule_keep_strategy" = "Keep Current Strategy";
+"common.cancel" = "Cancel";
+"settings.curve_hint" = "Drag a point, double-click the chart to add one, or select a point to fine-tune it here.";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "Remove Selected Point";
+"settings.strategy_new_help" = "New strategy based on this one";
+"settings.strategy_delete_ellipsis" = "Delete Strategy…";
+"settings.curve_legend_curve" = "Curve";
+"settings.curve_legend_protected" = "With protection";
+"settings.curve_legend_others" = "Other strategies";
+"settings.curve_legend_live" = "Live";
+
+"settings.curve_add_point" = "Add Point";
+
+"settings.curve_add_hint" = "Click the chart to insert a point. Its shape stays unchanged.";
+
+"settings.curve_undo" = "Undo Curve Edit";
+
+"settings.curve_redo" = "Redo Curve Edit";

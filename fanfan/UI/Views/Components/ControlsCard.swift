@@ -17,8 +17,8 @@ struct ControlsSnapshot: Equatable {
     var numberOfFans: Int
     var autoThreshold: Double
     var autoMaxSpeed: Int
-    var autoAggressiveness: Double
-    var powerStrategy: PowerStrategy
+    var strategies: [FanStrategy]
+    var activeStrategyID: String
     var perFanManualControl: Bool
     var manualSpeed: Int
     var manualSpeeds: [Int]
@@ -63,6 +63,15 @@ struct ControlsCard: View, Equatable {
     @State private var perFanDraft: [Int: Double] = [:]
     @State private var perFanApplyTasks: [Int: Task<Void, Never>] = [:]
     @State private var selectedMode: ControlMode
+    @State private var selectedStrategyID: String
+    /// Drives which section is laid out. Changed inside one animation so the card and
+    /// the popover (which follows the measured height every frame) resize together. / 中文：决定展示哪个分区。
+    /// 在同一个动画里变化，使卡片与逐帧跟随测量高度的弹窗一起平滑缩放。
+    @State private var displayedMode: ControlMode
+    /// Opacity of the visible section. Only this animates: the layout change itself is
+    /// instant, so the popover window and the content never disagree on height. / 中文：可见分区的透明度。只有它做动画，
+    /// 布局变化本身即时完成，因此弹窗窗口与内容的高度永远一致。
+    @State private var sectionOpacity: Double = 1
 
     /// Seeds `selectedMode` from the snapshot so the first layout pass already / 中文：用 snapshot 初始化 `selectedMode`，让首次布局就是
     /// has the live mode. The popover rebuilds this view on every open, and / 中文：当前模式。popover 每次打开都重建本视图，
@@ -72,17 +81,22 @@ struct ControlsCard: View, Equatable {
         self.snapshot = snapshot
         self.viewModel = viewModel
         _selectedMode = State(initialValue: snapshot.controlMode)
+        _selectedStrategyID = State(initialValue: snapshot.activeStrategyID)
+        _displayedMode = State(initialValue: snapshot.controlMode)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
 
-            if selectedMode == .automatic {
-                autoSliders
-            } else if selectedMode == .manual {
-                manualSliders
+            Group {
+                if displayedMode == .automatic {
+                    autoSliders
+                } else if displayedMode == .manual {
+                    manualSliders
+                }
             }
+            .opacity(sectionOpacity)
 
             if snapshot.applyDidFail {
                 Label(
@@ -95,9 +109,20 @@ struct ControlsCard: View, Equatable {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .themedCard(scheme)
+        .themedCard()
         .onChange(of: snapshot.controlMode) { _, newMode in
-            selectedMode = newMode
+            withAnimation(.snappy) { selectedMode = newMode }
+        }
+        .onChange(of: selectedMode) { _, newMode in
+            displayedMode = newMode
+            sectionOpacity = 0
+            // Fade in on the next runloop, after the new layout has been committed. / 中文：下一轮事件循环再淡入，确保新布局已先提交。
+            DispatchQueue.main.async {
+                withAnimation(.easeOut(duration: 0.22)) { sectionOpacity = 1 }
+            }
+        }
+        .onChange(of: snapshot.activeStrategyID) { _, newID in
+            withAnimation(.snappy) { selectedStrategyID = newID }
         }
         .onDisappear(perform: cancelPendingSliderApplies)
     }
@@ -121,17 +146,15 @@ struct ControlsCard: View, Equatable {
 
     private var header: some View {
         labeledRow {
-            Text(String(format: NSLocalizedString("controls.header", comment: ""),
-                        modeLabel(selectedMode).uppercased()))
-                .font(Theme.label(10.5, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(Theme.text3)
+            Text(NSLocalizedString("popover.mode", comment: ""))
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Theme.text1)
         } control: {
             Picker(NSLocalizedString("popover.mode", comment: ""), selection: Binding(
                 get: { selectedMode },
                 set: { newMode in
                     guard newMode != selectedMode else { return }
-                    selectedMode = newMode
+                    withAnimation(.snappy) { selectedMode = newMode }
                     DispatchQueue.main.async {
                         viewModel.setControlMode(newMode)
                     }
@@ -178,6 +201,8 @@ struct ControlsCard: View, Equatable {
     private var autoSliders: some View {
         VStack(alignment: .leading, spacing: 8) {
             strategyPicker
+            // Slider values follow the chosen strategy, so they glide with it. / 中文：滑杆数值随所选策略变化，因此一起平滑过渡。
+            Group {
             LabeledSlider(
                 label: NSLocalizedString("popover.threshold", comment: ""),
                 value: Binding(
@@ -198,44 +223,59 @@ struct ControlsCard: View, Equatable {
                 step: 50,
                 format: { "\(Int($0.rounded())) rpm" }
             )
-            LabeledSlider(
-                label: NSLocalizedString("popover.response", comment: ""),
-                value: Binding(
-                    get: { Double(ResponseScale.index(for: snapshot.autoAggressiveness)) },
-                    set: { viewModel.setAutoAggressiveness(ResponseScale.step($0)) }
-                ),
-                range: ResponseScale.sliderRange, step: 1,
-                format: { ResponseScale.label(for: ResponseScale.step($0)) },
-                showsTicks: true
-            )
+            }
+            .animation(.snappy, value: selectedStrategyID)
         }
     }
 
-    /// One-tap efficiency strategy over the three auto sliders. Hand-tuning any / 中文：覆盖三个自动滑杆的一键能效策略。手动调过任一
-    /// slider flips the strategy to `.custom`, which matches no segment — so the / 中文：滑杆会把策略切到 `.custom`，它不匹配任何分段——
-    /// segmented control then reads as "no preset selected". / 中文：于是分段控件显示为“未选中预设”。
+    /// Strategies are shown as a native segmented control, so every option is visible at once. / 中文：策略以原生分段控件展示，所有选项一览无余。
+    /// Restoring shipped values lives in Settings, not here. / 中文：恢复出厂参数放在设置里，不在这里。
+    /// Same row layout as the mode picker, so both controls share one right edge. / 中文：与模式选择器相同的行布局，两者右边缘对齐。
     private var strategyPicker: some View {
-        labeledRow {
-            Text(NSLocalizedString("popover.strategy", comment: ""))
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(Theme.text1)
-        } control: {
-            Picker(NSLocalizedString("popover.strategy", comment: ""), selection: Binding(
-                get: { snapshot.powerStrategy },
-                set: { newStrategy in
-                    guard newStrategy != snapshot.powerStrategy else { return }
-                    DispatchQueue.main.async {
-                        viewModel.setPowerStrategy(newStrategy)
-                    }
-                }
-            )) {
-                Text(NSLocalizedString("popover.strategy.power_saving", comment: "")).tag(PowerStrategy.powerSaving)
-                Text(NSLocalizedString("popover.strategy.balanced",     comment: "")).tag(PowerStrategy.balanced)
-                Text(NSLocalizedString("popover.strategy.performance",  comment: "")).tag(PowerStrategy.performance)
+        let label = Text(NSLocalizedString("popover.strategy", comment: ""))
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(Theme.text1)
+            .lineLimit(1)
+        // Segmented while every strategy fits, beside or below the label; a menu once user / 中文：所有策略放得下时用分段控件（与标签同行或换行）；
+        // strategies make it wider than the card, which would otherwise push the card past the popover. / 中文：自定义策略多到比卡片还宽时改用菜单，否则卡片会被撑出 popover。
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                label.fixedSize()
+                Spacer(minLength: 8)
+                strategyControl.pickerStyle(.segmented).fixedSize()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            VStack(alignment: .leading, spacing: 6) {
+                label
+                strategyControl.pickerStyle(.segmented).fixedSize().frame(maxWidth: .infinity)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                label
+                strategyControl.pickerStyle(.segmented).controlSize(.small).fixedSize().frame(maxWidth: .infinity)
+            }
+            HStack(spacing: 6) {
+                label.fixedSize()
+                Spacer(minLength: 8)
+                strategyControl.pickerStyle(.menu).fixedSize()
+            }
         }
+    }
+
+    private var strategyControl: some View {
+        Picker(NSLocalizedString("popover.strategy", comment: ""), selection: Binding(
+            get: { selectedStrategyID },
+            set: { newID in
+                guard newID != selectedStrategyID else { return }
+                withAnimation(.snappy) { selectedStrategyID = newID }
+                DispatchQueue.main.async {
+                    viewModel.setActiveStrategy(newID)
+                }
+            }
+        )) {
+            ForEach(snapshot.strategies) { strategy in
+                Text(strategy.displayName).tag(strategy.id)
+            }
+        }
+        .labelsHidden()
     }
 
     // MARK: - Manual / 中文：手动
@@ -313,17 +353,6 @@ struct ControlsCard: View, Equatable {
         return lo...hi
     }
 
-    private func modeLabel(_ mode: ControlMode) -> String {
-        switch mode {
-        case .manual:
-            return NSLocalizedString("popover.mode.manual", comment: "")
-        case .automatic:
-            return NSLocalizedString("popover.mode.auto", comment: "")
-        case .system:
-            return NSLocalizedString("popover.mode.system", comment: "")
-        }
-    }
-
     private func scheduleApply(_ value: Int) {
         manualApplyTask?.cancel()
         manualApplyTask = Task {
@@ -343,46 +372,6 @@ struct ControlsCard: View, Equatable {
                 perFanDraft[index] = nil
             }
         }
-    }
-}
-
-// MARK: - ResponseScale / 中文：响应档位
-
-/// The response slider's notches, shared by the popover and the strategy / 中文：响应滑杆的档位，供 popover 与设置里的
-/// preset editor in Settings. / 中文：策略预设编辑器共用。
-enum ResponseScale {
-    /// One representative aggressiveness value per response label — the slider / 中文：每个响应标签对应一个代表性响应强度值——滑杆
-    /// snaps to exactly these notches instead of a continuous 0...3 range. / 中文：精确吸附到这些档位，而不是使用连续的 0...3 范围。
-    static let steps: [Double] = [0.0, 0.6, 1.0, 1.5, 2.0, 2.5, 3.0]
-
-    static var sliderRange: ClosedRange<Double> { 0...Double(steps.count - 1) }
-
-    static func label(for v: Double) -> String {
-        if v <= 0.3 { return NSLocalizedString("popover.response.min_override",  comment: "") }
-        if v <= 0.8 { return NSLocalizedString("popover.response.quiet",         comment: "") }
-        if v <= 1.2 { return NSLocalizedString("popover.response.balanced",      comment: "") }
-        if v <= 1.8 { return NSLocalizedString("popover.response.auto",          comment: "") }
-        if v <= 2.3 { return NSLocalizedString("popover.response.performance",   comment: "") }
-        if v <= 2.7 { return NSLocalizedString("popover.response.aggressive",    comment: "") }
-        return NSLocalizedString("popover.response.max_override", comment: "")
-    }
-
-    /// Maps a stored aggressiveness value back to its notch index, using the / 中文：把已存储的响应强度映射回档位索引，
-    /// same thresholds as `label(for:)` so the round-trip is stable. / 中文：使用与 `label(for:)` 相同的阈值，确保往返转换稳定。
-    static func index(for v: Double) -> Int {
-        if v <= 0.3 { return 0 }
-        if v <= 0.8 { return 1 }
-        if v <= 1.2 { return 2 }
-        if v <= 1.8 { return 3 }
-        if v <= 2.3 { return 4 }
-        if v <= 2.7 { return 5 }
-        return 6
-    }
-
-    /// Resolves a slider position (0...6) to its representative value. / 中文：把滑杆位置（0...6）解析为其代表值。
-    static func step(_ sliderValue: Double) -> Double {
-        let i = min(max(Int(sliderValue.rounded()), 0), steps.count - 1)
-        return steps[i]
     }
 }
 

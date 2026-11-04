@@ -111,7 +111,7 @@ struct SensorListView: View {
             }
         }
         .padding(.bottom, idxBottomPad)
-        .themedCard(scheme)
+        .themedCard(glass: false)
     }
 
     private var separator: some View {

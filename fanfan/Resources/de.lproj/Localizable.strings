@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "Menüleiste";
 "settings.section.monitoring" = "Überwachung & Warnungen";
 "settings.section.general" = "Allgemein";
-"settings.section.advanced_pid" = "Erweiterte PID-Abstimmung";
 "settings.section.about" = "Über";
 
 /* About / Updates */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "Neue Version direkt in der App laden und installieren";
 "settings.check_updates.button" = "Prüfen";
 
-"settings.pid_override" = "Eigene Verstärkung";
-"settings.pid_override_desc" = "Aus: Werte werden aus der Reaktionsstufe berechnet";
-"settings.pid_kp" = "Kp Proportional";
-"settings.pid_kp_desc" = "RPM-Beitrag pro °C Abweichung";
-"settings.pid_ki" = "Ki Integral";
-"settings.pid_ki_desc" = "Wie schnell bleibende Abweichungen abgebaut werden";
-"settings.pid_kd" = "Kd Differenzial";
-"settings.pid_kd_desc" = "Vorausschauende Reaktion auf den Temperaturtrend";
-"settings.pid_reset" = "Standardwerte";
 
 /* Settings Items */
 "settings.launch_at_login" = "Beim Anmelden öffnen";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "Sparen";
 "popover.strategy.balanced" = "Mittel";
 "popover.strategy.performance" = "Leistung";
-"popover.threshold" = "Zieltemperatur";
+"popover.threshold" = "Anstiegsbeginn";
 "popover.max_speed" = "Max. Drehzahl";
-"popover.response" = "Reaktion";
 
 /* Response Levels */
-"popover.response.min_override" = "Min.";
-"popover.response.quiet" = "Leise";
-"popover.response.balanced" = "Mittel";
-"popover.response.auto" = "Auto";
-"popover.response.performance" = "Leistung";
-"popover.response.aggressive" = "Stark";
-"popover.response.max_override" = "Max.";
 
 /* Control Modes */
 "popover.mode.manual" = "Manuell";
@@ -263,12 +245,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "Strategie-Voreinstellungen";
 "settings.strategy_preset" = "Strategie";
-"settings.strategy_preset_desc" = "Welche Strategie angepasst wird";
-"settings.strategy_preset_target" = "Zieltemperatur";
-"settings.strategy_preset_target_desc" = "Temperatur, die die Lüfter halten (°C)";
-"settings.strategy_preset_max_speed" = "Max. Drehzahl";
-"settings.strategy_preset_max_speed_desc" = "Anteil des Hardware-Drehzahlbereichs";
-"settings.strategy_preset_response" = "Reaktion";
-"settings.strategy_preset_response_desc" = "Wie stark die Lüfter auf Wärme reagieren";
 "settings.strategy_preset_reset" = "Auf Standard zurücksetzen";
 "settings.strategy_custom" = "Eigene";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "Eigene";
+"settings.strategy_new" = "Neue Strategie";
+"settings.strategy_delete" = "Löschen";
+"settings.strategy_delete_title" = "„%@“ löschen?";
+"settings.strategy_delete_message" = "Zeitpläne, die sie verwenden, nutzen stattdessen die aktive Strategie.";
+"settings.strategy_name" = "Name";
+"settings.strategy_name_desc" = "Leer lassen, um den integrierten Namen wiederherzustellen";
+"settings.strategy_activate" = "Aktivieren";
+"settings.strategy_in_use" = "Aktiv";
+"settings.strategy_state_custom" = "Eigene Strategie";
+"settings.strategy_state_modified" = "Von den Werkseinstellungen abweichend";
+"settings.strategy_state_shipped" = "Entspricht den Werkseinstellungen";
+"settings.strategy_curve_desc" = "Im Automatikmodus gelten Änderungen an der aktiven Strategie sofort.";
+"settings.strategy_new_name" = "Neue Strategie %d";
+"settings.strategy_list_footer" = "Klicke auf eine Strategie, um ihre Kurve zu bearbeiten. „Aktivieren“ legt fest, welcher die Lüfter im Automatikmodus folgen.";
+"settings.strategy_editor_header" = "„%@“ bearbeiten";
+"settings.section.schedule" = "Zeitplan";
+"settings.schedule_footer" = "Wechselt den Modus zu jeder Uhrzeit. Zeitpunkte, die während des Ruhezustands oder bei geschlossener App verpasst wurden, werden bei der nächsten Prüfung nachgeholt.";
+"settings.schedule_add" = "Zeit hinzufügen";
+"settings.schedule_remove" = "Zeit entfernen";
+"settings.schedule_days.every" = "Täglich";
+"settings.schedule_days.weekdays" = "Werktags";
+"settings.schedule_days.weekends" = "Wochenende";
+"settings.schedule_keep_strategy" = "Aktuelle Strategie beibehalten";
+"common.cancel" = "Abbrechen";
+"settings.curve_hint" = "Punkt ziehen, zum Hinzufügen doppelt ins Diagramm klicken oder auswählen und hier feinjustieren.";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "Ausgewählten Punkt entfernen";
+"settings.strategy_new_help" = "Neue Strategie auf Basis dieser";
+"settings.strategy_delete_ellipsis" = "Strategie löschen …";
+"settings.curve_legend_curve" = "Kurve";
+"settings.curve_legend_protected" = "Mit Schutz";
+"settings.curve_legend_others" = "Andere";
+"settings.curve_legend_live" = "Aktuell";
+
+"settings.curve_add_point" = "Punkt hinzufügen";
+
+"settings.curve_add_hint" = "Zum Einfügen ins Diagramm klicken. Die Kurvenform bleibt erhalten.";
+
+"settings.curve_undo" = "Kurvenänderung widerrufen";
+
+"settings.curve_redo" = "Kurvenänderung wiederholen";

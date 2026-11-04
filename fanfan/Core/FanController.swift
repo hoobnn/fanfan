@@ -10,58 +10,10 @@ import Foundation
 import Combine
 import IOKit
 
-enum ControlMode: String, CaseIterable {
+enum ControlMode: String, CaseIterable, Codable {
     case manual
     case automatic
     case system
-}
-
-/// Auto-mode efficiency strategy — a one-tap preset over the three core auto / 中文：自动模式能效策略——对三个核心自动参数
-/// parameters. Each named case resolves to a `StrategyPreset` the user can / 中文：的一键预设。每个具名档位对应一份用户可在设置里
-/// retune in Settings. `.custom` is the state a hand-dragged slider lands in — / 中文：重新调整的 `StrategyPreset`。`.custom` 是手动拖动
-/// it carries no preset values. / 中文：滑块后落入的状态——不携带任何预设值。
-enum PowerStrategy: String, CaseIterable {
-    case powerSaving
-    case balanced
-    case performance
-    case custom
-
-    /// The strategies that own an editable preset, in display order. / 中文：拥有可编辑预设的策略，按显示顺序排列。
-    static let named: [PowerStrategy] = [.powerSaving, .balanced, .performance]
-
-    /// Shipped values, used until the user retunes the preset. / 中文：出厂参数，用户未调整预设前使用。
-    var defaultPreset: StrategyPreset? {
-        switch self {
-        case .powerSaving: return StrategyPreset(targetTemp: 80, aggressiveness: 0.6, maxSpeedFraction: 0.2)
-        case .balanced:    return StrategyPreset(targetTemp: 75, aggressiveness: 0.6, maxSpeedFraction: 0.35)
-        case .performance: return StrategyPreset(targetTemp: 60, aggressiveness: 1.5, maxSpeedFraction: 0.65)
-        case .custom:      return nil
-        }
-    }
-}
-
-/// The three core auto parameters a named strategy fills in. / 中文：具名策略填入的三个核心自动参数。
-struct StrategyPreset: Equatable, Codable {
-    /// Target temperature the PID loop steers toward (°C). / 中文：PID 控制环逼近的目标温度（°C）。
-    var targetTemp: Double
-    /// Response aggressiveness notch (matches the response slider steps). / 中文：响应强度档位（对应响应滑杆档位）。
-    var aggressiveness: Double
-    /// Fraction of the [min, max] hardware RPM span used as the auto ceiling. / 中文：作为自动转速上限的 [min, max] 硬件转速区间占比。
-    var maxSpeedFraction: Double
-
-    static let targetTempRange: ClosedRange<Double> = 40...90
-    static let aggressivenessRange: ClosedRange<Double> = 0...3
-    static let maxSpeedFractionRange: ClosedRange<Double> = 0.05...1
-
-    /// Same preset with every field pulled into its valid range. / 中文：把每个字段夹回有效范围后的同一预设。
-    var clamped: StrategyPreset {
-        func clamp(_ v: Double, _ r: ClosedRange<Double>) -> Double { min(r.upperBound, max(r.lowerBound, v)) }
-        return StrategyPreset(
-            targetTemp: clamp(targetTemp, Self.targetTempRange),
-            aggressiveness: clamp(aggressiveness, Self.aggressivenessRange),
-            maxSpeedFraction: clamp(maxSpeedFraction, Self.maxSpeedFractionRange)
-        )
-    }
 }
 
 class FanController: ObservableObject {
@@ -72,25 +24,31 @@ class FanController: ObservableObject {
     @Published var manualSpeeds: [Int] = []
     @Published var perFanManualControl: Bool = false
 
-    @Published var autoThreshold: Double = 55.0
-    @Published var autoMaxSpeed: Int = 3600
-    @Published var autoAggressiveness: Double = 1.5  // 0.0 = always min, 1.5 = temp-based, 3.0 = always max
+    /// Live mirrors of the active curve for the popover sliders. The curve is the source of truth; these two / 中文：当前曲线的实时镜像，供弹窗滑杆使用。曲线是唯一来源，这两项由它推导，
+    /// are derived by `syncLiveParameters()` and never written on their own. / 中文：由 `syncLiveParameters()` 推导，从不单独写入。
+    @Published private(set) var autoThreshold: Double = 55.0
+    @Published private(set) var autoMaxSpeed: Int = 3600
 
-    // PID gain overrides — nil means use the formula derived from aggressiveness. / 中文：PID 增益覆盖值；nil 表示使用由响应强度推导出的公式。
-    // Exposed in the advanced/debug settings pane. / 中文：Exposed in the advanced/debug 设置 pane.
-    @Published var pidKpCustom: Double? = nil
-    @Published var pidKiCustom: Double? = nil
-    @Published var pidKdCustom: Double? = nil
+    // MARK: - Strategies / 中文：策略
+    // A strategy is a named fan curve (temperature → speed). Dragging a popover slider reshapes the
+    // *active* curve in place, so the selection is remembered and "Reset" restores a built-in's shipped curve.
+    // 中文：策略是具名的风扇曲线（温度 → 转速）。拖动弹窗滑杆会就地修改*当前生效*的曲线，因此选择会被记住；“重设”恢复内置策略的出厂曲线。
+    @Published private(set) var strategies: [FanStrategy] = FanStrategy.builtIns
+    @Published private(set) var activeStrategyID: String = FanStrategy.balancedID
+    /// Bumped when the stored layout changes, so older settings can be migrated. / 中文：存储布局变化时递增，以便迁移旧设置。
+    /// 1 = original, 2 = shifted tiers, 3 = preset list, 4 = curves. / 中文：1 = 初版，2 = 档位上移，3 = 预设列表，4 = 曲线。
+    private static let strategyLayoutVersion = 4
+    /// Legacy `.custom` migration: its ceiling was stored in RPM. It waits here until the fan limits are known, / 中文：旧版 `.custom` 迁移：其上限以转速存储，需等风扇转速边界可知后才能换算为占比，
+    /// because a fraction needs that span. / 中文：因此暂存于此。
+    private var pendingLegacyCustom: (id: String, targetTemp: Double, aggressiveness: Double, maxRPM: Int)?
 
-    // MARK: - Power strategy / 中文：能效策略
-    // A one-tap preset over the three core auto parameters (target temp, max / 中文：对三个核心自动参数（目标温度、最高转速、
-    // speed, response). It always applies — there is no plugged/battery branch — / 中文：响应）的一键预设。它始终生效——不再区分接电/电池——
-    // and `.custom` means the user dragged a slider so no preset is highlighted. / 中文：`.custom` 表示用户拖动过滑块，因而没有预设被高亮。
-    @Published var powerStrategy: PowerStrategy = .balanced
-    /// User-tuned values for each named strategy; missing entries use the shipped default. / 中文：每个具名策略的用户调整值；缺失时使用出厂默认值。
-    @Published private(set) var strategyPresetOverrides: [PowerStrategy: StrategyPreset] = [:]
-    /// Bumped when the preset layout changes meaning, so stored labels can be migrated. / 中文：预设布局含义变化时递增，以便迁移已存储的策略标签。
-    private static let presetLayoutVersion = 2
+    // MARK: - Schedule / 中文：定时
+    @Published private(set) var scheduleEntries: [ScheduleEntry] = []
+    /// Trigger time of the last schedule entry applied, so each trigger fires once
+    /// and a missed trigger (sleep, quit) is applied on the next check. / 中文：上一次已应用的定时触发时刻；
+    /// 每个触发点只执行一次，错过的触发点（睡眠、退出期间）会在下次检查时补上。
+    private var lastAppliedScheduleStamp: Double?
+    private var scheduleTimer: Timer?
 
     @Published var isControlEnabled = false
     @Published var lastWriteSuccess = false
@@ -180,70 +138,27 @@ class FanController: ObservableObject {
     private static let protectionOnsetTemperature: Double = 85
     private static let criticalTemperature: Double = 95
 
-    // MARK: - PID State / 中文：PID 状态
+    // MARK: - Control State / 中文：控制状态
 
-    private var pidIntegral: Double = 0
-    private var pidLastError: Double = 0
-    private var pidLastUpdateTime: Date = Date()
-    /// Anti-windup clamp on the integral term, in RPM-seconds-equivalent units. / 中文：Anti-windup 夹取 on the integral term, in RPM-seconds-equivalent units.
-    /// Tuned so Ki * pidIntegralMaxAbs ≈ full RPM range at typical gains. / 中文：Tuned so Ki * pidIntegralMaxAbs ≈ full RPM range at typical gains.
-    private let pidIntegralMaxAbs: Double = 600
-
-    /// Default proportional gain: each °C of error contributes / 中文：默认比例增益：每 1°C 误差都会贡献转速修正。
-    /// (range × aggressiveness / 10) RPM. At aggressiveness=1.5, range=3200 / 中文：(range × aggressiveness / 10) RPM. At aggressiveness=1.5, range=3200
-    /// → Kp ≈ 480 RPM/°C → 5°C overshoot drives +2400 RPM immediately. / 中文：→ Kp ≈ 480 RPM/°C → 5°C overshoot drives +2400 RPM immediately.
-    private var pidKp: Double {
-        if let custom = pidKpCustom { return custom }
-        let range = Double(unifiedMaxClamp - unifiedMinClamp)
-        return range * autoAggressiveness / 10.0
-    }
-
-    /// Integral time constant ~60 s: long enough to absorb sensor noise, / 中文：Integral time constant ~60 s: long enough to absorb 传感器 noise,
-    /// short enough that the loop converges to the target within ~2 min. / 中文：short enough that the loop converges to the 目标 within ~2 min.
-    private var pidKi: Double {
-        if let custom = pidKiCustom { return custom }
-        return pidKp / 60.0
-    }
-
-    /// Derivative time constant ~2 s: predicts where temperature is heading / 中文：微分时间常数约 2 秒：预测温度走向，
-    /// over the next few cycles, lets fans pre-empt sustained ramps. Kept / 中文：让风扇提前应对持续升温。相比早期的 ×3，
-    /// lower than before because the EMA-filtered input no longer needs a / 中文：增益调低——温度已做 EMA 滤波，
-    /// big derivative gain to fight sensor jitter (and a big one amplified it). / 中文：不再需要大微分增益对抗传感器抖动（大增益反而放大抖动）。
-    private var pidKd: Double {
-        if let custom = pidKdCustom { return custom }
-        return pidKp * 2.0
-    }
-
-    var effectivePIDKp: Double { pidKp }
-    var effectivePIDKi: Double { pidKi }
-    var effectivePIDKd: Double { pidKd }
-
-    private func resetPIDState() {
-        pidIntegral = 0
-        pidLastError = 0
-        pidLastUpdateTime = Date()
+    /// Clears the state that belongs to one control run: the temperature EMA is re-seeded and an in-progress / 中文：清除属于一次控制过程的状态：温度 EMA 重新播种，进行中的降速标记清零。
+    /// spin-down is forgotten. / 中文：未完成的降速标记随之失效。
+    private func resetControlState() {
         smoothedTemp = nil  // re-seed the EMA on the next sample / 中文：下次采样时重新播种 EMA
         spinDownInProgress = false
-    }
-
-    /// Response curve presets / 中文：响应曲线预设。
-    enum ResponsePreset: String, CaseIterable {
-        case silent, balanced, performance, custom
-
-        var aggressiveness: Double {
-            switch self {
-            case .silent: return 0.5
-            case .balanced: return 1.5
-            case .performance: return 2.5
-            case .custom: return -1 // uses stored value
-            }
-        }
     }
 
     init(systemMonitor: SystemMonitor) {
         self.systemMonitor = systemMonitor
         smcQueue.setSpecific(key: smcQueueKey, value: ())
         loadSettings()
+
+        // Checks the schedule every 30 s; the check is cheap and state-based. / 中文：每 30 秒检查一次定时计划；检查开销很小且基于状态。
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
+            self?.evaluateSchedule()
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        scheduleTimer = timer
 
         systemMonitor.$fanMaxSpeeds
             .combineLatest(systemMonitor.$fanMinSpeeds, systemMonitor.$numberOfFans)
@@ -261,12 +176,14 @@ class FanController: ObservableObject {
             .sink { [weak self] _ in
                 print("FanController: Fans detected, applying initial settings")
                 self?.applyInitialSettings()
+                self?.evaluateSchedule()
             }
             .store(in: &cancellables)
     }
 
     deinit {
         stopAutoControl()
+        scheduleTimer?.invalidate()
         controlLeaseTimer?.invalidate()
         restoreAutomaticControlSync()
     }
@@ -313,7 +230,8 @@ class FanController: ObservableObject {
         guard let monitor = systemMonitor, monitor.numberOfFans > 0 else { return }
         ensureManualSpeedsSize()
         manualSpeed = clampUnified(manualSpeed)
-        autoMaxSpeed = clampUnified(autoMaxSpeed)
+        resolvePendingLegacyMaxSpeed()
+        syncLiveParameters()
         if !manualSpeeds.isEmpty {
             manualSpeeds = manualSpeeds.enumerated().map { clampToFan($0.element, index: $0.offset) }
         }
@@ -780,7 +698,7 @@ class FanController: ObservableObject {
         if let currentMax = systemMonitor?.fanSpeeds.max(), currentMax > 0 {
             lastAppliedSpeed = currentMax
         }
-        resetPIDState()
+        resetControlState()
         updateAutoControl()
         let timer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.updateAutoControl()
@@ -837,7 +755,7 @@ class FanController: ObservableObject {
         guard rawTemp > 0, monitor.numberOfFans > 0 else { return }
 
         // Smooth the raw SMC reading before anything downstream sees it, so / 中文：先对原始 SMC 读数滤波再交给下游，
-        // sensor jitter can no longer drive the PID, the trend label, or the / 中文：传感器抖动便无法再驱动 PID、趋势标签
+        // sensor jitter can no longer drive the curve lookup, the trend label, or the / 中文：传感器抖动便无法再驱动曲线查询、趋势标签
         // load-aware boost. / 中文：或负载感知加速。
         let currentTemp = smoothTemperature(rawTemp)
 
@@ -851,30 +769,34 @@ class FanController: ObservableObject {
         // 只有到临界温度才同时绕过保持窗口、滞回和缓升。
         let safetyTemperature = max(monitor.rawMaxTemperature ?? 0, rawTemp)
         let isCritical = safetyTemperature >= Self.criticalTemperature
-        let userCeiling = min(autoMaxSpeed, unifiedMaxClamp)
-        let autoCeiling = Self.softCeiling(
-            userCeiling: autoMaxSpeed,
-            hardwareMax: Self.protectionMax(unifiedMaxClamp, fraction: protectionMaxFraction),
-            safetyTemperature: safetyTemperature
-        )
-        thermalProtectionCeiling = autoCeiling > userCeiling ? autoCeiling : nil
         let autoFloor = unifiedMinClamp
 
-        // 1. PID feedback: drives temperature toward autoThreshold (target temp) / 中文：1. PID feedback: drives 温度 toward auto阈值 (目标 temp)
-        let baseSpeed = pidResponse(temp: currentTemp, floor: autoFloor, ceiling: autoCeiling)
+        // 1. Curve lookup at the smoothed temperature. Thermal protection reads the raw sensor, so the / 中文：1. 以平滑后的温度查询曲线。高温保护读取原始传感器，
+        // ceiling lift and the minimum speed are not delayed by the filter. / 中文：上限抬升与最低转速不会被滤波拖慢。
+        let curve = ResponseCurve.target(
+            curveTemp: currentTemp,
+            safetyTemp: safetyTemperature,
+            curve: activeStrategy.curve,
+            floor: autoFloor,
+            hardwareMax: unifiedMaxClamp,
+            protectionFraction: protectionMaxFraction
+        )
+        let autoCeiling = curve.ceiling
+        thermalProtectionCeiling = autoCeiling > curve.userCeiling ? autoCeiling : nil
+        let baseSpeed = curve.rpm
 
-        // 2. Load-aware feedforward: pre-empts heat from sustained power draw / 中文：2. 负载-aware feedforward: pre-empts heat from sustained 功率 draw
+        // 2. Load-aware feedforward: pre-empts heat from sustained power draw / 中文：2. 负载感知前馈：提前应对持续功耗带来的热量
         let loadAdjustment = loadAwareAdjustment(floor: autoFloor, ceiling: autoCeiling)
 
-        // 3. Combine and clamp into the auto window / 中文：3. Combine and 夹取 into the auto 窗口
+        // 3. Combine and clamp into the auto window / 中文：3. 合并并夹取到自动窗口内
         let rawTarget = min(Double(autoCeiling), baseSpeed + loadAdjustment)
         let unifiedTarget = Int(max(Double(autoFloor), rawTarget))
 
         if !isControlEnabled {
             // Re-engage after firmware was running the fan (e.g., post screen-sleep / 中文：固件接管过风扇后（如屏幕息屏唤醒）重新接管时，
             // restoreAutomaticControl). Re-seed from the real RPM so the hysteresis / 中文：用真实转速重新 seed，让滞回基于风扇当前状态，
-            // check tracks the fan's current state, not a stale Swift target that / 中文：而不是接管前那个可能恰好等于新 PID 目标的过期值——
-            // could equal the new PID output and block the re-engagement write. / 中文：否则下次写入会被滞回挡住。
+            // check tracks the fan's current state, not a stale Swift target that / 中文：而不是接管前那个可能恰好等于新曲线目标的过期值——
+            // could equal the new curve target and block the re-engagement write. / 中文：否则下次写入会被滞回挡住。
             lastAppliedSpeed = monitor.fanSpeeds.max() ?? 0
             enableManualMode()
         }
@@ -926,33 +848,6 @@ class FanController: ObservableObject {
         }
     }
 
-    // MARK: - PID Response / 中文：PID 响应
-
-    /// Closed-loop response toward `autoThreshold` (interpreted as target temp). / 中文：Closed-loop response toward `auto阈值` (interpreted as 目标 temp).
-    /// Returns an absolute RPM in [floor, ceiling]; downstream clamps still apply. / 中文：Returns an absolute RPM in [floor, ceiling]; downstream 夹取s still apply.
-    private func pidResponse(temp: Double, floor: Int, ceiling: Int) -> Double {
-        let now = Date()
-        let rawDt = now.timeIntervalSince(pidLastUpdateTime)
-        let dt = max(0.1, min(5.0, rawDt))  // guard first call / suspended app
-
-        let error = temp - autoThreshold
-        let derivative = (error - pidLastError) / dt
-        pidIntegral += error * dt
-        pidIntegral = max(-pidIntegralMaxAbs, min(pidIntegralMaxAbs, pidIntegral))
-        pidLastError = error
-        pidLastUpdateTime = now
-
-        let p = pidKp * error
-        let i = pidKi * pidIntegral
-        let d = pidKd * derivative
-
-        // Center the output around the floor: when temp == target and the / 中文：Center the output around the floor: when temp == 目标 and the
-        // integral has settled, the loop sits at the hardware minimum. The / 中文：积分项稳定后，控制环会停在硬件最低转速；
-        // integral pulls the baseline up over time if that's not enough. / 中文：如果最低转速不足，积分项会随时间把基线拉高。
-        let raw = Double(floor) + p + i + d
-        return max(Double(floor), min(Double(ceiling), raw))
-    }
-
     // MARK: - Temperature Trend Prediction / 中文：温度趋势预测
 
     /// Exponential moving average of the control temperature. First sample / 中文：控制温度的指数滑动平均。首个采样
@@ -996,7 +891,7 @@ class FanController: ObservableObject {
     private func loadAwareAdjustment(floor: Int, ceiling: Int) -> Double {
         // The power-saving strategy suppresses every feedforward boost — burst / 中文：省电策略关闭所有前馈加速——突发负载和
         // and charging adjustments both spend the power we're trying to save. / 中文：充电加速都会消耗我们正想省下的电。
-        if powerStrategy == .powerSaving { return 0 }
+        if activeStrategy.isPowerSaving { return 0 }
         guard let power = BatteryMonitor.shared.batteryInfo.powerWatts, power > 0.1 else {
             return 0
         }
@@ -1179,64 +1074,117 @@ class FanController: ObservableObject {
             manualSpeeds = savedPerFan
         }
 
-        let savedThreshold = defaults.double(forKey: "autoThreshold")
-        if savedThreshold >= 40 && savedThreshold <= 90 {
-            autoThreshold = savedThreshold
-        }
-
-        let savedMaxSpeed = defaults.integer(forKey: "autoMaxSpeed")
-        if savedMaxSpeed >= FanRPMBounds.absoluteWriteMinRPM && savedMaxSpeed <= FanRPMBounds.absoluteWriteMaxRPM {
-            autoMaxSpeed = savedMaxSpeed
-        }
-
-        if defaults.object(forKey: "autoAggressiveness") != nil {
-            let savedAggressiveness = defaults.double(forKey: "autoAggressiveness")
-            if savedAggressiveness >= 0.0 && savedAggressiveness <= 3.0 {
-                autoAggressiveness = savedAggressiveness
-            }
-        }
-
         if let saved = defaults.object(forKey: "protectionMaxFraction") as? Double,
            Self.protectionMaxFractionRange.contains(saved) {
             protectionMaxFraction = saved
         }
 
-        pidKpCustom = defaults.object(forKey: "pidKpCustom") as? Double
-        pidKiCustom = defaults.object(forKey: "pidKiCustom") as? Double
-        pidKdCustom = defaults.object(forKey: "pidKdCustom") as? Double
+        loadScheduleSettings(defaults)
+        loadStrategies(defaults)
+        syncLiveParameters()
+    }
 
-        if let raw = defaults.string(forKey: "powerStrategy"),
-           let strategy = PowerStrategy(rawValue: raw) {
-            powerStrategy = Self.migratedStrategy(
-                strategy,
-                fromLayout: defaults.integer(forKey: "powerStrategyPresetLayout")
-            )
-        }
-
-        for strategy in PowerStrategy.named {
-            if let data = defaults.data(forKey: Self.presetDefaultsKey(strategy)),
-               let preset = try? JSONDecoder().decode(StrategyPreset.self, from: data) {
-                strategyPresetOverrides[strategy] = preset.clamped
+    /// Loads the strategy list. Layouts 3 and 4 store it whole; layout 3 holds presets, which convert exactly / 中文：加载策略列表。布局 3 与 4 整体存储；布局 3 存的是预设，经 `StrategyPreset.curve` 精确转换。
+    /// through `StrategyPreset.curve`. Older layouts are rebuilt from the per-strategy keys and the single / 中文：更早的布局由各策略的旧键与单一 `powerStrategy` 档位重建。
+    /// `powerStrategy` tier. Nothing is written here, so an interrupted migration simply repeats. / 中文：此处不写入，因此中断的迁移下次会重新执行。
+    private func loadStrategies(_ defaults: UserDefaults) {
+        if let data = defaults.data(forKey: "fanStrategies"),
+           let stored = try? JSONDecoder().decode([FanStrategy].self, from: data) {
+            strategies = Self.normalizedStrategies(stored)
+            activeStrategyID = defaults.string(forKey: "activeStrategyID") ?? FanStrategy.balancedID
+        } else {
+            var builtIns = FanStrategy.builtIns
+            for index in builtIns.indices {
+                if let data = defaults.data(forKey: "strategyPreset.\(builtIns[index].id)"),
+                   let preset = try? JSONDecoder().decode(StrategyPreset.self, from: data) {
+                    builtIns[index].curve = preset.curve
+                }
             }
+
+            var userStrategies: [FanStrategy] = []
+            // A fresh install has no legacy tier and must start on balanced, unmigrated. / 中文：全新安装没有旧档位，应直接为均衡，不经迁移。
+            let resolved: LegacyPowerStrategy
+            if let raw = defaults.string(forKey: "powerStrategy"),
+               let stored = LegacyPowerStrategy(rawValue: raw) {
+                resolved = Self.migratedStrategy(
+                    stored,
+                    fromLayout: defaults.integer(forKey: "powerStrategyPresetLayout")
+                )
+            } else {
+                resolved = .balanced
+            }
+            switch resolved {
+            case .powerSaving:
+                activeStrategyID = FanStrategy.powerSavingID
+            case .balanced:
+                activeStrategyID = FanStrategy.balancedID
+            case .performance:
+                activeStrategyID = FanStrategy.performanceID
+            case .custom:
+                // Keep the values the user was actually running. / 中文：保留用户实际在用的参数。
+                let target = storedDouble(defaults, "autoThreshold", 40...90) ?? 55
+                let aggressiveness = storedDouble(defaults, "autoAggressiveness", 0...3) ?? 1.5
+                let custom = FanStrategy.user(
+                    name: NSLocalizedString("strategy.migrated_custom", comment: ""),
+                    curve: StrategyPreset(targetTemp: target, aggressiveness: aggressiveness, maxSpeedFraction: 0.35).curve
+                )
+                userStrategies.append(custom)
+                activeStrategyID = custom.id
+                if defaults.object(forKey: "autoMaxSpeed") != nil {
+                    pendingLegacyCustom = (custom.id, target, aggressiveness, defaults.integer(forKey: "autoMaxSpeed"))
+                }
+            }
+            strategies = builtIns + userStrategies
+        }
+        if strategy(id: activeStrategyID) == nil {
+            activeStrategyID = FanStrategy.fallbackID
         }
     }
 
+    private func storedDouble(_ defaults: UserDefaults, _ key: String, _ range: ClosedRange<Double>) -> Double? {
+        guard defaults.object(forKey: key) != nil else { return nil }
+        let value = defaults.double(forKey: key)
+        return range.contains(value) ? value : nil
+    }
+
+    private func loadScheduleSettings(_ defaults: UserDefaults) {
+        if let data = defaults.data(forKey: "scheduleEntries"),
+           let entries = try? JSONDecoder().decode([ScheduleEntry].self, from: data) {
+            scheduleEntries = entries
+        }
+        if defaults.object(forKey: "scheduleLastAppliedStamp") != nil {
+            lastAppliedScheduleStamp = defaults.double(forKey: "scheduleLastAppliedStamp")
+        }
+    }
+
+    /// Keeps the built-ins in display order and drops duplicates. Curves are already normalised by decoding. / 中文：内置策略按显示顺序保留，并去除重复项。曲线在解码时已完成规范化。
+    nonisolated static func normalizedStrategies(_ stored: [FanStrategy]) -> [FanStrategy] {
+        let builtIns = FanStrategy.builtInIDs.map { id -> FanStrategy in
+            var strategy = stored.first { $0.id == id }
+                ?? FanStrategy(id: id, name: nil, curve: FanStrategy.shippedCurve(for: id)!)
+            if strategy.name?.isEmpty == true { strategy.name = nil }
+            return strategy
+        }
+        var seen = Set(FanStrategy.builtInIDs)
+        let userStrategies = stored.filter { strategy in
+            !FanStrategy.builtInIDs.contains(strategy.id) && seen.insert(strategy.id).inserted
+        }
+        return builtIns + userStrategies
+    }
+
+    /// Maps a legacy tier onto the layout it was saved under. / 中文：把旧档位映射到保存时所用的布局。
     /// Layout 1 shipped Saving 75 °C / Balanced 60 °C / Performance 50 °C. Layout 2 / 中文：布局 1 为 省电 75 °C / 均衡 60 °C / 性能 50 °C。布局 2
     /// shifted each set up one tier and added a quieter Saving, so a stored label / 中文：把每组参数上移一档并新增更安静的省电档，因此
     /// is moved to whichever tier now holds the values it was running — an / 中文：已存储的标签迁到现在持有其原参数的档位——
     /// upgrade must not change how loud the fans are. / 中文：升级不应改变风扇的响度。
-    nonisolated static func migratedStrategy(_ stored: PowerStrategy, fromLayout layout: Int) -> PowerStrategy {
-        guard layout < presetLayoutVersion else { return stored }
+    nonisolated static func migratedStrategy(_ stored: LegacyPowerStrategy, fromLayout layout: Int) -> LegacyPowerStrategy {
+        guard layout < 2 else { return stored }
         switch stored {
         case .powerSaving: return .balanced
         case .balanced:    return .performance
         case .performance: return .custom  // its values match no current preset / 中文：其参数不再对应任何预设
         case .custom:      return .custom
         }
-    }
-
-    private static func presetDefaultsKey(_ strategy: PowerStrategy) -> String {
-        "strategyPreset.\(strategy.rawValue)"
     }
 
     func resetToSystemControl() {
@@ -1251,34 +1199,38 @@ class FanController: ObservableObject {
         defaults.set(perFanManualControl, forKey: "perFanManualControl")
         defaults.set(manualSpeed, forKey: "manualFanSpeed")
         defaults.set(manualSpeeds, forKey: "manualFanSpeedsPerFan")
-        defaults.set(autoThreshold, forKey: "autoThreshold")
-        defaults.set(autoMaxSpeed, forKey: "autoMaxSpeed")
-        defaults.set(autoAggressiveness, forKey: "autoAggressiveness")
         defaults.set(protectionMaxFraction, forKey: "protectionMaxFraction")
-        defaults.set(powerStrategy.rawValue, forKey: "powerStrategy")
-        defaults.set(Self.presetLayoutVersion, forKey: "powerStrategyPresetLayout")
-        for strategy in PowerStrategy.named {
-            if let preset = strategyPresetOverrides[strategy],
-               let data = try? JSONEncoder().encode(preset) {
-                defaults.set(data, forKey: Self.presetDefaultsKey(strategy))
-            } else {
-                defaults.removeObject(forKey: Self.presetDefaultsKey(strategy))
-            }
+
+        defaults.set(Self.strategyLayoutVersion, forKey: "powerStrategyPresetLayout")
+        if let data = try? JSONEncoder().encode(strategies) {
+            defaults.set(data, forKey: "fanStrategies")
+        }
+        defaults.set(activeStrategyID, forKey: "activeStrategyID")
+        // Pre-list keys are superseded once the list is written. / 中文：列表写入后，旧版各键即失效。
+        defaults.removeObject(forKey: "powerStrategy")
+        for id in FanStrategy.builtInIDs {
+            defaults.removeObject(forKey: "strategyPreset.\(id)")
         }
 
-        if let v = pidKpCustom { defaults.set(v, forKey: "pidKpCustom") } else { defaults.removeObject(forKey: "pidKpCustom") }
-        if let v = pidKiCustom { defaults.set(v, forKey: "pidKiCustom") } else { defaults.removeObject(forKey: "pidKiCustom") }
-        if let v = pidKdCustom { defaults.set(v, forKey: "pidKdCustom") } else { defaults.removeObject(forKey: "pidKdCustom") }
+        if let data = try? JSONEncoder().encode(scheduleEntries) {
+            defaults.set(data, forKey: "scheduleEntries")
+        }
+        if let stamp = lastAppliedScheduleStamp {
+            defaults.set(stamp, forKey: "scheduleLastAppliedStamp")
+        } else {
+            defaults.removeObject(forKey: "scheduleLastAppliedStamp")
+        }
+
+        // Keys of the parameter-based settings are superseded by the curves saved above. / 中文：以参数为基础的旧键已被上面保存的曲线取代。
+        for key in ["autoThreshold", "autoMaxSpeed", "autoAggressiveness", "pidKpCustom", "pidKiCustom", "pidKdCustom"] {
+            defaults.removeObject(forKey: key)
+        }
     }
 
+    /// Popover slider for the ramp start: moves the whole active curve along the temperature axis. / 中文：弹窗的爬升起点滑杆：整条当前曲线沿温度轴平移。
     func setAutoThreshold(_ threshold: Double) {
-        autoThreshold = max(40, min(90, threshold))
-        powerStrategy = .custom  // hand-tuning a slider leaves the named presets / 中文：手动调滑块即离开具名预设
-        saveSettings()
-        if mode == .automatic {
-            resetPIDState()
-            updateAutoControl()
-        }
+        let wanted = max(40, min(90, threshold))
+        tuneActiveCurve { curve in curve.shiftedTemps(by: wanted - curve.rampStartTemp) }
     }
 
     func setProtectionMaxFraction(_ fraction: Double) {
@@ -1290,79 +1242,178 @@ class FanController: ObservableObject {
         }
     }
 
+    /// Popover slider for the ceiling: rescales the active curve so its highest point reads this speed. / 中文：弹窗的上限滑杆：缩放当前曲线，使最高点对应该转速。
     func setAutoMaxSpeed(_ speed: Int) {
-        autoMaxSpeed = clampUnified(speed)
-        powerStrategy = .custom
+        // Only write the fraction when the fan limits are real; fallbacks would store garbage. / 中文：仅在转速边界真实可读时写入占比，否则会存入错误数值。
+        guard hasHardwareLimits else { return }
+        let fraction = maxSpeedFraction(forRPM: clampUnified(speed))
+        tuneActiveCurve { $0.scaledTop(to: fraction) }
+    }
+
+    // MARK: - Strategy management / 中文：策略管理
+
+    var activeStrategy: FanStrategy {
+        strategy(id: activeStrategyID) ?? strategies[0]
+    }
+
+    func strategy(id: String) -> FanStrategy? {
+        strategies.first { $0.id == id }
+    }
+
+    func curve(for id: String) -> FanCurve? {
+        strategy(id: id)?.curve
+    }
+
+    /// Pushes the active curve into the live mirrors that the popover reads. / 中文：把当前曲线推送到弹窗读取的实时镜像。
+    private func syncLiveParameters() {
+        let curve = activeStrategy.curve
+        autoThreshold = curve.rampStartTemp
+        let span = unifiedMaxClamp - unifiedMinClamp
+        autoMaxSpeed = unifiedMinClamp + Int((curve.topFraction * Double(span)).rounded())
+    }
+
+    /// Makes a strategy active. The loop reads a different curve from now on, so its control state restarts. / 中文：启用某策略。此后控制环读取另一条曲线，因此控制状态重新开始。
+    func setActiveStrategy(_ id: String) {
+        guard strategy(id: id) != nil else { return }
+        activeStrategyID = id
+        syncLiveParameters()
         saveSettings()
         if mode == .automatic {
-            resetPIDState()
+            resetControlState()
             updateAutoControl()
         }
     }
 
-    func setAutoAggressiveness(_ value: Double) {
-        autoAggressiveness = max(0.0, min(3.0, value))
-        powerStrategy = .custom
+    /// Edits the active curve in place without restarting the loop, so a dragged slider stays smooth. / 中文：就地修改当前曲线且不重启控制环，使拖动滑杆保持平滑。
+    private func tuneActiveCurve(_ change: (FanCurve) -> FanCurve) {
+        guard let index = strategies.firstIndex(where: { $0.id == activeStrategyID }) else { return }
+        strategies[index].curve = change(strategies[index].curve)
+        syncLiveParameters()
         saveSettings()
         if mode == .automatic {
-            resetPIDState()
             updateAutoControl()
         }
     }
 
-    func setPIDGains(kp: Double?, ki: Double?, kd: Double?) {
-        pidKpCustom = kp
-        pidKiCustom = ki
-        pidKdCustom = kd
+    /// Replaces a strategy's curve. If it is the active one, the loop picks it up on its next tick. / 中文：替换某策略的曲线；若为当前策略，控制环在下一次计时时生效。
+    func setStrategyCurve(_ curve: FanCurve, for id: String) {
+        guard let index = strategies.firstIndex(where: { $0.id == id }) else { return }
+        strategies[index].curve = curve
+        if activeStrategyID == id {
+            syncLiveParameters()
+            if mode == .automatic {
+                updateAutoControl()
+            }
+        }
         saveSettings()
-        if mode == .automatic {
-            resetPIDState()
-            updateAutoControl()
-        }
     }
 
-    /// The values a named strategy applies: the user's tuning, else the shipped default. / 中文：具名策略实际套用的参数：优先用户调整值，否则出厂默认。
-    func preset(for strategy: PowerStrategy) -> StrategyPreset? {
-        strategyPresetOverrides[strategy] ?? strategy.defaultPreset
+    /// Restores a built-in strategy's curve to its shipped shape. / 中文：把内置策略的曲线恢复为出厂形状。
+    func resetStrategyCurve(for id: String) {
+        guard let shipped = FanStrategy.shippedCurve(for: id) else { return }
+        setStrategyCurve(shipped, for: id)
     }
 
-    /// Apply a named efficiency strategy, filling the three core auto parameters. / 中文：套用具名能效策略，填好三个核心自动参数。
-    /// `.custom` is a no-op marker the manual sliders flip into. / 中文：`.custom` 是手动滑块切入的空标记。
-    func setPowerStrategy(_ strategy: PowerStrategy) {
-        powerStrategy = strategy
-
-        if let preset = preset(for: strategy)?.clamped {
-            autoThreshold = preset.targetTemp
-            autoAggressiveness = preset.aggressiveness
-            // Map the fraction onto this machine's [min, max] RPM span, snapping / 中文：把占比映射到本机 [min, max] 转速区间，
-            // to 50-rpm steps to match the slider. / 中文：吸附到 50 rpm 档位以匹配滑杆。
-            let span = Double(unifiedMaxClamp - unifiedMinClamp)
-            let target = Double(unifiedMinClamp) + preset.maxSpeedFraction * span
-            autoMaxSpeed = clampUnified(Int((target / 50).rounded()) * 50)
-        }
-
+    /// Adds a user strategy copied from `basedOn` (default: the active one). It is not activated. / 中文：从 `basedOn`（默认为当前策略）复制出一个用户策略，不会自动启用。
+    @discardableResult
+    func addStrategy(name: String, basedOn id: String? = nil) -> String {
+        let base = curve(for: id ?? activeStrategyID) ?? activeStrategy.curve
+        let created = FanStrategy.user(name: name, curve: base)
+        strategies.append(created)
         saveSettings()
-        if mode == .automatic {
-            resetPIDState()
-            updateAutoControl()
-        }
+        return created.id
     }
 
-    /// Retune a named strategy. If it is the active one, the new values take / 中文：重新调整某个具名策略。若它正在生效，
-    /// effect right away. / 中文：新参数立即生效。
-    func setStrategyPreset(_ preset: StrategyPreset, for strategy: PowerStrategy) {
-        guard let shipped = strategy.defaultPreset else { return }
-        let value = preset.clamped
-        strategyPresetOverrides[strategy] = value == shipped ? nil : value
-        if powerStrategy == strategy {
-            setPowerStrategy(strategy)
+    /// Renames a strategy. Built-ins may be reset to their localized title with an empty name. / 中文：重命名策略。内置策略可用空名恢复为本地化标题。
+    func renameStrategy(_ id: String, to name: String) {
+        guard let index = strategies.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            guard strategies[index].isBuiltIn else { return }
+            strategies[index].name = nil
+        } else {
+            strategies[index].name = trimmed
+        }
+        saveSettings()
+    }
+
+    /// Deletes a user strategy. Built-ins cannot be deleted. / 中文：删除用户策略；内置策略不可删除。
+    func deleteStrategy(_ id: String) {
+        guard let target = strategy(id: id), !target.isBuiltIn else { return }
+        strategies.removeAll { $0.id == id }
+        scheduleEntries = scheduleEntries.map { entry in
+            var copy = entry
+            if copy.strategyID == id { copy.strategyID = nil }
+            return copy
+        }
+        if activeStrategyID == id {
+            setActiveStrategy(FanStrategy.fallbackID)
         } else {
             saveSettings()
         }
     }
 
-    func resetStrategyPreset(for strategy: PowerStrategy) {
-        guard let shipped = strategy.defaultPreset else { return }
-        setStrategyPreset(shipped, for: strategy)
+    // MARK: - Schedule / 中文：定时
+
+    /// Replaces the schedule. An edit applies the latest reached trigger at once. / 中文：替换整个定时计划。编辑后立即应用最近已到达的触发点。
+    func setScheduleEntries(_ entries: [ScheduleEntry]) {
+        scheduleEntries = entries
+        lastAppliedScheduleStamp = nil
+        saveSettings()
+        evaluateSchedule()
     }
+
+    /// Applies the most recent trigger if it has not been applied yet. State-based,
+    /// so a trigger missed while asleep or quit still fires, and a manual change made
+    /// after a trigger is left alone until the next one. / 中文：若最近触发点尚未应用则应用。
+    /// 基于状态而非边沿：睡眠或退出期间错过的触发点会补上；触发点之后的手动修改会保持到下一个触发点。
+    func evaluateSchedule(now: Date = Date()) {
+        guard let trigger = ScheduleResolver.latestTrigger(in: scheduleEntries, now: now) else { return }
+        let stamp = trigger.date.timeIntervalSince1970
+        guard lastAppliedScheduleStamp != stamp else { return }
+        lastAppliedScheduleStamp = stamp
+        saveSettings()
+        applySchedule(trigger.entry)
+    }
+
+    private func applySchedule(_ entry: ScheduleEntry) {
+        // Strategy first, so the mode switch starts the loop with the right parameters. / 中文：先切策略，再切模式，使控制环以正确参数启动。
+        if entry.mode == .automatic, let id = entry.strategyID,
+           strategy(id: id) != nil, id != activeStrategyID {
+            setActiveStrategy(id)
+        }
+        if mode != entry.mode {
+            setMode(entry.mode)
+        }
+    }
+
+    // MARK: - Helpers / 中文：辅助
+
+    /// True once the fan count and RPM limits come from the SMC rather than fallbacks. / 中文：风扇数量与转速边界来自 SMC 而非回退值时为 true。
+    private var hasHardwareLimits: Bool {
+        (systemMonitor?.numberOfFans ?? 0) > 0
+    }
+
+    private func maxSpeedFraction(forRPM rpm: Int) -> Double {
+        let span = Double(unifiedMaxClamp - unifiedMinClamp)
+        guard span > 0 else { return 0 }
+        let fraction = Double(rpm - unifiedMinClamp) / span
+        return min(max(fraction, StrategyPreset.maxSpeedFractionRange.lowerBound),
+                   StrategyPreset.maxSpeedFractionRange.upperBound)
+    }
+
+    /// Rebuilds a migrated custom curve once its ceiling can be read as a fraction of the fan span. / 中文：迁移来的自定义曲线在上限可换算为占比后重建。
+    private func resolvePendingLegacyMaxSpeed() {
+        guard let pending = pendingLegacyCustom, hasHardwareLimits else { return }
+        pendingLegacyCustom = nil
+        guard let index = strategies.firstIndex(where: { $0.id == pending.id }) else { return }
+        strategies[index].curve = StrategyPreset(
+            targetTemp: pending.targetTemp,
+            aggressiveness: pending.aggressiveness,
+            maxSpeedFraction: maxSpeedFraction(forRPM: pending.maxRPM)
+        ).curve
+        syncLiveParameters()
+        saveSettings()
+    }
+
 }

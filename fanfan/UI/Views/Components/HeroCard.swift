@@ -124,7 +124,7 @@ struct HeroCard: View {
             }
         }
         .padding(12)
-        .themedCard(scheme)
+        .themedCard()
     }
 
     private func stat(value: String, unit: String) -> some View {

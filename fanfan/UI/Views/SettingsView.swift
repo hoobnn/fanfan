@@ -17,9 +17,40 @@ enum StatusBarDisplayMode: String, CaseIterable {
 }
 
 enum SettingsWindowLayout {
-    static let minSize = CGSize(width: 420, height: 500)
-    static let idealSize = CGSize(width: 456, height: 520)
-    static let maxSize = CGSize(width: 560, height: 620)
+    static let minSize = CGSize(width: 700, height: 480)
+    static let idealSize = CGSize(width: 800, height: 680)
+    static let maxSize = CGSize(width: 1000, height: 860)
+}
+
+/// Sidebar pages of the Settings window. / 中文：设置窗口的侧边栏页面。
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general
+    case monitoring
+    case strategies
+    case schedule
+    case about
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .general:    return "settings.section.general"
+        case .monitoring: return "settings.section.monitoring"
+        case .strategies: return "popover.strategy"
+        case .schedule:   return "settings.section.schedule"
+        case .about:      return "settings.section.about"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general:    return "gearshape"
+        case .monitoring: return "thermometer.medium"
+        case .strategies: return "chart.xyaxis.line"
+        case .schedule:   return "clock"
+        case .about:      return "info.circle"
+        }
+    }
 }
 
 // MARK: - Settings / 中文：设置
@@ -37,22 +68,93 @@ struct SettingsView: View {
     @AppStorage("highTempAlert")          private var highTempAlert = 85.0
     @AppStorage("autoSwitchMode")         private var autoSwitchMode = false
     @AppStorage("protectionMaxFraction")  private var protectionMaxFraction = FanController.defaultProtectionMaxFraction
+    @AppStorage("settingsPane")           private var paneRaw = SettingsPane.general.rawValue
 
-    @State private var editingStrategy: PowerStrategy = .balanced
+    /// Strategy whose values the editor shows. Separate from the active one: editing the active / 中文：编辑器所显示的策略，与当前生效的策略分开：
+    /// strategy applies immediately in automatic mode; other strategies remain inactive. / 中文：自动模式下编辑生效中的策略会立即应用，其他策略不受影响。
+    @State private var editingStrategyID = FanStrategy.balancedID
+    @State private var nameDraft = ""
+    @FocusState private var nameFieldFocused: Bool
+    @State private var pendingDeleteID: String?
+
+    private var pane: SettingsPane { SettingsPane(rawValue: paneRaw) ?? .general }
 
     var body: some View {
-        // Native grouped form: the macOS 26 inset-group look, row separators, / 中文：原生分组表单：macOS 26 的内嵌分组外观、行分隔线、
-        // scroll-edge effect and inactive-window dimming all come from the / 中文：滚动边缘效果与非活跃窗口变暗都由系统提供，
-        // system, and follow later releases (macOS 27) without code changes. / 中文：后续系统（macOS 27）的样式更新无需改代码即可跟随。
-        Form {
-            menuBarSection
-            monitoringSection
-            strategyPresetsSection
-            pidAdvancedSection
-            generalSection
-            aboutSection
+        // Sidebar + one grouped form per page, like System Settings. Each page stays short / 中文：侧边栏加每页一个分组表单，与系统设置一致。
+        // enough to read without scrolling, and the strategy curve gets room to be edited. / 中文：每页基本无需滚动，策略曲线也有足够的编辑空间。
+        NavigationSplitView {
+            List(selection: Binding<SettingsPane?>(
+                get: { pane },
+                set: { if let newPane = $0 { paneRaw = newPane.rawValue } }
+            )) {
+                ForEach(SettingsPane.allCases) { item in
+                    // Monochrome icons: temperature is the only colour in the UI. / 中文：图标保持单色，界面中只有温度使用颜色。
+                    Label {
+                        Text(NSLocalizedString(item.titleKey, comment: ""))
+                    } icon: {
+                        Image(systemName: item.symbol).foregroundStyle(.secondary)
+                    }
+                    .tag(item)
+                }
+            }
+            // A plain frame: on macOS 26 the column-width modifier alone left the sidebar at ~145 pt. / 中文：直接设 frame：macOS 26 上仅用列宽修饰符时侧边栏只有约 145 pt。
+            .frame(minWidth: 220)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 230, max: 280)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            // Native grouped form: the macOS 26 inset-group look, row separators, / 中文：原生分组表单：macOS 26 的内嵌分组外观、行分隔线、
+            // scroll-edge effect and inactive-window dimming all come from the system. / 中文：滚动边缘效果与非活跃窗口变暗都由系统提供。
+            Form {
+                switch pane {
+                case .general:
+                    generalSection
+                    menuBarSection
+                case .monitoring:
+                    monitoringSection
+                    protectionSection
+                case .strategies:
+                    strategyListSection
+                    strategyEditorSection
+                case .schedule:
+                    scheduleSection
+                case .about:
+                    aboutSection
+                }
+            }
+            .formStyle(.grouped)
+            .id(pane)
         }
-        .formStyle(.grouped)
+        .confirmationDialog(
+            String(format: NSLocalizedString("settings.strategy_delete_title", comment: ""),
+                   viewModel.strategy(id: pendingDeleteID ?? "")?.displayName ?? ""),
+            isPresented: Binding(get: { pendingDeleteID != nil }, set: { if !$0 { pendingDeleteID = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(NSLocalizedString("settings.strategy_delete", comment: ""), role: .destructive) {
+                if let id = pendingDeleteID { deleteStrategy(id) }
+                pendingDeleteID = nil
+            }
+            Button(NSLocalizedString("common.cancel", comment: ""), role: .cancel) { pendingDeleteID = nil }
+        } message: {
+            Text(NSLocalizedString("settings.strategy_delete_message", comment: ""))
+        }
+        .onAppear {
+            editingStrategyID = viewModel.activeStrategyID
+            nameDraft = viewModel.strategy(id: editingStrategyID)?.name ?? ""
+        }
+        .onChange(of: viewModel.strategies) { _, strategies in
+            if !strategies.contains(where: { $0.id == editingStrategyID }) {
+                editingStrategyID = viewModel.activeStrategyID
+                nameDraft = editingStrategy?.name ?? ""
+            }
+        }
+        // A typed name is kept however the field is left: Return, clicking elsewhere, / 中文：无论以何种方式离开输入框都保存名称：回车、点别处、
+        // switching page or closing the window. / 中文：切换页面或关闭窗口。
+        .onChange(of: nameFieldFocused) { _, focused in
+            if !focused { commitName(for: editingStrategyID) }
+        }
+        .onChange(of: paneRaw) { _, _ in commitName(for: editingStrategyID) }
+        .onDisappear { commitName(for: editingStrategyID) }
         .frame(minWidth: SettingsWindowLayout.minSize.width,
                idealWidth: SettingsWindowLayout.idealSize.width,
                maxWidth: SettingsWindowLayout.maxSize.width,
@@ -102,7 +204,7 @@ struct SettingsView: View {
     }
 
     private var monitoringSection: some View {
-        Section(NSLocalizedString("settings.section.monitoring", comment: "")) {
+        Section {
             LabeledContent {
                 InlineSlider(value: $monitoringInterval, range: 0.5...5.0, step: 0.5,
                              format: { String(format: "%.1fs", $0) },
@@ -125,6 +227,18 @@ struct SettingsView: View {
                 rowLabel("settings.high_temp_alert")
             }
 
+            Toggle(isOn: $enableNotifications) {
+                rowLabel("settings.notifications")
+            }
+            .onChange(of: enableNotifications) { _, newValue in
+                viewModel.enableNotifications = newValue
+            }
+        }
+    }
+
+    /// What the app does on its own when the Mac runs hot. / 中文：Mac 过热时应用自行采取的动作。
+    private var protectionSection: some View {
+        Section {
             LabeledContent {
                 InlineSlider(value: $protectionMaxFraction,
                              range: FanController.protectionMaxFractionRange, step: 0.05,
@@ -136,13 +250,6 @@ struct SettingsView: View {
                 rowLabel("settings.protection_max")
             }
 
-            Toggle(isOn: $enableNotifications) {
-                rowLabel("settings.notifications")
-            }
-            .onChange(of: enableNotifications) { _, newValue in
-                viewModel.enableNotifications = newValue
-            }
-
             Toggle(isOn: $autoSwitchMode) {
                 rowLabel("settings.auto_mode_switching")
             }
@@ -152,193 +259,285 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Strategy presets / 中文：策略预设
+    // MARK: - Strategy / 中文：策略
 
-    private var editingPreset: StrategyPreset {
-        viewModel.preset(for: editingStrategy) ?? StrategyPreset(targetTemp: 60, aggressiveness: 1.5, maxSpeedFraction: 0.65)
+    private var editingStrategy: FanStrategy? {
+        viewModel.strategy(id: editingStrategyID)
     }
 
-    /// Writes one field of the preset being edited. / 中文：写入正在编辑的预设中的单个字段。
-    private func presetBinding(_ keyPath: WritableKeyPath<StrategyPreset, Double>) -> Binding<Double> {
-        Binding(
-            get: { editingPreset[keyPath: keyPath] },
-            set: { newValue in
-                var preset = editingPreset
-                preset[keyPath: keyPath] = newValue
-                viewModel.setStrategyPreset(preset, for: editingStrategy)
-            }
-        )
+    /// Fan limits the curve is drawn against: the same bounds the controller clamps to. / 中文：曲线绘制所用的转速边界，与控制器夹取所用的边界一致。
+    private var unifiedFloorRPM: Int {
+        viewModel.fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
     }
 
-    private var strategyPresetsSection: some View {
-        Section(NSLocalizedString("settings.section.strategy_presets", comment: "")) {
-            Picker(selection: $editingStrategy) {
-                ForEach(PowerStrategy.named, id: \.self) { strategy in
-                    Text(strategyName(strategy)).tag(strategy)
-                }
-            } label: {
-                rowLabel("settings.strategy_preset")
-            }
-            .pickerStyle(.segmented)
+    private var unifiedHardwareMaxRPM: Int {
+        let hardware = viewModel.fanMaxSpeeds.min() ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
+        return max(unifiedFloorRPM, hardware)
+    }
 
-            LabeledContent {
-                InlineSlider(value: presetBinding(\.targetTemp),
-                             range: StrategyPreset.targetTempRange, step: 1,
-                             format: { String(format: "%.0f°C", $0) },
-                             accent: .thermal,
-                             valueWidth: 64)
+    /// Every strategy in one list. Clicking a row opens it in the editor below; the trailing / 中文：所有策略列在一处。点一行即在下方编辑它；行尾
+    /// control shows or sets which one the fans follow, so "editing" and "in use" never share a control. / 中文：显示或切换风扇实际使用的策略，「编辑」与「生效」不再共用一个控件。
+    private var strategyListSection: some View {
+        Section {
+            ForEach(viewModel.strategies) { strategy in
+                strategyRow(strategy)
+            }
+            Button {
+                addStrategy()
             } label: {
-                rowLabel("settings.strategy_preset_target")
+                Label(NSLocalizedString("settings.strategy_new", comment: ""), systemImage: "plus")
             }
-
-            LabeledContent {
-                InlineSlider(value: presetBinding(\.maxSpeedFraction),
-                             range: StrategyPreset.maxSpeedFractionRange, step: 0.05,
-                             format: { String(format: "%.0f%%", $0 * 100) },
-                             valueWidth: 64)
-            } label: {
-                rowLabel("settings.strategy_preset_max_speed")
-            }
-
-            LabeledContent {
-                InlineSlider(
-                    value: Binding(
-                        get: { Double(ResponseScale.index(for: editingPreset.aggressiveness)) },
-                        set: { presetBinding(\.aggressiveness).wrappedValue = ResponseScale.step($0) }
-                    ),
-                    range: ResponseScale.sliderRange, step: 1,
-                    format: { ResponseScale.label(for: ResponseScale.step($0)) },
-                    showsTicks: true,
-                    valueWidth: 64
-                )
-            } label: {
-                rowLabel("settings.strategy_preset_response")
-            }
-
-            HStack {
-                Spacer()
-                Button(NSLocalizedString("settings.strategy_preset_reset", comment: "")) {
-                    viewModel.resetStrategyPreset(for: editingStrategy)
-                }
-                .disabled(viewModel.strategyPresetOverrides[editingStrategy] == nil)
-            }
+            .buttonStyle(.borderless)
+            .help(NSLocalizedString("settings.strategy_new_help", comment: ""))
+        } header: {
+            Text(NSLocalizedString("settings.section.strategy_presets", comment: ""))
+        } footer: {
+            Text(NSLocalizedString("settings.strategy_list_footer", comment: ""))
         }
     }
 
-    private func strategyName(_ strategy: PowerStrategy) -> String {
-        switch strategy {
-        case .powerSaving: return NSLocalizedString("popover.strategy.power_saving", comment: "")
-        case .balanced:    return NSLocalizedString("popover.strategy.balanced", comment: "")
-        case .performance: return NSLocalizedString("popover.strategy.performance", comment: "")
-        case .custom:      return NSLocalizedString("settings.strategy_custom", comment: "")
-        }
-    }
-
-    // MARK: - PID Advanced Tuning / 中文：PID 高级调节
-
-    private var useCustomPIDBinding: Binding<Bool> {
-        Binding(
-            get: { isCustomPID },
-            set: { newVal in
-                if newVal {
-                    viewModel.setPIDGains(
-                        kp: viewModel.effectivePIDKp,
-                        ki: viewModel.effectivePIDKi,
-                        kd: viewModel.effectivePIDKd
-                    )
+    private func strategyRow(_ strategy: FanStrategy) -> some View {
+        let isEditing = strategy.id == editingStrategyID
+        let isActive = strategy.id == viewModel.activeStrategyID
+        return HStack(spacing: 8) {
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Theme.text2)
+                .opacity(isEditing ? 1 : 0)
+            Text(strategy.displayName)
+                .fontWeight(isEditing ? .semibold : .regular)
+                .foregroundStyle(Theme.text1)
+            Spacer(minLength: 8)
+            // Both states are buttons of the same size, so they line up in one column. The in-use one / 中文：两种状态都是同尺寸按钮，在同一列对齐。
+            // is a filled system-accent badge that does nothing when clicked. / 中文：「正在生效」是系统强调色的实心标记，点击无动作。
+            // Both titles are laid out hidden so the column takes the wider one in every language. / 中文：两种标题都隐藏排版一次，任何语言下这一列都取较宽者。
+            ZStack {
+                Button(NSLocalizedString("settings.strategy_in_use", comment: "")) {}.hidden()
+                Button(NSLocalizedString("settings.strategy_activate", comment: "")) {}.hidden()
+            }
+            .overlay {
+                if isActive {
+                    Button {} label: {
+                        Text(NSLocalizedString("settings.strategy_in_use", comment: "")).frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .allowsHitTesting(false)
+                    .accessibilityRemoveTraits(.isButton)
                 } else {
-                    viewModel.setPIDGains(kp: nil, ki: nil, kd: nil)
-                }
-            }
-        )
-    }
-
-    private var isCustomPID: Bool {
-        viewModel.pidKpCustom != nil
-            || viewModel.pidKiCustom != nil
-            || viewModel.pidKdCustom != nil
-    }
-
-    /// Progressive disclosure: the gain sliders only appear once custom / 中文：渐进披露：打开自定义增益后才显示增益滑杆，
-    /// gains are switched on, instead of showing three disabled rows. / 中文：而不是摆出三行禁用的控件。
-    private var pidAdvancedSection: some View {
-        Section(NSLocalizedString("settings.section.advanced_pid", comment: "")) {
-            Toggle(isOn: useCustomPIDBinding.animation(.snappy)) {
-                rowLabel("settings.pid_override")
-            }
-
-            if isCustomPID {
-                LabeledContent {
-                    InlineSlider(
-                        value: Binding(
-                            get: { viewModel.pidKpCustom ?? viewModel.effectivePIDKp },
-                            set: { newVal in
-                                viewModel.setPIDGains(
-                                    kp: newVal,
-                                    ki: viewModel.pidKiCustom ?? viewModel.effectivePIDKi,
-                                    kd: viewModel.pidKdCustom ?? viewModel.effectivePIDKd
-                                )
-                            }
-                        ),
-                        range: 0...2000, step: 10,
-                        format: { String(format: "%.0f", $0) }
-                    )
-                } label: {
-                    rowLabel("settings.pid_kp")
-                }
-
-                LabeledContent {
-                    InlineSlider(
-                        value: Binding(
-                            get: { viewModel.pidKiCustom ?? viewModel.effectivePIDKi },
-                            set: { newVal in
-                                viewModel.setPIDGains(
-                                    kp: viewModel.pidKpCustom ?? viewModel.effectivePIDKp,
-                                    ki: newVal,
-                                    kd: viewModel.pidKdCustom ?? viewModel.effectivePIDKd
-                                )
-                            }
-                        ),
-                        range: 0...100, step: 0.5,
-                        format: { String(format: "%.1f", $0) }
-                    )
-                } label: {
-                    rowLabel("settings.pid_ki")
-                }
-
-                LabeledContent {
-                    InlineSlider(
-                        value: Binding(
-                            get: { viewModel.pidKdCustom ?? viewModel.effectivePIDKd },
-                            set: { newVal in
-                                viewModel.setPIDGains(
-                                    kp: viewModel.pidKpCustom ?? viewModel.effectivePIDKp,
-                                    ki: viewModel.pidKiCustom ?? viewModel.effectivePIDKi,
-                                    kd: newVal
-                                )
-                            }
-                        ),
-                        range: 0...5000, step: 50,
-                        format: { String(format: "%.0f", $0) }
-                    )
-                } label: {
-                    rowLabel("settings.pid_kd")
-                }
-
-                HStack {
-                    Spacer()
-                    Button(NSLocalizedString("settings.pid_reset", comment: "")) {
-                        withAnimation(.snappy) {
-                            viewModel.setPIDGains(kp: nil, ki: nil, kd: nil)
-                        }
+                    Button {
+                        viewModel.setActiveStrategy(strategy.id)
+                    } label: {
+                        Text(NSLocalizedString("settings.strategy_activate", comment: "")).frame(maxWidth: .infinity)
                     }
                 }
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture { selectStrategy(strategy.id) }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isEditing ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { selectStrategy(strategy.id) }
+    }
+
+    private var strategyEditorSection: some View {
+        Section {
+            LabeledContent {
+                TextField(
+                    "",
+                    text: $nameDraft,
+                    prompt: Text(editingStrategy?.displayName ?? "")
+                )
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .focused($nameFieldFocused)
+                .onSubmit { commitName(for: editingStrategyID) }
+                // Width follows the name instead of leaving a wide empty field. / 中文：宽度随名称变化，不留大片空白。
+                .fixedSize()
+                .frame(minWidth: 60, alignment: .trailing)
+            } label: {
+                Text(NSLocalizedString("settings.strategy_name", comment: ""))
+                if editingStrategy?.isBuiltIn ?? false {
+                    Text(NSLocalizedString("settings.strategy_name_desc", comment: ""))
+                }
+            }
+
+            // Curve edits are committed on release; precision controls commit one step at a time.
+            ResponseCurveView(
+                strategies: viewModel.strategies,
+                selectedID: editingStrategyID,
+                floorRPM: unifiedFloorRPM,
+                hardwareMaxRPM: unifiedHardwareMaxRPM,
+                protectionFraction: protectionMaxFraction,
+                liveTemperature: viewModel.maxTemperature > 0 ? viewModel.maxTemperature : nil,
+                liveRPM: viewModel.fanSpeeds.max().map(Double.init),
+                onCommit: { curve in viewModel.setStrategyCurve(curve, for: editingStrategyID) },
+                chartHeight: 240
+            )
+            .padding(.vertical, 4)
+
+            // Built-ins can be reset but not deleted; user strategies the other way round. / 中文：内置策略只能恢复默认、不能删除；自定义策略相反。
+            LabeledContent {
+                if editingStrategy?.isBuiltIn ?? true {
+                    Button(NSLocalizedString("settings.strategy_preset_reset", comment: "")) {
+                        viewModel.resetStrategyCurve(for: editingStrategyID)
+                    }
+                    .disabled(!(editingStrategy?.isModified ?? false))
+                } else {
+                    Button(NSLocalizedString("settings.strategy_delete_ellipsis", comment: ""), role: .destructive) {
+                        pendingDeleteID = editingStrategyID
+                    }
+                }
+            } label: {
+                Text(strategyStateText)
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text(String(format: NSLocalizedString("settings.strategy_editor_header", comment: ""),
+                        editingStrategy?.displayName ?? ""))
+        } footer: {
+            Text(NSLocalizedString("settings.strategy_curve_desc", comment: ""))
+        }
+    }
+
+    private var strategyStateText: String {
+        guard let strategy = editingStrategy else { return "" }
+        if !strategy.isBuiltIn {
+            return NSLocalizedString("settings.strategy_state_custom", comment: "")
+        }
+        return strategy.isModified
+            ? NSLocalizedString("settings.strategy_state_modified", comment: "")
+            : NSLocalizedString("settings.strategy_state_shipped", comment: "")
+    }
+
+    /// Switches the editor, saving a half-typed name for the strategy it was typed for. / 中文：切换编辑对象，并把输入到一半的名称存给它原本对应的策略。
+    private func selectStrategy(_ id: String) {
+        guard id != editingStrategyID else { return }
+        commitName(for: editingStrategyID)
+        editingStrategyID = id
+        nameDraft = viewModel.strategy(id: id)?.name ?? ""
+    }
+
+    private func addStrategy() {
+        let number = viewModel.strategies.filter { !$0.isBuiltIn }.count + 1
+        let name = String(format: NSLocalizedString("settings.strategy_new_name", comment: ""), number)
+        let newID = viewModel.addStrategy(name: name, basedOn: editingStrategyID)
+        selectStrategy(newID)
+    }
+
+    private func deleteStrategy(_ id: String) {
+        viewModel.deleteStrategy(id)
+        if !viewModel.strategies.contains(where: { $0.id == editingStrategyID }) {
+            editingStrategyID = viewModel.activeStrategyID
+            nameDraft = editingStrategy?.name ?? ""
+        }
+    }
+
+    /// Applies the name field to `id`, which must be the strategy the field was typed for. / 中文：把名称输入框的内容应用到 `id`，`id` 必须是输入时所对应的策略。
+    /// Empty input on a built-in restores its localized title. Only a real change is written. / 中文：内置策略留空即恢复本地化标题；只在内容真正变化时写入。
+    private func commitName(for id: String) {
+        guard let strategy = viewModel.strategy(id: id) else { return }
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != (strategy.name ?? "") else { return }
+        viewModel.renameStrategy(id, to: trimmed)
+    }
+
+    // MARK: - Schedule / 中文：时间计划
+
+    private var scheduleSection: some View {
+        Section {
+            ForEach(viewModel.scheduleEntries) { entry in
+                scheduleRow(entry)
+            }
+            Button {
+                viewModel.setScheduleEntries(viewModel.scheduleEntries + [ScheduleEntry.new()])
+            } label: {
+                Label(NSLocalizedString("settings.schedule_add", comment: ""), systemImage: "plus")
+            }
+        } footer: {
+            Text(NSLocalizedString("settings.schedule_footer", comment: ""))
+        }
+    }
+
+    private func scheduleRow(_ entry: ScheduleEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                DatePicker("", selection: timeBinding(entry), displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                    .fixedSize()
+                Spacer(minLength: 8)
+                Picker("", selection: scheduleBinding(entry, \.days)) {
+                    Text(NSLocalizedString("settings.schedule_days.every", comment: "")).tag(ScheduleDays.everyDay)
+                    Text(NSLocalizedString("settings.schedule_days.weekdays", comment: "")).tag(ScheduleDays.weekdays)
+                    Text(NSLocalizedString("settings.schedule_days.weekends", comment: "")).tag(ScheduleDays.weekends)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                Button(role: .destructive) {
+                    viewModel.setScheduleEntries(viewModel.scheduleEntries.filter { $0.id != entry.id })
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(NSLocalizedString("settings.schedule_remove", comment: ""))
+            }
+            HStack(spacing: 8) {
+                Picker("", selection: scheduleBinding(entry, \.mode)) {
+                    Text(NSLocalizedString("popover.mode.manual", comment: "")).tag(ControlMode.manual)
+                    Text(NSLocalizedString("popover.mode.auto", comment: "")).tag(ControlMode.automatic)
+                    Text(NSLocalizedString("popover.mode.system", comment: "")).tag(ControlMode.system)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                if entry.mode == .automatic {
+                    Picker("", selection: scheduleBinding(entry, \.strategyID)) {
+                        Text(NSLocalizedString("settings.schedule_keep_strategy", comment: "")).tag(String?.none)
+                        ForEach(viewModel.strategies) { strategy in
+                            Text(strategy.displayName).tag(Optional(strategy.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func updateScheduleEntry(_ id: UUID, _ change: (inout ScheduleEntry) -> Void) {
+        var entries = viewModel.scheduleEntries
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
+        change(&entries[index])
+        viewModel.setScheduleEntries(entries)
+    }
+
+    private func scheduleBinding<Value>(_ entry: ScheduleEntry, _ keyPath: WritableKeyPath<ScheduleEntry, Value>) -> Binding<Value> {
+        Binding(
+            get: { viewModel.scheduleEntries.first { $0.id == entry.id }?[keyPath: keyPath] ?? entry[keyPath: keyPath] },
+            set: { newValue in updateScheduleEntry(entry.id) { $0[keyPath: keyPath] = newValue } }
+        )
+    }
+
+    private func timeBinding(_ entry: ScheduleEntry) -> Binding<Date> {
+        Binding(
+            get: {
+                Calendar.current.date(bySettingHour: entry.hour, minute: entry.minute, second: 0, of: Date()) ?? Date()
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                updateScheduleEntry(entry.id) {
+                    $0.hour = parts.hour ?? 0
+                    $0.minute = parts.minute ?? 0
+                }
+            }
+        )
     }
 
     private var generalSection: some View {
-        Section(NSLocalizedString("settings.section.general", comment: "")) {
+        Section {
             Toggle(isOn: $launchAtLogin) {
                 rowLabel("settings.launch_at_login")
             }
@@ -352,7 +551,7 @@ struct SettingsView: View {
     // MARK: - About / 中文：关于
 
     private var aboutSection: some View {
-        Section(NSLocalizedString("settings.section.about", comment: "")) {
+        Section {
             LabeledContent {
                 Text(versionDisplay)
                     .font(Theme.num(12, weight: .medium))
@@ -449,7 +648,7 @@ private struct InlineSlider: View {
                 .minimumScaleFactor(0.8)
                 .frame(width: valueWidth, alignment: .trailing)
         }
-        .frame(width: 132 + valueWidth)
+        .frame(width: 200 + valueWidth)
     }
 
     private var sliderTint: Color {

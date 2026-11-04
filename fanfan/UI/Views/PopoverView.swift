@@ -44,9 +44,19 @@ struct PopoverView: View {
             footer
         }
         .frame(width: Self.width)
+        // Take the content's ideal height, not the window's: the window is sized
+        // from this measurement, so a proposal-driven height would never shrink. / 中文：取内容的理想高度而非窗口高度：
+        // 窗口由这次测量决定，若跟随窗口提议的高度，将永远无法缩小。
+        .fixedSize(horizontal: false, vertical: true)
         .frame(minHeight:   usesFixedHeight ? fixedPopoverHeight : nil,
                idealHeight: usesFixedHeight ? fixedPopoverHeight : nil,
                maxHeight:   usesFixedHeight ? fixedPopoverHeight : nil)
+        // Report the real height so the status bar sizes the popover explicitly.
+        // Hosting-controller auto-sizing grows with content but does not shrink back. / 中文：把真实高度上报，由状态栏显式设置弹窗尺寸；
+        // 托管控制器的自动尺寸只会随内容变大，不会缩回来。
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            NotificationCenter.default.post(name: .popoverContentSizeChanged, object: size)
+        }
         .background(alignment: .top) {
             // No opaque fill: the popover's own Liquid Glass material is the
             // surface, the cards sit on it as the content layer.
@@ -138,7 +148,7 @@ struct PopoverView: View {
                     .padding(10)
                     .frame(width: Self.width)
                     // Fanless Macs have a short Overview; keep the Sensors page usable. / 中文：无风扇 Mac 的概览很矮，给传感器页留出可用高度。
-                    .frame(minHeight: 420, alignment: .top)
+                    .frame(minHeight: hasFans ? 0 : 420, alignment: .top)
                     // Pin to the ideal height: a min-only frame is vertically flexible, / 中文：锁定为理想高度：只设 minHeight 的 frame 纵向可伸缩，
                     // and NSPopover then falls back to its default 580 pt content size. / 中文：NSPopover 会退回默认的 580 pt 内容高度。
                     .fixedSize(horizontal: false, vertical: true)
@@ -194,7 +204,7 @@ struct PopoverView: View {
         }
     }
 
-    /// Icon-only footer control, as light as the footer text beside it; the / 中文：仅图标的底栏按钮，和旁边的底栏文字一样轻；
+    /// Icon-only footer control on a circular system glass button; the / 中文：仅图标的底栏按钮，使用系统圆形玻璃按钮；
     /// title backs both the tooltip and VoiceOver. / 中文：title 同时用作提示与 VoiceOver 标签。
     private func footerButton(systemImage: String,
                               title: String,
@@ -204,7 +214,9 @@ struct PopoverView: View {
                 .font(.system(size: 12, weight: .medium))
                 .frame(width: 16, height: 16)
         }
-        .buttonStyle(FooterIconButtonStyle())
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(.small)
         .help(title)
         .accessibilityLabel(title)
     }
@@ -212,6 +224,8 @@ struct PopoverView: View {
     // MARK: - Overview / 中文：概览
 
     private var overviewTab: some View {
+        // One container so the cards share a glass pass. / 中文：卡片放进同一个容器，共用一次玻璃渲染。
+        GlassEffectContainer(spacing: 8) {
         VStack(spacing: 8) {
             HeroCard(metrics: heroMetrics, showsFan: hasFans)
             curveCard
@@ -240,6 +254,7 @@ struct PopoverView: View {
                     )
                 }
             }
+        }
         }
     }
 
@@ -270,7 +285,7 @@ struct PopoverView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .themedCard(scheme)
+        .themedCard()
     }
 
     // MARK: - Footer / 中文：页脚
@@ -297,7 +312,8 @@ struct PopoverView: View {
                 .font(Theme.num(10, weight: .medium))
                 .foregroundStyle(Theme.text3)
 
-            HStack(spacing: 2) {
+            GlassEffectContainer(spacing: 6) {
+            HStack(spacing: 6) {
                 footerButton(
                     systemImage: "slider.horizontal.3",
                     title: NSLocalizedString("popover.settings", comment: "")
@@ -311,12 +327,12 @@ struct PopoverView: View {
                     showingQuitConfirm = true
                 }
             }
+            }
         }
-        // Toggle and buttons align with the card content (22pt); the buttons'
-        // hit areas overhang by their own inset so the glyphs sit on that line.
-        // 中文：开关与按钮都对齐卡片内容（22pt）；按钮点击区向外多出自身内边距，图标本身落在这条线上。
+        // The toggle aligns with the card content (22pt); the glass buttons are / 中文：开关对齐卡片内容（22pt）；玻璃按钮自带外形，
+        // shapes of their own, so their edge lines up with the card edges instead. / 中文：因此让按钮外缘与卡片边缘对齐。
         .padding(.leading, 22)
-        .padding(.trailing, 22 - FooterIconButtonStyle.inset)
+        .padding(.trailing, 12)
         .padding(.vertical, 6)
         .overlay(alignment: .top) {
             Rectangle().fill(Theme.separator(scheme)).frame(height: 0.5)
@@ -366,8 +382,8 @@ struct PopoverView: View {
             numberOfFans: viewModel.numberOfFans,
             autoThreshold: viewModel.autoThreshold,
             autoMaxSpeed: viewModel.autoMaxSpeed,
-            autoAggressiveness: viewModel.autoAggressiveness,
-            powerStrategy: viewModel.powerStrategy,
+            strategies: viewModel.strategies,
+            activeStrategyID: viewModel.activeStrategyID,
             perFanManualControl: viewModel.perFanManualControl,
             manualSpeed: viewModel.manualSpeed,
             manualSpeeds: viewModel.manualSpeeds,
@@ -451,29 +467,6 @@ struct PopoverView: View {
     }
 }
 
-// MARK: - Footer icon button / 中文：底栏图标按钮
-
-/// Monochrome glyph that darkens on hover and press, with a faint rounded / 中文：单色图标，悬停与按下时加深，
-/// backing while pressed. / 中文：按下时衬一层淡淡的圆角底。
-private struct FooterIconButtonStyle: ButtonStyle {
-    static let inset: CGFloat = 4
-
-    @Environment(\.colorScheme) private var scheme
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(hovering || configuration.isPressed ? Theme.text1 : Theme.text2)
-            .padding(Self.inset)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Theme.fill2(scheme).opacity(configuration.isPressed ? 1 : hovering ? 0.6 : 0))
-            )
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-    }
-}
-
 // MARK: - State views / 中文：状态视图
 
 private struct InstallHelperStateView: View {
@@ -537,7 +530,7 @@ private struct InstallHelperStateView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .themedCard(scheme)
+        .themedCard()
     }
 }
 
@@ -554,4 +547,9 @@ private struct PopoverMessageStateView: View {
 
 #Preview {
     PopoverView(viewModel: FanControlViewModel())
+}
+
+extension Notification.Name {
+    /// Posted with the popover content's size (CGSize) whenever it changes. / 中文：弹窗内容尺寸变化时发布，对象为尺寸（CGSize）。
+    static let popoverContentSizeChanged = Notification.Name("PopoverContentSizeChanged")
 }

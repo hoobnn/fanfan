@@ -42,7 +42,7 @@ struct MicroMetricCard: View {
         .padding(.top, 7)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .themedCard(scheme, cornerRadius: 8)
+        .themedCard(cornerRadius: 8)
         .help(help ?? "")
     }
 }

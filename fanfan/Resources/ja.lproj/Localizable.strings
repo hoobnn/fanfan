@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "メニューバー";
 "settings.section.monitoring" = "モニタリングと警告";
 "settings.section.general" = "一般";
-"settings.section.advanced_pid" = "PID 詳細調整";
 "settings.section.about" = "情報";
 
 /* 情報 / アップデート */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "アプリ内で新しいバージョンをダウンロードしてインストールします";
 "settings.check_updates.button" = "確認";
 
-"settings.pid_override" = "カスタムゲイン";
-"settings.pid_override_desc" = "オフの場合、応答レベルから Kp/Ki/Kd を自動算出します";
-"settings.pid_kp" = "Kp 比例";
-"settings.pid_kp_desc" = "誤差 1°C あたりの RPM";
-"settings.pid_ki" = "Ki 積分";
-"settings.pid_ki_desc" = "定常偏差を解消する速さ";
-"settings.pid_kd" = "Kd 微分";
-"settings.pid_kd_desc" = "温度変化の傾向に対する予測応答";
-"settings.pid_reset" = "デフォルトに戻す";
 
 /* 設定項目 */
 "settings.launch_at_login" = "ログイン時に起動";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "省電力";
 "popover.strategy.balanced" = "バランス";
 "popover.strategy.performance" = "高性能";
-"popover.threshold" = "目標温度";
+"popover.threshold" = "立ち上がり温度";
 "popover.max_speed" = "最大回転数";
-"popover.response" = "応答";
 
 /* 応答レベル */
-"popover.response.min_override" = "最小固定";
-"popover.response.quiet" = "静音";
-"popover.response.balanced" = "バランス";
-"popover.response.auto" = "自動";
-"popover.response.performance" = "高性能";
-"popover.response.aggressive" = "強力";
-"popover.response.max_override" = "最大固定";
 
 /* 制御モード */
 "popover.mode.manual" = "手動";
@@ -263,12 +245,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "戦略プリセット";
 "settings.strategy_preset" = "戦略";
-"settings.strategy_preset_desc" = "調整する戦略を選択";
-"settings.strategy_preset_target" = "目標温度";
-"settings.strategy_preset_target_desc" = "ファンが維持しようとする温度（°C）";
-"settings.strategy_preset_max_speed" = "最大回転数";
-"settings.strategy_preset_max_speed_desc" = "ハードウェア回転数範囲に対する割合";
-"settings.strategy_preset_response" = "レスポンス";
-"settings.strategy_preset_response_desc" = "温度変化へのファンの反応の強さ";
 "settings.strategy_preset_reset" = "デフォルトに戻す";
 "settings.strategy_custom" = "カスタム";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "カスタム";
+"settings.strategy_new" = "新規作成";
+"settings.strategy_delete" = "削除";
+"settings.strategy_delete_title" = "「%@」を削除しますか？";
+"settings.strategy_delete_message" = "この戦略を使う時間設定は、現在有効な戦略に切り替わります。";
+"settings.strategy_name" = "名前";
+"settings.strategy_name_desc" = "空欄で内蔵の名前に戻ります";
+"settings.strategy_activate" = "有効にする";
+"settings.strategy_in_use" = "使用中";
+"settings.strategy_state_custom" = "カスタム戦略";
+"settings.strategy_state_modified" = "出荷時の値から変更済み";
+"settings.strategy_state_shipped" = "出荷時の値と同じです";
+"settings.strategy_curve_desc" = "自動モードでは、使用中の戦略への編集がすぐに反映されます。";
+"settings.strategy_new_name" = "新しい戦略 %d";
+"settings.strategy_list_footer" = "戦略をクリックするとカーブを編集できます。「有効にする」で自動モードのファンが従う戦略を選びます。";
+"settings.strategy_editor_header" = "「%@」を編集中";
+"settings.section.schedule" = "スケジュール";
+"settings.schedule_footer" = "設定時刻になるとモードを切り替えます。スリープ中や終了中に過ぎた時刻は、次回の確認時に適用されます。";
+"settings.schedule_add" = "時刻を追加";
+"settings.schedule_remove" = "時刻を削除";
+"settings.schedule_days.every" = "毎日";
+"settings.schedule_days.weekdays" = "平日";
+"settings.schedule_days.weekends" = "週末";
+"settings.schedule_keep_strategy" = "現在の戦略のまま";
+"common.cancel" = "キャンセル";
+"settings.curve_hint" = "制御点をドラッグ、グラフをダブルクリックで追加、選択するとここで微調整できます。";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "選択したポイントを削除";
+"settings.strategy_new_help" = "この戦略をもとに新規作成";
+"settings.strategy_delete_ellipsis" = "戦略を削除…";
+"settings.curve_legend_curve" = "設定曲線";
+"settings.curve_legend_protected" = "温度保護込み";
+"settings.curve_legend_others" = "ほかの戦略";
+"settings.curve_legend_live" = "現在値";
+
+"settings.curve_add_point" = "制御点を追加";
+
+"settings.curve_add_hint" = "グラフをクリックして制御点を挿入します。曲線の形は変わりません。";
+
+"settings.curve_undo" = "曲線の編集を取り消す";
+
+"settings.curve_redo" = "曲線の編集をやり直す";

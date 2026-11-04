@@ -35,16 +35,11 @@ class FanControlViewModel: ObservableObject {
     @Published var manualSpeed: Int = 2000
     @Published var autoThreshold: Double = 60.0
     @Published var autoMaxSpeed: Int = 4500
-    @Published var autoAggressiveness: Double = 1.5
 
-    // Power-strategy mirror (see FanController). / 中文：能效策略镜像（详见 FanController）。
-    @Published var powerStrategy: PowerStrategy = .balanced
-    @Published private(set) var strategyPresetOverrides: [PowerStrategy: StrategyPreset] = [:]
-
-    // PID gain overrides (nil = use the formula derived from aggressiveness). / 中文：PID 增益覆盖值（nil 表示使用由响应强度推导的公式）。
-    @Published var pidKpCustom: Double? = nil
-    @Published var pidKiCustom: Double? = nil
-    @Published var pidKdCustom: Double? = nil
+    // Strategy and schedule mirrors (see FanController). / 中文：策略与定时的镜像（详见 FanController）。
+    @Published private(set) var strategies: [FanStrategy] = FanStrategy.builtIns
+    @Published private(set) var activeStrategyID: String = FanStrategy.balancedID
+    @Published private(set) var scheduleEntries: [ScheduleEntry] = []
 
     /// When true (manual mode), each fan uses its own target RPM from `manualSpeeds`. / 中文：When true (手动 模式), each 风扇 uses its own 目标 RPM from `手动Speeds`.
     @Published var perFanManualControl: Bool = false
@@ -272,32 +267,20 @@ class FanControlViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: &$autoMaxSpeed)
 
-        fanController.$autoAggressiveness
+        fanController.$strategies
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .assign(to: &$autoAggressiveness)
+            .assign(to: &$strategies)
 
-        fanController.$powerStrategy
+        fanController.$activeStrategyID
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .assign(to: &$powerStrategy)
+            .assign(to: &$activeStrategyID)
 
-        fanController.$strategyPresetOverrides
+        fanController.$scheduleEntries
             .removeDuplicates()
             .receive(on: DispatchQueue.main)
-            .assign(to: &$strategyPresetOverrides)
-
-        fanController.$pidKpCustom
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$pidKpCustom)
-
-        fanController.$pidKiCustom
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$pidKiCustom)
-
-        fanController.$pidKdCustom
-            .receive(on: DispatchQueue.main)
-            .assign(to: &$pidKdCustom)
+            .assign(to: &$scheduleEntries)
 
         fanController.$statusMessage
             .removeDuplicates()
@@ -434,6 +417,8 @@ class FanControlViewModel: ObservableObject {
         print("FanControl: System woke up - scheduling settings reapply")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
             guard let self, self.wakeReapplyGeneration == generation else { return }
+            // A scheduled switch may have come due while asleep. / 中文：睡眠期间可能已有定时切换到期。
+            self.fanController.evaluateSchedule()
             self.fanController.reapplySettings()
         }
     }
@@ -522,42 +507,43 @@ class FanControlViewModel: ObservableObject {
         fanController.setProtectionMaxFraction(fraction)
     }
 
-    func setAutoAggressiveness(_ value: Double) {
-        fanController.setAutoAggressiveness(value)
+    var activeStrategy: FanStrategy {
+        strategies.first { $0.id == activeStrategyID } ?? strategies[0]
     }
 
-    func setPowerStrategy(_ strategy: PowerStrategy) {
-        fanController.setPowerStrategy(strategy)
+    func strategy(id: String) -> FanStrategy? {
+        strategies.first { $0.id == id }
     }
 
-    func preset(for strategy: PowerStrategy) -> StrategyPreset? {
-        strategyPresetOverrides[strategy] ?? strategy.defaultPreset
+    func setActiveStrategy(_ id: String) {
+        fanController.setActiveStrategy(id)
     }
 
-    func setStrategyPreset(_ preset: StrategyPreset, for strategy: PowerStrategy) {
-        fanController.setStrategyPreset(preset, for: strategy)
+    func setStrategyCurve(_ curve: FanCurve, for id: String) {
+        fanController.setStrategyCurve(curve, for: id)
     }
 
-    func resetStrategyPreset(for strategy: PowerStrategy) {
-        fanController.resetStrategyPreset(for: strategy)
+    func resetStrategyCurve(for id: String) {
+        fanController.resetStrategyCurve(for: id)
     }
 
-    /// Override individual PID gains (pass nil to fall back to the formula). / 中文：覆盖单个 PID 增益（传入 nil 时回退到公式值）。
-    func setPIDGains(kp: Double?, ki: Double?, kd: Double?) {
-        fanController.setPIDGains(kp: kp, ki: ki, kd: kd)
+    @discardableResult
+    func addStrategy(name: String, basedOn id: String? = nil) -> String {
+        fanController.addStrategy(name: name, basedOn: id)
     }
 
-    /// Read the gain currently in effect (custom override or formula default). / 中文：读取 the gain currently in effect (custom override or formula default).
-    var effectivePIDKp: Double {
-        fanController.effectivePIDKp
+    func renameStrategy(_ id: String, to name: String) {
+        fanController.renameStrategy(id, to: name)
     }
-    var effectivePIDKi: Double {
-        fanController.effectivePIDKi
+
+    func deleteStrategy(_ id: String) {
+        fanController.deleteStrategy(id)
     }
-    var effectivePIDKd: Double {
-        fanController.effectivePIDKd
+
+    func setScheduleEntries(_ entries: [ScheduleEntry]) {
+        fanController.setScheduleEntries(entries)
     }
-    
+
     // MARK: - Access Control / 中文：访问控制
     
     func checkAccess() -> Bool {

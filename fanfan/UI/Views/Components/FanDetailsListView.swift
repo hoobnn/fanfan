@@ -55,7 +55,7 @@ struct FanDetailsListView: View {
             }
             .padding(.bottom, 2)
         }
-        .themedCard(scheme)
+        .themedCard()
     }
 
     private func fanRow(_ index: Int) -> some View {

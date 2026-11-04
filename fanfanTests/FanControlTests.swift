@@ -18,15 +18,16 @@ final class FanControlTests: XCTestCase {
         "manualFanSpeedsPerFan",
         "autoThreshold",
         "autoMaxSpeed",
-        "autoAggressiveness",
         "powerStrategy",
         "powerStrategyPresetLayout",
         "strategyPreset.powerSaving",
         "strategyPreset.balanced",
         "strategyPreset.performance",
-        "pidKpCustom",
-        "pidKiCustom",
-        "pidKdCustom"
+        "fanStrategies",
+        "activeStrategyID",
+        "scheduleEntries",
+        "scheduleLastAppliedStamp",
+        "autoAggressiveness"
     ]
     private var savedDefaults: [String: Any] = [:]
 
@@ -147,54 +148,244 @@ final class FanControlTests: XCTestCase {
         XCTAssertEqual(controller.mode, .automatic)
     }
     
-    func testPowerStrategyDefault() {
-        let monitor = SystemMonitor()
-        let controller = FanController(systemMonitor: monitor)
-
-        // A fresh install starts on the balanced strategy. / 中文：全新安装默认为均衡策略。
-        XCTAssertEqual(controller.powerStrategy, .balanced)
-    }
-
-    func testPowerStrategyAppliesPreset() {
-        let monitor = SystemMonitor()
-        let controller = FanController(systemMonitor: monitor)
-
-        // Selecting a named strategy fills the core auto parameters from its / 中文：选择具名策略会用该档预设
-        // preset (target temp + response notch). / 中文：填好核心自动参数（目标温度 + 响应档位）。
-        controller.setPowerStrategy(.powerSaving)
-        XCTAssertEqual(controller.powerStrategy, .powerSaving)
-        XCTAssertEqual(controller.autoThreshold, PowerStrategy.powerSaving.defaultPreset!.targetTemp)
-        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.powerSaving.defaultPreset!.aggressiveness)
-
-        controller.setPowerStrategy(.performance)
-        XCTAssertEqual(controller.autoThreshold, PowerStrategy.performance.defaultPreset!.targetTemp)
-        XCTAssertEqual(controller.autoAggressiveness, PowerStrategy.performance.defaultPreset!.aggressiveness)
-    }
-
-    func testUserPresetOverridesDefaultAndPersists() {
+    func testStrategiesStartWithTheBuiltIns() {
         let controller = FanController(systemMonitor: SystemMonitor())
-        controller.setPowerStrategy(.balanced)
 
-        // Retuning the active strategy applies at once and survives a relaunch. / 中文：调整生效中的策略会立即应用，并在重启后保留。
-        let tuned = StrategyPreset(targetTemp: 70, aggressiveness: 1.0, maxSpeedFraction: 0.5)
-        controller.setStrategyPreset(tuned, for: .balanced)
-        XCTAssertEqual(controller.powerStrategy, .balanced)
-        XCTAssertEqual(controller.autoThreshold, 70)
-        XCTAssertEqual(controller.autoAggressiveness, 1.0)
-
-        let reloaded = FanController(systemMonitor: SystemMonitor())
-        XCTAssertEqual(reloaded.preset(for: .balanced), tuned)
-
-        reloaded.resetStrategyPreset(for: .balanced)
-        XCTAssertEqual(reloaded.preset(for: .balanced), PowerStrategy.balanced.defaultPreset)
-        XCTAssertNil(reloaded.strategyPresetOverrides[.balanced])
+        // A fresh install lists the three built-ins and starts on balanced. / 中文：全新安装列出三个内置策略，默认均衡。
+        XCTAssertEqual(controller.strategies.map(\.id), FanStrategy.builtInIDs)
+        XCTAssertEqual(controller.activeStrategyID, FanStrategy.balancedID)
     }
 
-    func testLegacyStrategyLabelMigratesToTierHoldingItsValues() {
+    func testSelectingAStrategyAppliesItsCurve() {
+        let controller = FanController(systemMonitor: SystemMonitor())
+
+        // The live ramp start follows the strategy's curve. / 中文：实时爬升起点跟随策略的曲线。
+        controller.setActiveStrategy(FanStrategy.powerSavingID)
+        XCTAssertEqual(controller.activeStrategyID, FanStrategy.powerSavingID)
+        XCTAssertEqual(controller.autoThreshold, 80, accuracy: 0.001)
+
+        controller.setActiveStrategy(FanStrategy.performanceID)
+        XCTAssertEqual(controller.autoThreshold, 60, accuracy: 0.001)
+    }
+
+    func testSliderEditsReshapeTheActiveCurveAndResetRestoresIt() {
+        let controller = FanController(systemMonitor: SystemMonitor())
+        controller.setActiveStrategy(FanStrategy.balancedID)
+
+        // Moving the ramp start shifts the curve and keeps the strategy selected, marked as adjusted. / 中文：移动爬升起点会平移曲线，策略仍保持选中并标记为已调整。
+        controller.setAutoThreshold(70)
+        XCTAssertEqual(controller.activeStrategyID, FanStrategy.balancedID)
+        XCTAssertTrue(controller.activeStrategy.isModified)
+        XCTAssertEqual(controller.autoThreshold, 70, accuracy: 0.001)
+
+        // The adjustment survives a relaunch. / 中文：调整在重启后依然保留。
+        let reloaded = FanController(systemMonitor: SystemMonitor())
+        XCTAssertEqual(reloaded.activeStrategyID, FanStrategy.balancedID)
+        XCTAssertEqual(reloaded.autoThreshold, 70, accuracy: 0.001)
+
+        reloaded.resetStrategyCurve(for: FanStrategy.balancedID)
+        XCTAssertEqual(reloaded.strategy(id: FanStrategy.balancedID)?.curve, FanStrategy.shippedCurve(for: FanStrategy.balancedID))
+        XCTAssertFalse(reloaded.activeStrategy.isModified)
+    }
+
+    func testUserStrategyCanBeAddedRenamedAndDeleted() {
+        let controller = FanController(systemMonitor: SystemMonitor())
+
+        let id = controller.addStrategy(name: "Office")
+        XCTAssertEqual(controller.strategy(id: id)?.displayName, "Office")
+        XCTAssertNotEqual(controller.activeStrategyID, id, "Adding must not activate the new strategy")
+
+        controller.renameStrategy(id, to: "  Quiet  ")
+        XCTAssertEqual(controller.strategy(id: id)?.displayName, "Quiet")
+
+        // A user strategy cannot be renamed to nothing. / 中文：用户策略不能改名为空。
+        controller.renameStrategy(id, to: "   ")
+        XCTAssertEqual(controller.strategy(id: id)?.displayName, "Quiet")
+
+        controller.setActiveStrategy(id)
+        controller.deleteStrategy(id)
+        XCTAssertNil(controller.strategy(id: id))
+        XCTAssertEqual(controller.activeStrategyID, FanStrategy.balancedID)
+
+        // Built-ins cannot be deleted. / 中文：内置策略不可删除。
+        controller.deleteStrategy(FanStrategy.balancedID)
+        XCTAssertNotNil(controller.strategy(id: FanStrategy.balancedID))
+    }
+
+    func testBuiltInRenameWithEmptyNameRestoresTitle() {
+        let controller = FanController(systemMonitor: SystemMonitor())
+
+        controller.renameStrategy(FanStrategy.balancedID, to: "Mine")
+        XCTAssertEqual(controller.strategy(id: FanStrategy.balancedID)?.displayName, "Mine")
+
+        controller.renameStrategy(FanStrategy.balancedID, to: "")
+        XCTAssertNil(controller.strategy(id: FanStrategy.balancedID)?.name)
+        XCTAssertFalse(controller.strategy(id: FanStrategy.balancedID)?.displayName.isEmpty ?? true)
+    }
+
+    func testLegacyTiersMigrateToTheTierHoldingTheirValues() {
         XCTAssertEqual(FanController.migratedStrategy(.powerSaving, fromLayout: 0), .balanced)
         XCTAssertEqual(FanController.migratedStrategy(.balanced, fromLayout: 0), .performance)
         XCTAssertEqual(FanController.migratedStrategy(.performance, fromLayout: 0), .custom)
         XCTAssertEqual(FanController.migratedStrategy(.powerSaving, fromLayout: 2), .powerSaving)
+    }
+
+    func testLegacyCustomBecomesAUserStrategyThatStaysActive() {
+        let defaults = UserDefaults.standard
+        defaults.set("custom", forKey: "powerStrategy")
+        defaults.set(68.0, forKey: "autoThreshold")
+        defaults.set(1.0, forKey: "autoAggressiveness")
+
+        // Upgrading must keep the values the user was running, not fall back to balanced. / 中文：升级必须保留用户正在使用的参数，而不是回退到均衡。
+        let controller = FanController(systemMonitor: SystemMonitor())
+        XCTAssertFalse(controller.activeStrategy.isBuiltIn)
+        XCTAssertEqual(controller.activeStrategy.curve.rampStartTemp, 68, accuracy: 0.001)
+        XCTAssertEqual(controller.autoThreshold, 68, accuracy: 0.001)
+    }
+
+    func testLegacyParametersConvertToTheSameCurveTheOldLawDrew() {
+        // The old law: flat until the target, then `span × aggressiveness / 10` RPM per °C, capped at the ceiling. / 中文：旧定律：目标温度前保持下界，之后每 °C 增加 `span × 响应强度 / 10` RPM，并封顶。
+        let floor = 1000.0
+        let span = 4000.0
+        let curve = StrategyPreset(targetTemp: 70, aggressiveness: 1.5, maxSpeedFraction: 0.5).curve
+        for temp in stride(from: 40.0, through: 100.0, by: 1.0) {
+            let legacy = floor + min(0.5 * span, max(0, span * 1.5 / 10 * (temp - 70)))
+            XCTAssertEqual(floor + curve.fraction(at: temp) * span, legacy, accuracy: 1, "at \(temp) °C")
+        }
+    }
+
+    func testLayoutThreeStrategiesWithPresetsDecodeToTheirCurves() throws {
+        // Settings saved by the previous build stored `preset`, not `curve`. / 中文：上一版保存的设置存的是 `preset` 而非 `curve`。
+        let json = #"[{"id":"balanced","preset":{"targetTemp":75,"aggressiveness":0.6,"maxSpeedFraction":0.35}}]"#
+        let decoded = try JSONDecoder().decode([FanStrategy].self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.first?.curve, FanStrategy.shippedCurve(for: FanStrategy.balancedID))
+    }
+
+    func testCurveNormalizationKeepsOrderAndNeverFalls() {
+        let curve = FanCurve(points: [
+            CurvePoint(temp: 80, fraction: 0.6),
+            CurvePoint(temp: 50, fraction: 0.4),
+            CurvePoint(temp: 65, fraction: 0.1),
+            CurvePoint(temp: 120, fraction: 2)
+        ])
+        XCTAssertEqual(curve.points.map(\.temp), [50, 65, 80, 100])
+        XCTAssertEqual(curve.points.map(\.fraction), [0.4, 0.4, 0.6, 1.0])
+    }
+
+    func testCurveEditingKeepsTemperaturesDistinctAndPushesNeighbourSpeeds() {
+        let curve = FanCurve(points: [CurvePoint(temp: 40, fraction: 0.1),
+                                      CurvePoint(temp: 70, fraction: 0.4),
+                                      CurvePoint(temp: 90, fraction: 0.8)])
+        let moved = curve.movingPoint(at: 1, to: CurvePoint(temp: 100, fraction: 1))
+        XCTAssertEqual(moved.points[1], CurvePoint(temp: 89, fraction: 1))
+        XCTAssertEqual(moved.points[0], curve.points[0])
+        XCTAssertEqual(moved.points[2], CurvePoint(temp: 90, fraction: 1))
+        let lower = curve.movingPoint(at: 1, to: CurvePoint(temp: 20, fraction: -1))
+        XCTAssertEqual(lower.points[1], CurvePoint(temp: 41, fraction: 0))
+        XCTAssertEqual(lower.points[0], CurvePoint(temp: 40, fraction: 0))
+        XCTAssertEqual(lower.points[2], curve.points[2])
+        XCTAssertEqual(curve.movingPoint(at: 99, to: CurvePoint(temp: 50, fraction: 1)), curve)
+    }
+
+    func testInsertingCurvePointPreservesInterpolationAndRejectsCrowdedPoints() {
+        let curve = FanCurve(points: [CurvePoint(temp: 40, fraction: 0),
+                                      CurvePoint(temp: 93, fraction: 0.8)])
+        let inserted = curve.insertingPoint(at: 61.2)
+        XCTAssertEqual(inserted.points.count, 3)
+        XCTAssertEqual(inserted.points[1].temp, 61)
+        for temp in stride(from: 40.0, through: 100.0, by: 0.5) {
+            XCTAssertEqual(inserted.fraction(at: temp), curve.fraction(at: temp), accuracy: 0.000001)
+        }
+        XCTAssertEqual(inserted.insertingPoint(at: 61), inserted)
+        let full = FanCurve(points: (0..<8).map { CurvePoint(temp: 40 + Double($0) * 8, fraction: Double($0) / 10) })
+        XCTAssertEqual(full.insertingPoint(at: 50), full)
+    }
+
+    func testPrecisionCurveEditingPreservesTheUntouchedAxis() {
+        let curve = FanCurve(points: [CurvePoint(temp: 40, fraction: 0),
+                                      CurvePoint(temp: 80.833333, fraction: 0.333333),
+                                      CurvePoint(temp: 100, fraction: 0.7)])
+        let rpmEdit = curve.movingPoint(at: 1, to: CurvePoint(temp: curve.points[1].temp, fraction: 0.34))
+        XCTAssertEqual(rpmEdit.points[1].temp, curve.points[1].temp)
+        let tempEdit = curve.movingPoint(at: 1, to: CurvePoint(temp: 82, fraction: curve.points[1].fraction))
+        XCTAssertEqual(tempEdit.points[1].fraction, curve.points[1].fraction)
+    }
+
+    func testEditingLegacyFractionalPointsDoesNotReorderNeighbours() {
+        let curve = FanCurve(points: [CurvePoint(temp: 60, fraction: 0),
+                                      CurvePoint(temp: 60.5, fraction: 0.35),
+                                      CurvePoint(temp: 100, fraction: 0.7)])
+        let moved = curve.movingPoint(at: 1, to: CurvePoint(temp: 40, fraction: 0.1))
+        XCTAssertEqual(moved.points[1].temp, 60.5)
+        XCTAssertEqual(moved.points[0], curve.points[0])
+        XCTAssertEqual(moved.points[2], curve.points[2])
+        XCTAssertEqual(curve.insertingPoint(at: 61), curve)
+    }
+
+    func testNormalizedStrategiesRestoresMissingBuiltInsAndDropsDuplicates() {
+        let user = FanStrategy.user(
+            name: "Office",
+            curve: FanCurve(points: [CurvePoint(temp: 50, fraction: 0.2), CurvePoint(temp: 90, fraction: 0.8)])
+        )
+        let stored = [
+            user,
+            user,
+            FanStrategy(id: FanStrategy.balancedID, name: nil,
+                        curve: FanCurve(points: [CurvePoint(temp: 999, fraction: 9)]))
+        ]
+
+        let normalized = FanController.normalizedStrategies(stored)
+        XCTAssertEqual(normalized.map(\.id), FanStrategy.builtInIDs + [user.id])
+        XCTAssertEqual(normalized[0].curve, FanStrategy.shippedCurve(for: FanStrategy.powerSavingID))
+        XCTAssertEqual(normalized[1].curve.points.last?.temp, FanCurve.temperatureRange.upperBound)
+        XCTAssertEqual(normalized[1].curve.topFraction, 1)
+    }
+
+    func testCurveTargetFollowsTheCurveAndProtectionLiftsTheFloor() {
+        let curve = FanCurve(points: [CurvePoint(temp: 40, fraction: 0.1), CurvePoint(temp: 100, fraction: 0.35)])
+        func target(_ temp: Double, safety: Double) -> ResponseCurve.Target {
+            ResponseCurve.target(curveTemp: temp, safetyTemp: safety, curve: curve,
+                                 floor: 1000, hardwareMax: 5000, protectionFraction: 0.8)
+        }
+
+        // Between the points the speed is interpolated; the ceiling comes from the curve's top. / 中文：点之间按线性插值；上限取自曲线的最高点。
+        let mid = target(70, safety: 70)
+        XCTAssertEqual(mid.rpm, 1900, accuracy: 0.5)
+        XCTAssertEqual(mid.userCeiling, 2400)
+
+        // Protection raises a minimum speed above the onset, even on a curve that stays low. / 中文：超过起始温度后，即使曲线很低，保护也会抬升最低转速。
+        XCTAssertEqual(target(40, safety: 90).rpm, 2500, accuracy: 1)
+        // At the critical temperature the protection maximum takes over. / 中文：临界温度时，直接取保护上限。
+        XCTAssertEqual(target(40, safety: 95).rpm, 4000, accuracy: 0.5)
+    }
+
+    func testScheduleResolverFindsTheLatestTriggerAndHonoursDays() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+        func at(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+        }
+
+        // 2026-11-04 is a Wednesday; 11-07 Saturday; 11-08 Sunday. / 中文：2026-11-04 为周三，11-07 为周六，11-08 为周日。
+        let morning = ScheduleEntry(id: UUID(), hour: 9, minute: 0, days: .everyDay, mode: .automatic, strategyID: FanStrategy.performanceID)
+        let weekendNight = ScheduleEntry(id: UUID(), hour: 22, minute: 30, days: .weekends, mode: .system, strategyID: nil)
+        let entries = [morning, weekendNight]
+
+        XCTAssertEqual(ScheduleResolver.latestTrigger(in: entries, now: at(4, 12, 0), calendar: calendar)?.entry.id, morning.id)
+
+        // Before today's 09:00 the previous day's 09:00 is the latest. / 中文：今天 09:00 之前，最近的触发点是昨天 09:00。
+        let beforeMorning = ScheduleResolver.latestTrigger(in: entries, now: at(4, 8, 0), calendar: calendar)
+        XCTAssertEqual(beforeMorning?.entry.id, morning.id)
+        XCTAssertEqual(beforeMorning?.date, at(3, 9, 0))
+
+        // Weekend-only entry fires on Saturday night, not on a weekday night. / 中文：仅周末的条目在周六晚触发，工作日晚上不触发。
+        XCTAssertEqual(ScheduleResolver.latestTrigger(in: entries, now: at(7, 23, 0), calendar: calendar)?.entry.id, weekendNight.id)
+        XCTAssertEqual(ScheduleResolver.latestTrigger(in: entries, now: at(4, 23, 0), calendar: calendar)?.entry.id, morning.id)
+
+        // Monday morning before 09:00: last trigger is Sunday night. / 中文：周一 09:00 前，最近触发点是周日晚。
+        XCTAssertEqual(ScheduleResolver.latestTrigger(in: entries, now: at(9, 8, 0), calendar: calendar)?.entry.id, weekendNight.id)
+
+        XCTAssertNil(ScheduleResolver.latestTrigger(in: [], now: at(4, 12, 0), calendar: calendar))
     }
 
     func testUserDefaultsManager() {
@@ -677,20 +868,5 @@ final class FanControlTests: XCTestCase {
             ),
             4_800
         )
-    }
-
-    func testPIDOverrideStartsFromExactEffectiveGains() {
-        let controller = FanController(systemMonitor: SystemMonitor())
-        let gains = (
-            controller.effectivePIDKp,
-            controller.effectivePIDKi,
-            controller.effectivePIDKd
-        )
-
-        controller.setPIDGains(kp: gains.0, ki: gains.1, kd: gains.2)
-
-        XCTAssertEqual(controller.effectivePIDKp, gains.0)
-        XCTAssertEqual(controller.effectivePIDKi, gains.1)
-        XCTAssertEqual(controller.effectivePIDKd, gains.2)
     }
 }

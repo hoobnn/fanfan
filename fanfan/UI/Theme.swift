@@ -131,22 +131,17 @@ struct Theme {
 
     // ── Card surface ────────────────────────────────────────────────── / 中文：── 卡片表面 ──────────────────────────────────────────────────
 
-    /// Cards are the content layer sitting on the popover's Liquid Glass, so / 中文：卡片是叠在 popover Liquid Glass 上的内容层，
-    /// they stay a translucent tile — never glass themselves (no glass on / 中文：因此只做半透明色块，自身不上玻璃（避免玻璃叠玻璃），
-    /// glass) and no drop shadow, like Control Center modules. / 中文：也不加投影，与控制中心模块一致。
+    /// Flat tile for cards inside scroll views, where per-frame glass sampling stutters. / 中文：滚动视图内卡片用的平面色块，玻璃逐帧取样会导致滚动卡顿。
     static func cardBg(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.55)
     }
 
-    /// Hairline edge for cards — a faint lit top that keeps tiles separable / 中文：卡片发丝边——顶部微亮，让色块在
-    /// on bright wallpapers without reading as a raised panel. / 中文：明亮壁纸上仍可分辨，但不显得凸起。
+    /// Hairline edge for flat cards — a faint lit top that keeps tiles separable on bright wallpapers. / 中文：平面卡片的发丝边，顶部微亮，在明亮壁纸上仍可分辨。
     static func cardStroke(_ scheme: ColorScheme) -> LinearGradient {
         scheme == .dark
-            ? LinearGradient(colors: [Color.white.opacity(0.12),
-                                      Color.white.opacity(0.03)],
+            ? LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.03)],
                              startPoint: .top, endPoint: .bottom)
-            : LinearGradient(colors: [Color.white.opacity(0.8),
-                                      Color.black.opacity(0.04)],
+            : LinearGradient(colors: [Color.white.opacity(0.8), Color.black.opacity(0.04)],
                              startPoint: .top, endPoint: .bottom)
     }
 
@@ -189,27 +184,34 @@ struct Theme {
 // MARK: - Card surface modifier / 中文：卡片表面修饰器
 
 extension Theme {
-    /// Card surface: translucent monochrome fill plus a hairline lit edge. / 中文：卡片表面：半透明单色填充加发丝亮边。
-    /// Centralizes the look so every card stays consistent. / 中文：集中定义外观，保证所有卡片一致。
+    /// Card surface: system Liquid Glass, untinted so temperature stays the only colour. / 中文：卡片表面：系统 Liquid Glass，不着色，温度仍是唯一的颜色。
+    /// Centralizes the look so every card stays consistent. Put sibling cards in one / 中文：集中定义外观，保证所有卡片一致。相邻卡片放进同一个
+    /// `GlassEffectContainer` so they share one glass pass. / 中文：`GlassEffectContainer`，共用一次玻璃渲染。
+    /// Cards inside a scroll view pass `glass: false`: glass re-samples its backdrop every / 中文：滚动视图里的卡片传 `glass: false`：玻璃每帧都要重新取样背景，
+    /// frame, which makes scrolling stutter, so those get a flat tile instead. / 中文：会让滚动卡顿，因此改用平面色块。
     struct CardSurface: ViewModifier {
-        let scheme: ColorScheme
         let cornerRadius: CGFloat
+        let glass: Bool
+
+        @Environment(\.colorScheme) private var scheme
 
         func body(content: Content) -> some View {
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            return content
-                .background(Theme.cardBg(scheme), in: shape)
-                .overlay {
-                    shape.strokeBorder(Theme.cardStroke(scheme), lineWidth: 0.75)
-                }
-                .clipShape(shape)
+            if glass {
+                content.glassEffect(.regular, in: shape)
+            } else {
+                content
+                    .background(Theme.cardBg(scheme), in: shape)
+                    .overlay { shape.strokeBorder(Theme.cardStroke(scheme), lineWidth: 0.75) }
+                    .clipShape(shape)
+            }
         }
     }
 }
 
 extension View {
     /// Apply the standard refined card surface. / 中文：Apply the standard refined 卡片 surface.
-    func themedCard(_ scheme: ColorScheme, cornerRadius: CGFloat = 12) -> some View {
-        modifier(Theme.CardSurface(scheme: scheme, cornerRadius: cornerRadius))
+    func themedCard(cornerRadius: CGFloat = 12, glass: Bool = true) -> some View {
+        modifier(Theme.CardSurface(cornerRadius: cornerRadius, glass: glass))
     }
 }

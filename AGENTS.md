@@ -32,7 +32,7 @@ fanfan.app (user)  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶ 
 
 ## 代码结构（仅记录读代码看不出来的部分）
 
-- `FanController.swift` —— 自动模式控制器：EMA 平滑温度输入、PID 环、非对称 RPM 死区（易升难降）带 8 秒最短保持、非对称爬坡（升快降慢），以及 Silent / Balanced / Performance / Custom 预设。**抗震荡调参（平滑 + 非对称）是为消除可听见的风扇"喘振"而存在，重构时务必保留。**
+- `FanController.swift` —— 自动模式控制器：EMA 平滑温度输入、按策略风扇曲线查表得到目标转速（曲线与保护抬升在 `FanStrategy.swift` 的 `ResponseCurve.target`，控制点可在设置中编辑）、非对称 RPM 死区（易升难降）带 8 秒最短保持、非对称爬坡（升快降慢），以及内置策略（省电 / 均衡 / 性能）和用户自定义策略。**抗震荡调参（平滑 + 非对称）是为消除可听见的风扇"喘振"而存在，重构时务必保留。**
 - `FanControlViewModel.swift` —— 唯一的 Combine `ObservableObject`，UI 层风扇状态的事实来源，所有 UI 变更从这里流转。
 - `Theme.swift` —— 设计规则严格执行：**温度是唯一的颜色**。UI 全单色，温度升高时一层几乎不可见的暖色从 popover 顶部渗入。新增 UI 一律从 `Theme` 取色，不要硬编码。
 - `SystemMonitor.swift` —— IOKit 传感器 / SMC 读取器，SMC 键位目录在这里。

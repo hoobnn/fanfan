@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "選單列";
 "settings.section.monitoring" = "監控與警示";
 "settings.section.general" = "一般";
-"settings.section.advanced_pid" = "進階 PID 調校";
 "settings.section.about" = "關於";
 
 /* 關於 / 更新 */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "在 App 內下載並安裝新版本";
 "settings.check_updates.button" = "檢查";
 
-"settings.pid_override" = "使用自訂增益";
-"settings.pid_override_desc" = "關閉時依回應檔位自動推導 Kp/Ki/Kd";
-"settings.pid_kp" = "Kp 比例";
-"settings.pid_kp_desc" = "每 1°C 誤差貢獻的轉速";
-"settings.pid_ki" = "Ki 積分";
-"settings.pid_ki_desc" = "消除穩態偏差的速度";
-"settings.pid_kd" = "Kd 微分";
-"settings.pid_kd_desc" = "對溫度變化趨勢的預測回應";
-"settings.pid_reset" = "重置為預設值";
 
 /* 設定項目 */
 "settings.launch_at_login" = "登入時啟動";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "省電";
 "popover.strategy.balanced" = "均衡";
 "popover.strategy.performance" = "效能";
-"popover.threshold" = "目標溫度";
+"popover.threshold" = "起轉溫度";
 "popover.max_speed" = "最高轉速";
-"popover.response" = "回應";
 
 /* 回應等級 */
-"popover.response.min_override" = "最低覆寫";
-"popover.response.quiet" = "安靜";
-"popover.response.balanced" = "平衡";
-"popover.response.auto" = "自動";
-"popover.response.performance" = "效能";
-"popover.response.aggressive" = "積極";
-"popover.response.max_override" = "最高覆寫";
 
 /* 控制模式 */
 "popover.mode.manual" = "手動";
@@ -263,12 +245,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "策略預設";
 "settings.strategy_preset" = "策略";
-"settings.strategy_preset_desc" = "選擇要調整的策略";
-"settings.strategy_preset_target" = "目標溫度";
-"settings.strategy_preset_target_desc" = "風扇盡量維持的溫度（°C）";
-"settings.strategy_preset_max_speed" = "最高轉速";
-"settings.strategy_preset_max_speed_desc" = "佔硬體轉速範圍的比例";
-"settings.strategy_preset_response" = "回應";
-"settings.strategy_preset_response_desc" = "風扇對溫度變化的反應強度";
 "settings.strategy_preset_reset" = "恢復預設";
 "settings.strategy_custom" = "自訂";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "自訂";
+"settings.strategy_new" = "新增策略";
+"settings.strategy_delete" = "刪除";
+"settings.strategy_delete_title" = "刪除「%@」？";
+"settings.strategy_delete_message" = "使用此策略的定時項目會改用目前生效的策略。";
+"settings.strategy_name" = "名稱";
+"settings.strategy_name_desc" = "留空可恢復內建名稱";
+"settings.strategy_activate" = "設為生效";
+"settings.strategy_in_use" = "正在生效";
+"settings.strategy_state_custom" = "自訂策略";
+"settings.strategy_state_modified" = "已偏離出廠參數";
+"settings.strategy_state_shipped" = "與出廠參數一致";
+"settings.strategy_curve_desc" = "自動模式下，編輯目前生效的策略會立即生效。";
+"settings.strategy_new_name" = "新策略 %d";
+"settings.strategy_list_footer" = "點選一個策略來編輯它的曲線；「設為生效」決定自動模式下風扇遵循哪一個。";
+"settings.strategy_editor_header" = "編輯「%@」";
+"settings.section.schedule" = "定時";
+"settings.schedule_footer" = "到達設定時間時切換模式。睡眠或退出期間錯過的時間點，會在下次檢查時補上。";
+"settings.schedule_add" = "新增時間點";
+"settings.schedule_remove" = "刪除時間點";
+"settings.schedule_days.every" = "每天";
+"settings.schedule_days.weekdays" = "工作日";
+"settings.schedule_days.weekends" = "週末";
+"settings.schedule_keep_strategy" = "保持目前策略";
+"common.cancel" = "取消";
+"settings.curve_hint" = "拖曳控制點調整，按兩下圖表新增，點選後可在此微調。";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "刪除所選控制點";
+"settings.strategy_new_help" = "以目前策略為基礎新增";
+"settings.strategy_delete_ellipsis" = "刪除策略…";
+"settings.curve_legend_curve" = "設定曲線";
+"settings.curve_legend_protected" = "含高溫保護";
+"settings.curve_legend_others" = "其他策略";
+"settings.curve_legend_live" = "即時";
+
+"settings.curve_add_point" = "新增控制點";
+
+"settings.curve_add_hint" = "點擊圖表插入控制點，曲線形狀保持不變。";
+
+"settings.curve_undo" = "復原曲線編輯";
+
+"settings.curve_redo" = "重做曲線編輯";

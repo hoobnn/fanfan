@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "菜单栏";
 "settings.section.monitoring" = "监控与警报";
 "settings.section.general" = "通用";
-"settings.section.advanced_pid" = "高级 PID 调试";
 "settings.section.about" = "关于";
 
 /* 关于 / 更新 */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "在应用内下载并安装新版本";
 "settings.check_updates.button" = "检查";
 
-"settings.pid_override" = "使用自定义增益";
-"settings.pid_override_desc" = "关闭则按响应档自动推导 Kp/Ki/Kd";
-"settings.pid_kp" = "Kp 比例";
-"settings.pid_kp_desc" = "每 1°C 误差贡献的 RPM";
-"settings.pid_ki" = "Ki 积分";
-"settings.pid_ki_desc" = "消除稳态偏差的强度";
-"settings.pid_kd" = "Kd 微分";
-"settings.pid_kd_desc" = "对温度升降率的预测响应";
-"settings.pid_reset" = "重置为默认";
 
 /* 设置项 */
 "settings.launch_at_login" = "登录时启动";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "省电";
 "popover.strategy.balanced" = "均衡";
 "popover.strategy.performance" = "性能";
-"popover.threshold" = "目标温度";
+"popover.threshold" = "起转温度";
 "popover.max_speed" = "最大转速";
-"popover.response" = "响应";
 
 /* 响应级别 */
-"popover.response.min_override" = "最小覆盖";
-"popover.response.quiet" = "安静";
-"popover.response.balanced" = "平衡";
-"popover.response.auto" = "自动";
-"popover.response.performance" = "性能";
-"popover.response.aggressive" = "激进";
-"popover.response.max_override" = "最大覆盖";
 
 /* 控制模式 */
 "popover.mode.manual" = "手动";
@@ -263,12 +245,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "策略预设";
 "settings.strategy_preset" = "策略";
-"settings.strategy_preset_desc" = "选择要调整的策略";
-"settings.strategy_preset_target" = "目标温度";
-"settings.strategy_preset_target_desc" = "风扇尽量维持的温度（°C）";
-"settings.strategy_preset_max_speed" = "最高转速";
-"settings.strategy_preset_max_speed_desc" = "占硬件转速范围的比例";
-"settings.strategy_preset_response" = "响应";
-"settings.strategy_preset_response_desc" = "风扇对温度变化的反应强度";
 "settings.strategy_preset_reset" = "恢复默认";
 "settings.strategy_custom" = "自定义";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "自定义";
+"settings.strategy_new" = "新建策略";
+"settings.strategy_delete" = "删除";
+"settings.strategy_delete_title" = "删除“%@”？";
+"settings.strategy_delete_message" = "使用该策略的定时项会改用当前生效的策略。";
+"settings.strategy_name" = "名称";
+"settings.strategy_name_desc" = "留空可恢复内置名称";
+"settings.strategy_activate" = "设为生效";
+"settings.strategy_in_use" = "正在生效";
+"settings.strategy_state_custom" = "自定义策略";
+"settings.strategy_state_modified" = "已偏离出厂参数";
+"settings.strategy_state_shipped" = "与出厂参数一致";
+"settings.strategy_curve_desc" = "自动模式下，编辑当前生效的策略会立即生效。";
+"settings.strategy_new_name" = "新策略 %d";
+"settings.strategy_list_footer" = "点选一个策略来编辑它的曲线；「设为生效」决定自动模式下风扇遵循哪一个。";
+"settings.strategy_editor_header" = "编辑「%@」";
+"settings.section.schedule" = "定时";
+"settings.schedule_footer" = "到达设定时间时切换模式。睡眠或退出期间错过的时间点，会在下次检查时补上。";
+"settings.schedule_add" = "添加时间点";
+"settings.schedule_remove" = "删除时间点";
+"settings.schedule_days.every" = "每天";
+"settings.schedule_days.weekdays" = "工作日";
+"settings.schedule_days.weekends" = "周末";
+"settings.schedule_keep_strategy" = "保持当前策略";
+"common.cancel" = "取消";
+"settings.curve_hint" = "拖动控制点调整，双击图表添加，点选后可在此精调。";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "删除所选控制点";
+"settings.strategy_new_help" = "基于当前策略新建";
+"settings.strategy_delete_ellipsis" = "删除策略…";
+"settings.curve_legend_curve" = "设定曲线";
+"settings.curve_legend_protected" = "含高温保护";
+"settings.curve_legend_others" = "其他策略";
+"settings.curve_legend_live" = "实时";
+
+"settings.curve_add_point" = "添加控制点";
+
+"settings.curve_add_hint" = "点击图表插入控制点，曲线形状保持不变。";
+
+"settings.curve_undo" = "撤销曲线编辑";
+
+"settings.curve_redo" = "重做曲线编辑";

@@ -11,7 +11,6 @@
 "settings.section.menu_bar" = "메뉴 막대";
 "settings.section.monitoring" = "모니터링 및 알림";
 "settings.section.general" = "일반";
-"settings.section.advanced_pid" = "고급 PID 튜닝";
 "settings.section.about" = "정보";
 
 /* About / Updates */
@@ -23,15 +22,6 @@
 "settings.check_updates_desc" = "앱 안에서 새 버전을 다운로드하고 설치합니다";
 "settings.check_updates.button" = "확인";
 
-"settings.pid_override" = "사용자 지정 게인";
-"settings.pid_override_desc" = "끄면 응답 수준에 따라 Kp/Ki/Kd를 자동으로 계산합니다";
-"settings.pid_kp" = "Kp 비례";
-"settings.pid_kp_desc" = "오차 1°C당 더해지는 RPM";
-"settings.pid_ki" = "Ki 적분";
-"settings.pid_ki_desc" = "정상 상태 오차를 없애는 속도";
-"settings.pid_kd" = "Kd 미분";
-"settings.pid_kd_desc" = "온도 변화 추세에 대한 예측 반응";
-"settings.pid_reset" = "기본값으로 재설정";
 
 /* Settings Items */
 "settings.launch_at_login" = "로그인 시 실행";
@@ -89,18 +79,10 @@
 "popover.strategy.power_saving" = "절전";
 "popover.strategy.balanced" = "균형";
 "popover.strategy.performance" = "성능";
-"popover.threshold" = "목표 온도";
+"popover.threshold" = "상승 시작 온도";
 "popover.max_speed" = "최대 속도";
-"popover.response" = "응답";
 
 /* Response Levels */
-"popover.response.min_override" = "최소 고정";
-"popover.response.quiet" = "조용함";
-"popover.response.balanced" = "균형";
-"popover.response.auto" = "자동";
-"popover.response.performance" = "성능";
-"popover.response.aggressive" = "강력";
-"popover.response.max_override" = "최대 고정";
 
 /* Control Modes */
 "popover.mode.manual" = "수동";
@@ -263,12 +245,49 @@
 /* Strategy presets */
 "settings.section.strategy_presets" = "전략 프리셋";
 "settings.strategy_preset" = "전략";
-"settings.strategy_preset_desc" = "조정할 전략 선택";
-"settings.strategy_preset_target" = "목표 온도";
-"settings.strategy_preset_target_desc" = "팬이 유지하려는 온도(°C)";
-"settings.strategy_preset_max_speed" = "최대 속도";
-"settings.strategy_preset_max_speed_desc" = "하드웨어 RPM 범위 대비 비율";
-"settings.strategy_preset_response" = "응답";
-"settings.strategy_preset_response_desc" = "온도 변화에 대한 팬의 반응 강도";
 "settings.strategy_preset_reset" = "기본값으로 재설정";
 "settings.strategy_custom" = "사용자 지정";
+
+// Strategy list, schedule / 中文：策略列表、定时
+"strategy.migrated_custom" = "사용자 지정";
+"settings.strategy_new" = "새 전략";
+"settings.strategy_delete" = "삭제";
+"settings.strategy_delete_title" = "“%@”을(를) 삭제할까요?";
+"settings.strategy_delete_message" = "이 전략을 사용하는 예약은 현재 적용 중인 전략을 따릅니다.";
+"settings.strategy_name" = "이름";
+"settings.strategy_name_desc" = "비워 두면 기본 이름으로 돌아갑니다";
+"settings.strategy_activate" = "적용";
+"settings.strategy_in_use" = "사용 중";
+"settings.strategy_state_custom" = "사용자 지정 전략";
+"settings.strategy_state_modified" = "출고 시 값에서 변경됨";
+"settings.strategy_state_shipped" = "출고 시 값과 같음";
+"settings.strategy_curve_desc" = "자동 모드에서 사용 중인 전략을 편집하면 즉시 적용됩니다.";
+"settings.strategy_new_name" = "새 전략 %d";
+"settings.strategy_list_footer" = "전략을 클릭하면 곡선을 편집할 수 있습니다. ‘적용’은 자동 모드에서 팬이 따를 전략을 정합니다.";
+"settings.strategy_editor_header" = "‘%@’ 편집 중";
+"settings.section.schedule" = "예약";
+"settings.schedule_footer" = "설정한 시간이 되면 모드를 전환합니다. 절전 중이나 종료 중에 지나간 시간은 다음 확인 때 적용됩니다.";
+"settings.schedule_add" = "시간 추가";
+"settings.schedule_remove" = "시간 삭제";
+"settings.schedule_days.every" = "매일";
+"settings.schedule_days.weekdays" = "평일";
+"settings.schedule_days.weekends" = "주말";
+"settings.schedule_keep_strategy" = "현재 전략 유지";
+"common.cancel" = "취소";
+"settings.curve_hint" = "제어점을 드래그하고, 그래프를 더블 클릭해 추가하거나, 선택한 뒤 여기서 미세 조정하세요.";
+"settings.curve_point_readout" = "%d°C · %d RPM";
+"settings.curve_remove_point" = "선택한 점 삭제";
+"settings.strategy_new_help" = "이 전략을 바탕으로 새로 만들기";
+"settings.strategy_delete_ellipsis" = "전략 삭제…";
+"settings.curve_legend_curve" = "설정 곡선";
+"settings.curve_legend_protected" = "과열 보호 포함";
+"settings.curve_legend_others" = "다른 전략";
+"settings.curve_legend_live" = "실시간";
+
+"settings.curve_add_point" = "제어점 추가";
+
+"settings.curve_add_hint" = "차트를 클릭하여 제어점을 삽입하세요. 곡선 모양은 유지됩니다.";
+
+"settings.curve_undo" = "곡선 편집 실행 취소";
+
+"settings.curve_redo" = "곡선 편집 다시 실행";

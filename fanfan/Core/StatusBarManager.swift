@@ -168,7 +168,8 @@ class StatusBarManager: NSObject, ObservableObject {
         // 中文：关掉出场动画：popover 弹簧出场的第一帧会把靠近底边的系统滑杆轨道
         // 画得偏浅，每次打开「响应」滑杆都会闪一下。
         popover?.animates = false
-        popover?.contentSize = NSSize(width: 340, height: 580)
+        popover?.contentSize = NSSize(width: 320, height: 580)
+        observePopoverSize()
         popover?.delegate = self
         // Let AppKit attach the new status item before anchoring a pending panel.
         // 中文：等待 AppKit 挂载状态栏按钮，再显示启动期间待打开的面板。
@@ -252,13 +253,38 @@ class StatusBarManager: NSObject, ObservableObject {
             self?.popoverContentMounter = { [weak self] in
                 guard let popover = self?.popover,
                       popover.contentViewController == nil else { return }
-                popover.contentViewController = NSHostingController(rootView: builder())
+                let host = NSHostingController(rootView: builder())
+                // The status bar owns the popover height (see `observePopoverSize`). / 中文：弹窗高度由状态栏掌管（见 `observePopoverSize`）。
+                host.sizingOptions = []
+                popover.contentViewController = host
             }
             self?.enqueuePopoverPresentation()
         }
     }
 
     private var popoverContentMounter: (() -> Void)?
+
+    /// Sizes the popover from the content's reported size, in both directions. / 中文：按内容上报的高度设置弹窗尺寸，增大和缩小都生效。
+    private func observePopoverSize() {
+        guard heightObserver == nil else { return }
+        heightObserver = NotificationCenter.default.addObserver(
+            forName: .popoverContentSizeChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let size = note.object as? CGSize, size.width > 0, size.height > 0 else { return }
+            self?.resizePopover(to: NSSize(width: size.width, height: ceil(size.height)))
+        }
+    }
+
+    private var heightObserver: NSObjectProtocol?
+
+    /// Sets the popover to the content's size in one step. Window and content change
+    /// in the same frame, so nothing runs ahead of the other. / 中文：一步把弹窗设为内容尺寸。窗口与内容在同一帧变化，互不超前。
+    private func resizePopover(to target: NSSize) {
+        guard let popover else { return }
+        let current = popover.contentSize
+        guard abs(current.width - target.width) > 0.5 || abs(current.height - target.height) > 0.5 else { return }
+        popover.contentSize = target
+    }
 
     var isPopoverShown: Bool { popover?.isShown == true }
     
