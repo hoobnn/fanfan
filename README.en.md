@@ -21,7 +21,7 @@ FanFan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 <table>
   <tr>
     <td width="42%" align="center"><img src="docs/view/en/popover.png" alt="FanFan menu bar popover showing Mac temperature, fan RPM, a 60-second temperature chart, CPU/GPU/SSD/battery sensors, and automatic fan control"></td>
-    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="FanFan settings: menu bar display, monitoring interval, high temperature alert, notifications, auto mode switching, and custom PID gains"></td>
+    <td width="58%" align="center"><img src="docs/view/en/settings.png" alt="FanFan settings: sidebar pages, the strategy list, and a draggable temperature-to-fan-speed curve"></td>
   </tr>
   <tr>
     <td align="center"><sub>Menu bar popover</sub></td>
@@ -33,10 +33,10 @@ FanFan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 
 - Fan RPM plus CPU, GPU, SSD and battery temperatures, depending on which sensors your Mac has. The popover shows the last 60 seconds as a chart, and the Sensors tab lists every reading.
 - Three fan modes: a fixed RPM, automatic control based on temperature, or the Mac's own firmware control. On Macs with two fans you can set each one separately.
-- Automatic mode lets you change the target temperature, the maximum speed and how quickly it reacts. There are Power Saving, Balanced and Performance presets, or your own settings. Speed changes are smoothed (fast up, slow down) to avoid constant surging.
+- Automatic mode follows each strategy's temperature-to-speed curve. Power Saving, Balanced and Performance are built in; in Settings › Strategy you can drag points to reshape a curve, and create or rename strategies of your own. The popover adjusts the ramp-start temperature and maximum speed directly. Speed changes are smoothed (fast up, slow down) to avoid constant surging.
+- Schedule: switch the fan mode and strategy at set times, every day, on weekdays or on weekends, for example a quieter strategy at night.
 - The menu bar item can show temperature, power draw, fan speed as a percentage, or just the icon.
-- A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time.
-- Custom PID gains when none of the presets fit your workload.
+- A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time. Above 85°C, thermal protection lets the fans exceed your maximum speed, up to a limit you can set.
 - English, 简体中文, 繁體中文, 日本語, 한국어, Deutsch, Français and Español. FanFan follows the system language, or you can set its language on its own in System Settings › General › Language & Region › Applications.
 - Built-in updates: FanFan checks for new versions in the background and offers to install them and relaunch. You can also check by hand, or turn automatic checks off, in Settings › About.
 - Fan speeds are written by a separate privileged helper. If the app hangs for more than 10 seconds, quits or crashes, the fans go back to macOS control.
