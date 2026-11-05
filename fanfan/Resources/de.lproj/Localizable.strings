@@ -274,7 +274,14 @@
 "settings.schedule_days.weekends" = "Wochenende";
 "settings.schedule_keep_strategy" = "Aktuelle Strategie beibehalten";
 "common.cancel" = "Abbrechen";
-"settings.curve_hint" = "Punkt ziehen, zum Hinzufügen doppelt ins Diagramm klicken oder auswählen und hier feinjustieren.";
+"settings.curve_hint" = "Punkt ziehen, zum Hinzufügen doppelt ins Diagramm klicken. Ausgewählte Punkte hier feinjustieren oder mit der Rückschritttaste entfernen.";
+"settings.curve_field_temp" = "Temp.";
+"settings.curve_field_rpm" = "Drehzahl";
+"settings.schedule_empty" = "Noch keine Zeitpunkte.";
+"settings.schedule_header" = "Zeitpunkte";
+"settings.schedule_field_time" = "Uhrzeit";
+"settings.schedule_field_repeat" = "Wiederholen";
+"settings.schedule_field_mode" = "Modus";
 "settings.curve_point_readout" = "%d°C · %d RPM";
 "settings.curve_remove_point" = "Ausgewählten Punkt entfernen";
 "settings.strategy_new_help" = "Neue Strategie auf Basis dieser";

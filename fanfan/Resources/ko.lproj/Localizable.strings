@@ -274,7 +274,14 @@
 "settings.schedule_days.weekends" = "주말";
 "settings.schedule_keep_strategy" = "현재 전략 유지";
 "common.cancel" = "취소";
-"settings.curve_hint" = "제어점을 드래그하고, 그래프를 더블 클릭해 추가하거나, 선택한 뒤 여기서 미세 조정하세요.";
+"settings.curve_hint" = "제어점을 드래그하고, 그래프를 더블 클릭해 추가하세요. 선택한 뒤 여기서 미세 조정하거나 Delete 키로 삭제할 수 있습니다.";
+"settings.curve_field_temp" = "온도";
+"settings.curve_field_rpm" = "속도";
+"settings.schedule_empty" = "아직 시간 지점이 없습니다.";
+"settings.schedule_header" = "시간 지점";
+"settings.schedule_field_time" = "시간";
+"settings.schedule_field_repeat" = "반복";
+"settings.schedule_field_mode" = "모드";
 "settings.curve_point_readout" = "%d°C · %d RPM";
 "settings.curve_remove_point" = "선택한 점 삭제";
 "settings.strategy_new_help" = "이 전략을 바탕으로 새로 만들기";

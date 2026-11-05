@@ -274,7 +274,14 @@
 "settings.schedule_days.weekends" = "週末";
 "settings.schedule_keep_strategy" = "現在の戦略のまま";
 "common.cancel" = "キャンセル";
-"settings.curve_hint" = "制御点をドラッグ、グラフをダブルクリックで追加、選択するとここで微調整できます。";
+"settings.curve_hint" = "制御点をドラッグ、グラフをダブルクリックで追加。選択するとここで微調整でき、Delete キーで削除できます。";
+"settings.curve_field_temp" = "温度";
+"settings.curve_field_rpm" = "回転数";
+"settings.schedule_empty" = "時間ポイントはまだありません。";
+"settings.schedule_header" = "時間ポイント";
+"settings.schedule_field_time" = "時刻";
+"settings.schedule_field_repeat" = "繰り返し";
+"settings.schedule_field_mode" = "モード";
 "settings.curve_point_readout" = "%d°C · %d RPM";
 "settings.curve_remove_point" = "選択したポイントを削除";
 "settings.strategy_new_help" = "この戦略をもとに新規作成";

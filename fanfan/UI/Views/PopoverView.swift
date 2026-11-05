@@ -318,7 +318,7 @@ struct PopoverView: View {
                     systemImage: "slider.horizontal.3",
                     title: NSLocalizedString("popover.settings", comment: "")
                 ) {
-                    openWindow(id: "settings")
+                    SettingsWindowPresenter.show(using: openWindow)
                 }
                 footerButton(
                     systemImage: "power",

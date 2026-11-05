@@ -40,6 +40,9 @@ struct ResponseCurveView: View {
     @State private var redoHistory: [[CurvePoint]] = []
     /// Previous empty-area click, used to recognise a double-click inside the drag gesture. / 中文：上一次在空白处的单击，用于在拖动手势里识别双击。
     @State private var lastEmptyClick: (time: TimeInterval, location: CGPoint)?
+    /// The chart takes keyboard focus when clicked, so Delete removes the selected point and the / 中文：点击图表即获得键盘焦点：删除键移除所选控制点，
+    /// arrow keys nudge it. It also pulls focus out of any text field in the window. / 中文：方向键微调它；同时让窗口里的输入框失去焦点。
+    @FocusState private var chartFocused: Bool
 
     private static let insets = EdgeInsets(top: 20, leading: 38, bottom: 22, trailing: 16)
     private static let sampleStep = 1.0
@@ -78,6 +81,20 @@ struct ResponseCurveView: View {
                         readoutBubble(in: plot)
                         Color.clear
                             .contentShape(Rectangle())
+                            .focusable()
+                            .focused($chartFocused)
+                            .focusEffectDisabled()
+                            // The Delete key reaches a focused view as the delete command, not as a key press. / 中文：删除键以 delete 命令送达有焦点的视图，而不是按键事件。
+                            .onDeleteCommand { removeSelected() }
+                            .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow]) { press in
+                                nudgeSelected(press)
+                            }
+                            .onKeyPress(.escape) {
+                                guard selectedIndex != nil || addingPoint else { return .ignored }
+                                selectedIndex = nil
+                                addingPoint = false
+                                return .handled
+                            }
                             .gesture(editGesture(in: plot))
                             .pointerStyle(pointerStyle)
                             .onContinuousHover { phase in
@@ -119,33 +136,13 @@ struct ResponseCurveView: View {
         }
     }
 
-    /// One compact row under the chart: the hint or the selected point's precision steppers on the / 中文：图表下方一行紧凑工具栏：左侧是提示或所选控制点的精调步进器，
-    /// left, icon tools on the right. Its height never changes with the selection. / 中文：右侧是图标工具；高度不随选中状态变化。
+    /// One compact row under the chart: the hint or the selected point's values on the left, icon / 中文：图表下方一行紧凑工具栏：左侧是提示或所选控制点的数值，
+    /// tools on the right. Its height never changes with the selection. / 中文：右侧是图标工具；高度不随选中状态变化。
     private var editorControls: some View {
         HStack(spacing: 10) {
             Group {
                 if !addingPoint, let index = selectedIndex, displayPoints.indices.contains(index) {
-                    let point = displayPoints[index]
-                    // Labels sit outside the steppers: inside a Form a labelled Stepper takes the row's
-                    // label/control layout and claims the full row width, which pushed the form wider than the window.
-                    // 中文：标签放在步进器外面。Form 里带标签的 Stepper 会套用整行的标签/控件布局并占满行宽，曾把表单撑得比窗口还宽。
-                    HStack(spacing: 4) {
-                        Text(String(format: "%.0f °C", point.temp))
-                            .frame(minWidth: 38, alignment: .trailing)
-                        Stepper("", value: Binding(get: { point.temp }, set: {
-                            editSelected(CurvePoint(temp: $0, fraction: point.fraction))
-                        }), in: displayCurve.temperatureBounds(for: index), step: FanCurve.temperatureStep)
-                        .labelsHidden()
-                        Text(String(format: "%.0f RPM", rpm(forFraction: point.fraction)))
-                            .frame(minWidth: 66, alignment: .trailing)
-                            .padding(.leading, 10)
-                        Stepper("", value: Binding(get: { point.fraction }, set: {
-                            editSelected(CurvePoint(temp: point.temp, fraction: $0))
-                        }), in: 0...1, step: FanCurve.fractionStep)
-                        .labelsHidden()
-                    }
-                    .font(Theme.num(11.5, weight: .medium))
-                    .controlSize(.small)
+                    pointFields(index: index, point: displayPoints[index])
                 } else {
                     Text(NSLocalizedString(addingPoint ? "settings.curve_add_hint" : "settings.curve_hint", comment: ""))
                         .font(.caption)
@@ -154,7 +151,7 @@ struct ResponseCurveView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
 
             HStack(spacing: 2) {
                 toolButton(addingPoint ? "plus.circle.fill" : "plus.circle",
@@ -162,7 +159,7 @@ struct ResponseCurveView: View {
                            enabled: addingPoint || displayPoints.count < FanCurve.pointCountRange.upperBound) {
                     addingPoint.toggle()
                 }
-                toolButton("minus.circle", help: NSLocalizedString("settings.curve_remove_point", comment: ""),
+                toolButton("minus.circle", help: "\(NSLocalizedString("settings.curve_remove_point", comment: "")) (⌫)",
                            enabled: canRemoveSelected) { removeSelected() }
                 Divider().frame(height: 14).padding(.horizontal, 4)
                 toolButton("arrow.uturn.backward", help: NSLocalizedString("settings.curve_undo", comment: ""),
@@ -172,6 +169,63 @@ struct ResponseCurveView: View {
             }
             .fixedSize()
         }
+    }
+
+    /// Temperature and fan speed of the selected point: type a value, or step it one unit at a time. / 中文：所选控制点的温度与转速：可直接输入，也可逐级步进。
+    /// Labels sit outside the steppers: inside a Form a labelled Stepper takes the row's label/control / 中文：标签放在步进器外面。Form 里带标签的 Stepper 会套用整行的
+    /// layout and claims the full row width, which pushed the form wider than the window. / 中文：标签/控件布局并占满行宽，曾把表单撑得比窗口还宽。
+    private func pointFields(index: Int, point: CurvePoint) -> some View {
+        let bounds = displayCurve.temperatureBounds(for: index)
+        let tempText = Binding<Int>(
+            get: { Int(point.temp.rounded()) },
+            set: { editSelected(CurvePoint(temp: clamp(Double($0), bounds), fraction: point.fraction)) }
+        )
+        let tempStep = Binding<Double>(
+            get: { point.temp },
+            set: { editSelected(CurvePoint(temp: $0, fraction: point.fraction)) }
+        )
+        let rpmText = Binding<Int>(
+            get: { Int(rpm(forFraction: point.fraction).rounded()) },
+            set: { editSelected(CurvePoint(temp: point.temp, fraction: clamp((Double($0) - rpmDomain.lowerBound) / span, 0...1))) }
+        )
+        let fractionStep = Binding<Double>(
+            get: { point.fraction },
+            set: { editSelected(CurvePoint(temp: point.temp, fraction: $0)) }
+        )
+        return HStack(spacing: 16) {
+            // The end points are pinned at 40 °C and 100 °C, so only their speed is editable. / 中文：首尾点固定在 40 °C 与 100 °C，只能改转速。
+            valueField(label: "settings.curve_field_temp", unit: "°C", width: 34, text: tempText) {
+                Stepper("", value: tempStep, in: bounds, step: FanCurve.temperatureStep)
+            }
+            .disabled(displayCurve.isPinned(index))
+            valueField(label: "settings.curve_field_rpm", unit: "RPM", width: 46, text: rpmText) {
+                Stepper("", value: fractionStep, in: 0...1, step: FanCurve.fractionStep)
+            }
+        }
+        .controlSize(.small)
+    }
+
+    private func valueField<S: View>(label: String, unit: String, width: CGFloat, text: Binding<Int>,
+                                     @ViewBuilder stepper: () -> S) -> some View {
+        HStack(spacing: 5) {
+            Text(NSLocalizedString(label, comment: ""))
+                .font(.caption)
+                .foregroundStyle(Theme.text2)
+            TextField("", value: text, format: IntegerFormatStyle<Int>().grouping(.never))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .font(Theme.num(11.5, weight: .medium))
+                .frame(width: width)
+                .labelsHidden()
+            Text(verbatim: unit)
+                .font(Theme.num(10.5, weight: .medium))
+                .foregroundStyle(Theme.text2)
+            stepper()
+                .labelsHidden()
+                .padding(.leading, -2)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(NSLocalizedString(label, comment: ""))
     }
 
     private func toolButton(_ symbol: String, help: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -249,6 +303,24 @@ struct ResponseCurveView: View {
         commit(displayCurve.movingPoint(at: index, to: point).points)
     }
 
+    /// Arrow keys move the selected point one step (Shift: five), the same steps as the fields below. / 中文：方向键按一级步进移动所选控制点（按住 Shift 为五级），与下方输入框一致。
+    private func nudgeSelected(_ press: KeyPress) -> KeyPress.Result {
+        guard !addingPoint, let index = selectedIndex, displayPoints.indices.contains(index) else { return .ignored }
+        let point = displayPoints[index]
+        let steps = press.modifiers.contains(.shift) ? 5.0 : 1.0
+        var moved = point
+        switch press.key {
+        case .leftArrow:  moved.temp -= FanCurve.temperatureStep * steps
+        case .rightArrow: moved.temp += FanCurve.temperatureStep * steps
+        case .upArrow:    moved.fraction += FanCurve.fractionStep * steps
+        case .downArrow:  moved.fraction -= FanCurve.fractionStep * steps
+        default: return .ignored
+        }
+        editSelected(CurvePoint(temp: clamp(moved.temp, displayCurve.temperatureBounds(for: index)),
+                                fraction: clamp(moved.fraction, 0...1)))
+        return .handled
+    }
+
     private func restoreHistory(undo: Bool) {
         let points: [CurvePoint]?
         if undo {
@@ -291,7 +363,9 @@ struct ResponseCurveView: View {
 
     private var canRemoveSelected: Bool {
         guard let index = selectedIndex else { return false }
-        return committedPoints.indices.contains(index) && committedPoints.count > FanCurve.pointCountRange.lowerBound
+        return committedPoints.indices.contains(index)
+            && committedPoints.count > FanCurve.pointCountRange.lowerBound
+            && !FanCurve(points: committedPoints).isPinned(index)
     }
 
     private func readoutText(for point: CurvePoint) -> String {
@@ -336,6 +410,7 @@ struct ResponseCurveView: View {
             .onChanged { value in
                 if !dragging {
                     dragging = true
+                    chartFocused = true
                     dragIndex = handleIndex(near: value.startLocation, in: plot)
                     if let index = dragIndex {
                         lastEmptyClick = nil

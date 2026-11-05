@@ -339,7 +339,7 @@ private struct SettingsCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appSettings) {
             Button(NSLocalizedString("popover.settings", comment: "")) {
-                openWindow(id: "settings")
+                SettingsWindowPresenter.show(using: openWindow)
             }
             .keyboardShortcut(",", modifiers: .command)
         }

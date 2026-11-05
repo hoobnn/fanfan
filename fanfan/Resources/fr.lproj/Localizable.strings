@@ -274,7 +274,14 @@
 "settings.schedule_days.weekends" = "Week-ends";
 "settings.schedule_keep_strategy" = "Garder la stratégie actuelle";
 "common.cancel" = "Annuler";
-"settings.curve_hint" = "Faites glisser un point, double-cliquez sur le graphique pour en ajouter un, ou sélectionnez-le pour l’ajuster ici.";
+"settings.curve_hint" = "Faites glisser un point, double-cliquez sur le graphique pour en ajouter un. Sélectionnez-le pour l’ajuster ici ou appuyez sur Supprimer pour le retirer.";
+"settings.curve_field_temp" = "Temp.";
+"settings.curve_field_rpm" = "Vitesse";
+"settings.schedule_empty" = "Aucun horaire pour l’instant.";
+"settings.schedule_header" = "Horaires";
+"settings.schedule_field_time" = "Heure";
+"settings.schedule_field_repeat" = "Répéter";
+"settings.schedule_field_mode" = "Mode";
 "settings.curve_point_readout" = "%d°C · %d RPM";
 "settings.curve_remove_point" = "Supprimer le point sélectionné";
 "settings.strategy_new_help" = "Nouvelle stratégie basée sur celle-ci";

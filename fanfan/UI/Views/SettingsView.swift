@@ -76,6 +76,7 @@ struct SettingsView: View {
     @State private var nameDraft = ""
     @FocusState private var nameFieldFocused: Bool
     @State private var pendingDeleteID: String?
+    @State private var editingScheduleID: UUID?
 
     private var pane: SettingsPane { SettingsPane(rawValue: paneRaw) ?? .general }
 
@@ -155,6 +156,7 @@ struct SettingsView: View {
         }
         .onChange(of: paneRaw) { _, _ in commitName(for: editingStrategyID) }
         .onDisappear { commitName(for: editingStrategyID) }
+        .background(EndEditingOnOutsideClick())
         .frame(minWidth: SettingsWindowLayout.minSize.width,
                idealWidth: SettingsWindowLayout.idealSize.width,
                maxWidth: SettingsWindowLayout.maxSize.width,
@@ -300,9 +302,10 @@ struct SettingsView: View {
         let isEditing = strategy.id == editingStrategyID
         let isActive = strategy.id == viewModel.activeStrategyID
         return HStack(spacing: 8) {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Theme.text2)
+            // A selection bar, not a chevron: a chevron reads as "expandable" or "opens something". / 中文：用选中竖条而非箭头，箭头会让人以为这一行还能展开或打开。
+            Capsule()
+                .fill(Theme.text1)
+                .frame(width: 3, height: 14)
                 .opacity(isEditing ? 1 : 0)
             Text(strategy.displayName)
                 .fontWeight(isEditing ? .semibold : .regular)
@@ -443,68 +446,163 @@ struct SettingsView: View {
 
     // MARK: - Schedule / 中文：时间计划
 
+    /// Laid out like the Clock app's alarms: each time point is a large time over a one-line summary, / 中文：布局参照「时钟」App 的闹钟：每个时间点是大号时间加一行摘要，
+    /// listed in time order. Clicking a row opens its editor in a popover. / 中文：按时间先后排列。点一行在弹出面板里编辑。
     private var scheduleSection: some View {
         Section {
-            ForEach(viewModel.scheduleEntries) { entry in
+            if viewModel.scheduleEntries.isEmpty {
+                Text(NSLocalizedString("settings.schedule_empty", comment: ""))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(sortedScheduleEntries) { entry in
                 scheduleRow(entry)
             }
             Button {
-                viewModel.setScheduleEntries(viewModel.scheduleEntries + [ScheduleEntry.new()])
+                let entry = ScheduleEntry.new()
+                viewModel.setScheduleEntries(viewModel.scheduleEntries + [entry])
+                editingScheduleID = entry.id
             } label: {
                 Label(NSLocalizedString("settings.schedule_add", comment: ""), systemImage: "plus")
             }
+            .buttonStyle(.borderless)
+        } header: {
+            Text(NSLocalizedString("settings.schedule_header", comment: ""))
         } footer: {
             Text(NSLocalizedString("settings.schedule_footer", comment: ""))
         }
     }
 
+    private var sortedScheduleEntries: [ScheduleEntry] {
+        viewModel.scheduleEntries.sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+    }
+
     private func scheduleRow(_ entry: ScheduleEntry) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        Button {
+            editingScheduleID = entry.id
+        } label: {
             HStack(spacing: 8) {
-                DatePicker("", selection: timeBinding(entry), displayedComponents: .hourAndMinute)
-                    .labelsHidden()
-                    .fixedSize()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(timeBinding(entry).wrappedValue, format: .dateTime.hour().minute())
+                        .font(Theme.num(22, weight: .regular))
+                        .foregroundStyle(Theme.text1)
+                    Text(scheduleSummary(entry))
+                        .font(.callout)
+                        .foregroundStyle(Theme.text2)
+                }
                 Spacer(minLength: 8)
-                Picker("", selection: scheduleBinding(entry, \.days)) {
-                    Text(NSLocalizedString("settings.schedule_days.every", comment: "")).tag(ScheduleDays.everyDay)
-                    Text(NSLocalizedString("settings.schedule_days.weekdays", comment: "")).tag(ScheduleDays.weekdays)
-                    Text(NSLocalizedString("settings.schedule_days.weekends", comment: "")).tag(ScheduleDays.weekends)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                Button(role: .destructive) {
-                    viewModel.setScheduleEntries(viewModel.scheduleEntries.filter { $0.id != entry.id })
-                } label: {
-                    Image(systemName: "minus.circle.fill")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(NSLocalizedString("settings.schedule_remove", comment: ""))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.text3)
             }
-            HStack(spacing: 8) {
-                Picker("", selection: scheduleBinding(entry, \.mode)) {
-                    Text(NSLocalizedString("popover.mode.manual", comment: "")).tag(ControlMode.manual)
-                    Text(NSLocalizedString("popover.mode.auto", comment: "")).tag(ControlMode.automatic)
-                    Text(NSLocalizedString("popover.mode.system", comment: "")).tag(ControlMode.system)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-                if entry.mode == .automatic {
-                    Picker("", selection: scheduleBinding(entry, \.strategyID)) {
-                        Text(NSLocalizedString("settings.schedule_keep_strategy", comment: "")).tag(String?.none)
-                        ForEach(viewModel.strategies) { strategy in
-                            Text(strategy.displayName).tag(Optional(strategy.id))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                }
-                Spacer(minLength: 0)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: Binding(
+            get: { editingScheduleID == entry.id },
+            set: { if !$0, editingScheduleID == entry.id { editingScheduleID = nil } }
+        ), arrowEdge: .trailing) {
+            scheduleEditor(entry)
+        }
+        .contextMenu {
+            Button(NSLocalizedString("settings.schedule_remove", comment: ""), role: .destructive) {
+                removeScheduleEntry(entry.id)
             }
         }
-        .padding(.vertical, 2)
+    }
+
+    /// "Every Day · Auto · Balanced". The strategy only shows for automatic mode, where it applies. / 中文：如「每天 · 自动 · 均衡」。策略只在自动模式下有意义，也只在那时显示。
+    private func scheduleSummary(_ entry: ScheduleEntry) -> String {
+        var parts = [daysTitle(entry.days), modeTitle(entry.mode)]
+        if entry.mode == .automatic {
+            parts.append(entry.strategyID.flatMap { id in viewModel.strategies.first { $0.id == id }?.displayName }
+                         ?? NSLocalizedString("settings.schedule_keep_strategy", comment: ""))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func daysTitle(_ days: ScheduleDays) -> String {
+        switch days {
+        case .everyDay: return NSLocalizedString("settings.schedule_days.every", comment: "")
+        case .weekdays: return NSLocalizedString("settings.schedule_days.weekdays", comment: "")
+        case .weekends: return NSLocalizedString("settings.schedule_days.weekends", comment: "")
+        }
+    }
+
+    private func modeTitle(_ mode: ControlMode) -> String {
+        switch mode {
+        case .manual:    return NSLocalizedString("popover.mode.manual", comment: "")
+        case .automatic: return NSLocalizedString("popover.mode.auto", comment: "")
+        case .system:    return NSLocalizedString("popover.mode.system", comment: "")
+        }
+    }
+
+    private func scheduleEditor(_ entry: ScheduleEntry) -> some View {
+        let current = viewModel.scheduleEntries.first { $0.id == entry.id } ?? entry
+        return VStack(alignment: .trailing, spacing: 16) {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
+                GridRow {
+                    editorLabel("settings.schedule_field_time")
+                    DatePicker("", selection: timeBinding(current), displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.stepperField)
+                        .fixedSize()
+                }
+                GridRow {
+                    editorLabel("settings.schedule_field_repeat")
+                    menuPicker(scheduleBinding(current, \.days)) {
+                        ForEach([ScheduleDays.everyDay, .weekdays, .weekends], id: \.self) { days in
+                            Text(daysTitle(days)).tag(days)
+                        }
+                    }
+                }
+                GridRow {
+                    editorLabel("settings.schedule_field_mode")
+                    menuPicker(scheduleBinding(current, \.mode)) {
+                        ForEach([ControlMode.manual, .automatic, .system], id: \.self) { mode in
+                            Text(modeTitle(mode)).tag(mode)
+                        }
+                    }
+                }
+                if current.mode == .automatic {
+                    GridRow {
+                        editorLabel("settings.strategy_preset")
+                        menuPicker(scheduleBinding(current, \.strategyID)) {
+                            Text(NSLocalizedString("settings.schedule_keep_strategy", comment: "")).tag(String?.none)
+                            Divider()
+                            ForEach(viewModel.strategies) { strategy in
+                                Text(strategy.displayName).tag(Optional(strategy.id))
+                            }
+                        }
+                    }
+                }
+            }
+            Button(NSLocalizedString("settings.schedule_remove", comment: ""), role: .destructive) {
+                editingScheduleID = nil
+                removeScheduleEntry(entry.id)
+            }
+        }
+        .padding(16)
+    }
+
+    private func editorLabel(_ key: String) -> some View {
+        Text(NSLocalizedString(key, comment: ""))
+            .foregroundStyle(Theme.text2)
+            .gridColumnAlignment(.trailing)
+    }
+
+    private func removeScheduleEntry(_ id: UUID) {
+        viewModel.setScheduleEntries(viewModel.scheduleEntries.filter { $0.id != id })
+    }
+
+    /// A pop-up menu sized to its title. `.fixedSize()` alone sized the strategy menu to an / 中文：宽度贴合标题的弹出菜单。单用 `.fixedSize()` 时策略菜单按
+    /// earlier, shorter title and clipped the start of long names. / 中文：先前较短的标题定宽，长名称开头被截掉。
+    private func menuPicker<Value: Hashable, Content: View>(_ selection: Binding<Value>,
+                                                            @ViewBuilder content: () -> Content) -> some View {
+        Picker(selection: selection, content: content) { EmptyView() }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+            .id(selection.wrappedValue)
     }
 
     private func updateScheduleEntry(_ id: UUID, _ change: (inout ScheduleEntry) -> Void) {
@@ -604,22 +702,70 @@ struct SettingsWindowView: View {
     var body: some View {
         SettingsView(viewModel: viewModel, updater: updater)
             .onAppear {
-                if let window = NSApplication.shared.windows.first(where: {
-                    $0.title == NSLocalizedString("app.settings_title", comment: "")
-                }) {
-                    window.standardWindowButton(.closeButton)?.isHidden = false
-                    // `.floating` is only a way to surface the window from an
-                    // accessory-policy app; leaving it set pinned Settings above
-                    // every other application for the rest of the session, with
-                    // no way for the user to send it behind anything.
-                    window.level = .floating
-                    window.makeKeyAndOrderFront(nil)
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                    DispatchQueue.main.async {
-                        window.level = .normal
-                    }
-                }
+                SettingsWindowPresenter.window?.standardWindowButton(.closeButton)?.isHidden = false
+                SettingsWindowPresenter.bringToFront()
             }
+    }
+}
+
+/// Opens Settings, or brings the open window to the front. `openWindow` on an existing window / 中文：打开设置窗口；已打开时把它带到最前。对已存在的窗口调用 `openWindow`
+/// only reorders it inside this menu-bar app, which can leave it behind the app the user is in. / 中文：只会在本菜单栏应用内部调整次序，窗口可能仍压在用户当前使用的应用后面。
+@MainActor
+enum SettingsWindowPresenter {
+    static var window: NSWindow? {
+        NSApp.windows.first { $0.title == NSLocalizedString("app.settings_title", comment: "") }
+    }
+
+    /// Call from the click's action: activation is only granted on the stack of a user event, / 中文：请在点击回调中调用：只有在用户事件的调用栈上才会获准激活，
+    /// so an open window is brought forward synchronously instead of through `openWindow`. / 中文：因此已打开的窗口直接同步前置，而不经 `openWindow`。
+    static func show(using openWindow: OpenWindowAction) {
+        // A closed Settings window stays in `NSApp.windows`; only a shown one is brought forward. / 中文：关闭后的设置窗口仍在 `NSApp.windows` 里，只前置正在显示的窗口。
+        if let window, window.isVisible || window.isMiniaturized {
+            bringToFront()
+        } else {
+            openWindow(id: "settings")
+        }
+    }
+
+    static func bringToFront() {
+        guard let window else { return }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        // `.floating` is only a way to surface the window from an accessory-policy app; / 中文：`.floating` 只用于让辅助模式应用的窗口浮到最前；
+        // leaving it set would pin Settings above every other application. / 中文：一直保留会让设置窗口永远压在所有应用之上。
+        window.level = .floating
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { window.level = .normal }
+    }
+}
+
+/// AppKit keeps a text field editing when the user clicks blank space. A click anywhere outside / 中文：AppKit 中点击空白处不会结束输入框的编辑。在当前输入框之外任意位置
+/// the field being edited ends editing, which commits its value. / 中文：点击即结束编辑并提交输入内容。
+private struct EndEditingOnOutsideClick: NSViewRepresentable {
+    final class Coordinator {
+        var monitor: Any?
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak view] event in
+            guard let window = view?.window, event.window === window,
+                  let editor = window.firstResponder as? NSTextView, editor.isFieldEditor,
+                  let field = editor.delegate as? NSView else { return event }
+            if !field.convert(field.bounds, to: nil).contains(event.locationInWindow) {
+                window.makeFirstResponder(nil)
+            }
+            return event
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        if let monitor = coordinator.monitor { NSEvent.removeMonitor(monitor) }
     }
 }
 

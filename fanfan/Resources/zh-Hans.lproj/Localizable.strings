@@ -274,7 +274,14 @@
 "settings.schedule_days.weekends" = "周末";
 "settings.schedule_keep_strategy" = "保持当前策略";
 "common.cancel" = "取消";
-"settings.curve_hint" = "拖动控制点调整，双击图表添加，点选后可在此精调。";
+"settings.curve_hint" = "拖动控制点调整，双击图表添加；选中后可在此精调，或按删除键移除。";
+"settings.curve_field_temp" = "温度";
+"settings.curve_field_rpm" = "转速";
+"settings.schedule_empty" = "尚未添加时间点。";
+"settings.schedule_header" = "时间点";
+"settings.schedule_field_time" = "时间";
+"settings.schedule_field_repeat" = "重复";
+"settings.schedule_field_mode" = "模式";
 "settings.curve_point_readout" = "%d°C · %d RPM";
 "settings.curve_remove_point" = "删除所选控制点";
 "settings.strategy_new_help" = "基于当前策略新建";
