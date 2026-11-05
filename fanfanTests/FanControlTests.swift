@@ -268,8 +268,28 @@ final class FanControlTests: XCTestCase {
             CurvePoint(temp: 65, fraction: 0.1),
             CurvePoint(temp: 120, fraction: 2)
         ])
-        XCTAssertEqual(curve.points.map(\.temp), [50, 65, 80, 100])
-        XCTAssertEqual(curve.points.map(\.fraction), [0.4, 0.4, 0.6, 1.0])
+        XCTAssertEqual(curve.points.map(\.temp), [40, 50, 65, 80, 100])
+        XCTAssertEqual(curve.points.map(\.fraction), [0.4, 0.4, 0.4, 0.6, 1.0])
+    }
+
+    func testCurveEndsArePinnedAtTheRangeBoundsWithoutChangingTheCurve() {
+        let raw = FanCurve(points: [CurvePoint(temp: 60, fraction: 0), CurvePoint(temp: 80, fraction: 0.5)])
+        XCTAssertEqual(raw.points.first, CurvePoint(temp: 40, fraction: 0))
+        XCTAssertEqual(raw.points.last, CurvePoint(temp: 100, fraction: 0.5))
+        XCTAssertEqual(raw.fraction(at: 70), 0.25, accuracy: 0.000001)
+
+        // The ends keep their temperature; only the speed moves. / 中文：首尾点温度不动，只改转速。
+        XCTAssertEqual(raw.movingPoint(at: 0, to: CurvePoint(temp: 55, fraction: 0)).points.first?.temp, 40)
+        XCTAssertEqual(raw.movingPoint(at: 3, to: CurvePoint(temp: 90, fraction: 0.8)).points.last,
+                       CurvePoint(temp: 100, fraction: 0.8))
+
+        // Shifting moves the ramp but not the ends, and repeated shifts do not pile up points. / 中文：平移移动爬升段但不动首尾，反复平移也不会堆积控制点。
+        var shifted = raw
+        for _ in 0..<5 { shifted = shifted.shiftedTemps(by: 2) }
+        XCTAssertEqual(shifted.points.map(\.temp), [40, 70, 90, 100])
+        XCTAssertEqual(shifted.rampStartTemp, 70, accuracy: 0.000001)
+        XCTAssertEqual(shifted.shiftedTemps(by: -40).points.first?.temp, 40)
+        XCTAssertEqual(shifted.shiftedTemps(by: 40).points.last?.temp, 100)
     }
 
     func testCurveEditingKeepsTemperaturesDistinctAndPushesNeighbourSpeeds() {
@@ -291,13 +311,16 @@ final class FanControlTests: XCTestCase {
         let curve = FanCurve(points: [CurvePoint(temp: 40, fraction: 0),
                                       CurvePoint(temp: 93, fraction: 0.8)])
         let inserted = curve.insertingPoint(at: 61.2)
-        XCTAssertEqual(inserted.points.count, 3)
+        XCTAssertEqual(inserted.points.count, 4)
         XCTAssertEqual(inserted.points[1].temp, 61)
         for temp in stride(from: 40.0, through: 100.0, by: 0.5) {
             XCTAssertEqual(inserted.fraction(at: temp), curve.fraction(at: temp), accuracy: 0.000001)
         }
         XCTAssertEqual(inserted.insertingPoint(at: 61), inserted)
-        let full = FanCurve(points: (0..<8).map { CurvePoint(temp: 40 + Double($0) * 8, fraction: Double($0) / 10) })
+        let full = FanCurve(points: [40.0, 48, 56, 64, 72, 80, 88, 100].enumerated().map {
+            CurvePoint(temp: $0.element, fraction: Double($0.offset) / 10)
+        })
+        XCTAssertEqual(full.points.count, FanCurve.pointCountRange.upperBound)
         XCTAssertEqual(full.insertingPoint(at: 50), full)
     }
 
@@ -315,10 +338,10 @@ final class FanControlTests: XCTestCase {
         let curve = FanCurve(points: [CurvePoint(temp: 60, fraction: 0),
                                       CurvePoint(temp: 60.5, fraction: 0.35),
                                       CurvePoint(temp: 100, fraction: 0.7)])
-        let moved = curve.movingPoint(at: 1, to: CurvePoint(temp: 40, fraction: 0.1))
-        XCTAssertEqual(moved.points[1].temp, 60.5)
-        XCTAssertEqual(moved.points[0], curve.points[0])
-        XCTAssertEqual(moved.points[2], curve.points[2])
+        let moved = curve.movingPoint(at: 2, to: CurvePoint(temp: 40, fraction: 0.1))
+        XCTAssertEqual(moved.points[2].temp, 60.5)
+        XCTAssertEqual(moved.points[1], curve.points[1])
+        XCTAssertEqual(moved.points[3], curve.points[3])
         XCTAssertEqual(curve.insertingPoint(at: 61), curve)
     }
 

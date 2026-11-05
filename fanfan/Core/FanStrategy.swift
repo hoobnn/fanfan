@@ -52,21 +52,42 @@ struct FanCurve: Codable, Equatable {
             sorted[index].fraction = running
         }
 
-        // Too many points: drop interior ones so both ends survive. / 中文：点数过多时删除中间点，保留两端。
-        while sorted.count > pointCountRange.upperBound {
-            sorted.remove(at: sorted.count / 2)
-        }
         // Too few points: a flat curve through the one given value. / 中文：点数不足时，用给定的那一个值补成水平线。
         if sorted.isEmpty {
             return [CurvePoint(temp: temperatureRange.lowerBound, fraction: 0),
                     CurvePoint(temp: temperatureRange.upperBound, fraction: 0)]
         }
-        if sorted.count == 1 {
-            let only = sorted[0].fraction
-            return [CurvePoint(temp: temperatureRange.lowerBound, fraction: only),
-                    CurvePoint(temp: temperatureRange.upperBound, fraction: only)]
+
+        // Points sharing a temperature collapse into the later, higher one. / 中文：同一温度上的多个点合并为后面（更高）的那个。
+        var unique: [CurvePoint] = []
+        for point in sorted {
+            if let last = unique.last, last.temp == point.temp {
+                unique[unique.count - 1] = point
+            } else {
+                unique.append(point)
+            }
         }
-        return sorted
+
+        // Every curve spans the whole range: its ends sit at exactly 40 °C and 100 °C. A missing end is / 中文：每条曲线都覆盖完整区间，首尾点恰好位于 40 °C 与 100 °C。
+        // added at the nearest point's speed, which is the value the curve already held out there, so the / 中文：缺少的端点按最近一点的转速补上，这正是曲线原本在那一段保持的值，
+        // running curve does not change. / 中文：因此实际运行的曲线不变。
+        if unique[0].temp > temperatureRange.lowerBound {
+            unique.insert(CurvePoint(temp: temperatureRange.lowerBound, fraction: unique[0].fraction), at: 0)
+        }
+        if unique[unique.count - 1].temp < temperatureRange.upperBound {
+            unique.append(CurvePoint(temp: temperatureRange.upperBound, fraction: unique[unique.count - 1].fraction))
+        }
+
+        // Too many points: drop interior ones so both ends survive. / 中文：点数过多时删除中间点，保留两端。
+        while unique.count > pointCountRange.upperBound {
+            unique.remove(at: unique.count / 2)
+        }
+        return unique
+    }
+
+    /// The first and last points are pinned to the ends of the range; only their speed can change. / 中文：首尾控制点固定在区间两端，只能调整转速。
+    func isPinned(_ index: Int) -> Bool {
+        index == 0 || index == points.count - 1
     }
 
     /// Speed fraction at `temp`, held flat beyond the first and last points. / 中文：某温度下的转速占比；超出首尾点时保持端点的值。
@@ -85,8 +106,10 @@ struct FanCurve: Codable, Equatable {
     /// Editing keeps a full degree between neighbours, including legacy fractional temperatures.
     func temperatureBounds(for index: Int) -> ClosedRange<Double> {
         guard points.indices.contains(index) else { return Self.temperatureRange }
-        let lower = index == 0 ? Self.temperatureRange.lowerBound : min(points[index].temp, ceil(points[index - 1].temp + Self.temperatureStep))
-        let upper = index == points.count - 1 ? Self.temperatureRange.upperBound : max(points[index].temp, floor(points[index + 1].temp - Self.temperatureStep))
+        if index == 0 { return Self.temperatureRange.lowerBound...Self.temperatureRange.lowerBound }
+        if index == points.count - 1 { return Self.temperatureRange.upperBound...Self.temperatureRange.upperBound }
+        let lower = min(points[index].temp, ceil(points[index - 1].temp + Self.temperatureStep))
+        let upper = max(points[index].temp, floor(points[index + 1].temp - Self.temperatureStep))
         return lower...upper
     }
 
@@ -127,9 +150,19 @@ struct FanCurve: Codable, Equatable {
         points.last(where: { $0.fraction <= 0.0005 })?.temp ?? points.first?.temp ?? FanCurve.temperatureRange.lowerBound
     }
 
-    /// Moves every point along the temperature axis, clamped to the valid range. / 中文：整体平移所有控制点的温度，并夹取到有效范围内。
+    /// Moves the curve's shape along the temperature axis; the ends stay pinned at 40 °C and 100 °C. / 中文：沿温度轴平移曲线形状；首尾点仍固定在 40 °C 与 100 °C。
+    /// Interior points left flat between equal neighbours carry no shape, so repeated shifts do not pile them up. / 中文：夹在两个等高邻点之间的中间点不承载形状，删掉它们以免反复平移后越积越多。
     func shiftedTemps(by delta: Double) -> FanCurve {
-        FanCurve(points: points.map { CurvePoint(temp: $0.temp + delta, fraction: $0.fraction) })
+        var shifted = FanCurve(points: points.map { CurvePoint(temp: $0.temp + delta, fraction: $0.fraction) }).points
+        var index = 1
+        while index < shifted.count - 1 {
+            if shifted[index - 1].fraction == shifted[index].fraction, shifted[index].fraction == shifted[index + 1].fraction {
+                shifted.remove(at: index)
+            } else {
+                index += 1
+            }
+        }
+        return FanCurve(points: shifted)
     }
 
     /// Rescales the fractions so the highest point becomes `top`. A flat-zero curve has nothing to scale, so only its last point is raised. / 中文：按比例缩放转速占比，使最高点变为 `top`；全零曲线无法按比例缩放，只抬高最后一个点。
