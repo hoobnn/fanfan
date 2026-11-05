@@ -187,11 +187,11 @@ struct ControlsCard: View, Equatable {
             }
             VStack(alignment: .leading, spacing: 6) {
                 label
-                control.fixedSize().frame(maxWidth: .infinity)
+                control.fixedSize().frame(maxWidth: .infinity, alignment: .trailing)
             }
             VStack(alignment: .leading, spacing: 6) {
                 label
-                control.controlSize(.small).fixedSize().frame(maxWidth: .infinity)
+                control.controlSize(.small).fixedSize().frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
@@ -244,20 +244,44 @@ struct ControlsCard: View, Equatable {
                 Spacer(minLength: 8)
                 strategyControl.pickerStyle(.segmented).fixedSize()
             }
+            // Wrapped below the label, the control keeps the right edge shared with every other row. / 中文：换到标签下方时，控件仍与其他各行共用右边缘。
             VStack(alignment: .leading, spacing: 6) {
                 label
-                strategyControl.pickerStyle(.segmented).fixedSize().frame(maxWidth: .infinity)
+                strategyControl.pickerStyle(.segmented).fixedSize().frame(maxWidth: .infinity, alignment: .trailing)
             }
             VStack(alignment: .leading, spacing: 6) {
                 label
-                strategyControl.pickerStyle(.segmented).controlSize(.small).fixedSize().frame(maxWidth: .infinity)
+                strategyControl.pickerStyle(.segmented).controlSize(.small).fixedSize().frame(maxWidth: .infinity, alignment: .trailing)
             }
             HStack(spacing: 6) {
                 label.fixedSize()
                 Spacer(minLength: 8)
-                strategyControl.pickerStyle(.menu).fixedSize()
+                strategyMenu
             }
         }
+    }
+
+    /// Too many strategies for segments: the active name plus an up-down chevron, set like the slider / 中文：策略多到放不下分段时：显示当前策略名加上下箭头，
+    /// values below rather than as a wide grey button. The menu lists every strategy with a checkmark. / 中文：样式与下方滑杆的数值一致，而不是一个宽大的灰色按钮；菜单列出全部策略并勾选当前项。
+    private var strategyMenu: some View {
+        Menu {
+            strategyControl.pickerStyle(.inline)
+        } label: {
+            HStack(spacing: 4) {
+                Text(snapshot.strategies.first { $0.id == selectedStrategyID }?.displayName ?? "")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.text1)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Theme.text2)
+            }
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
     }
 
     private var strategyControl: some View {
@@ -276,6 +300,9 @@ struct ControlsCard: View, Equatable {
             }
         }
         .labelsHidden()
+        // A segmented control keeps the widths of the titles it was built with, so a renamed strategy / 中文：分段控件沿用创建时的标题宽度，策略改名后
+        // was clipped. Rebuilding it when any name changes re-measures the segments. / 中文：会被截断；任一名称变化时重建控件，重新测量各段宽度。
+        .id(snapshot.strategies.map(\.displayName))
     }
 
     // MARK: - Manual / 中文：手动
