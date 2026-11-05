@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.3.2] - 2026-11-05
+
+### Changed
+- Strategy curves always span 40°C to 100°C: the first and last points stay at those temperatures and only their speed can be changed. Saved curves keep running exactly as before.
+- Curve editor: type exact values for the selected point, press Delete to remove it, or nudge it with the arrow keys (Shift for bigger steps).
+- Schedule is now a list like the Clock app's alarms: each time shows its repeat, mode and strategy at a glance. Click a time to edit it.
+- The strategy being edited is marked with a selection bar instead of an arrow.
+
+### Fixed
+- Opening Settings while its window is minimised or behind other windows brings it back to the front.
+
 ## [2.3.1] - 2026-11-04
 
 2.3.0 was tagged but never published; 2.3.1 is the first release with these changes.
