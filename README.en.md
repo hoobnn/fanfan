@@ -33,7 +33,7 @@ FanFan sits in the menu bar and shows your Mac's temperatures and fan speeds. Yo
 
 - Fan RPM plus CPU, GPU, SSD and battery temperatures, depending on which sensors your Mac has. The popover shows the last 60 seconds as a chart, and the Sensors tab lists every reading.
 - Three fan modes: a fixed RPM, automatic control based on temperature, or the Mac's own firmware control. On Macs with two fans you can set each one separately.
-- Automatic mode follows each strategy's temperature-to-speed curve. Power Saving, Balanced and Performance are built in; in Settings › Strategy you can drag points to reshape a curve, and create or rename strategies of your own. The popover adjusts the ramp-start temperature and maximum speed directly. Speed changes are smoothed (fast up, slow down) to avoid constant surging.
+- Automatic mode follows each strategy's temperature-to-speed curve. Power Saving, Balanced and Performance are built in; in Settings › Strategy you can drag points to reshape a curve (its ends stay at 40°C and 100°C; only their speed changes), and create or rename strategies of your own. The popover adjusts the ramp-start temperature and maximum speed directly. Speed changes are smoothed (fast up, slow down) to avoid constant surging.
 - Schedule: switch the fan mode and strategy at set times, every day, on weekdays or on weekends, for example a quieter strategy at night.
 - The menu bar item can show temperature, power draw, fan speed as a percentage, or just the icon.
 - A notification when the temperature passes a limit you set, with an option to switch to automatic mode at the same time. Above 85°C, thermal protection lets the fans exceed your maximum speed, up to a limit you can set.
