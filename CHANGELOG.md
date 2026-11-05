@@ -2,6 +2,15 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.3.3] - 2026-11-05
+
+### Changed
+- With more strategies than fit in the popover, the strategy picker is a compact menu showing the active strategy's name.
+- Controls that move below their label in the popover now line up on the right with the other rows.
+
+### Fixed
+- Renaming a strategy no longer leaves its name clipped in the popover's strategy picker.
+
 ## [2.3.2] - 2026-11-05
 
 ### Changed
