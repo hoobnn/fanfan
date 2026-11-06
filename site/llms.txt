@@ -1,0 +1,27 @@
+# FanFan
+
+> FanFan is a free, open-source (MIT) Mac fan control and temperature monitor that lives in the macOS menu bar. It shows CPU, GPU, SSD and battery temperatures and fan speeds; fans can be pinned to a fixed speed, follow a temperature-to-speed curve, or be handed back to macOS. FanFan 是免费开源的 Mac 风扇控制与温度监控菜单栏工具，支持 Apple Silicon 和 Intel。
+
+Key facts:
+
+- Website: https://hoobnn.github.io/fanfan/
+- Source code: https://github.com/hoobnn/fanfan
+- Download: https://github.com/hoobnn/fanfan/releases/latest (DMG, auto-updates via Sparkle)
+- Install: `brew tap hoobnn/tap && brew install --cask fanfan`
+- Requirements: macOS 26 or later; Apple Silicon or Intel. Fanless Macs (e.g. MacBook Air) only show temperatures.
+- Price and license: free, MIT. No analytics; the only network activity is Sparkle update checks, which can be turned off.
+- Fan modes: fixed RPM, automatic by strategy curve (Power Saving, Balanced, Performance, or custom), or macOS firmware control; per fan on two-fan Macs. Scheduled mode switching and high-temperature alerts.
+- Safety: speeds are limited to the fan's reported min/max; fan speed is written by a small root helper (fanfan-smcd) over XPC, and the fans return to macOS control if the app quits, crashes or hangs for 10 seconds.
+- Languages: 简体中文, 繁體中文, English, 日本語, 한국어, Deutsch, Français, Español
+- Author: hoobnn (https://github.com/hoobnn, https://www.ikuyu.com)
+
+## Docs
+
+- [README (简体中文)](https://raw.githubusercontent.com/hoobnn/fanfan/main/README.md): features, install, update, uninstall, FAQ, how it works, build from source
+- [README (English)](https://raw.githubusercontent.com/hoobnn/fanfan/main/README.en.md): the same in English
+- [Changelog](https://raw.githubusercontent.com/hoobnn/fanfan/main/CHANGELOG.md): release notes
+
+## Optional
+
+- [Releases](https://github.com/hoobnn/fanfan/releases): all versions
+- [Issues](https://github.com/hoobnn/fanfan/issues): bug reports and feedback

@@ -4,7 +4,7 @@
 
 # FanFan
 
-开源的 macOS 菜单栏工具，用于监控温度和调节风扇转速。
+开源免费的 Mac 风扇控制与温度监控菜单栏工具。
 
 [![release](https://img.shields.io/github/v/release/hoobnn/fanfan?style=flat-square)](https://github.com/hoobnn/fanfan/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/hoobnn/fanfan/total?style=flat-square)](https://github.com/hoobnn/fanfan/releases)
@@ -16,7 +16,7 @@
 
 </div>
 
-FanFan 常驻菜单栏，显示 Mac 的温度和风扇转速。风扇支持固定转速、按温度自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上。
+FanFan 是免费开源（MIT）的 Mac 风扇控制与温度监控工具，常驻 macOS 菜单栏，显示 CPU、GPU、SSD、电池温度和风扇转速。风扇支持固定转速、按温度曲线自动调节，也可以交还 macOS 控制。支持 Apple Silicon 和 Intel 机型，要求 macOS 26 及以上，可用 Homebrew 安装。
 
 <table>
   <tr>
@@ -72,17 +72,29 @@ fanfan 会自动检查更新（基于 [Sparkle](https://sparkle-project.org)，�
 
 ## 常见问题
 
+**FanFan 免费吗？**
+免费，开源，采用 [MIT](LICENSE) 许可证。没有付费版，也没有内购。
+
 **调风扇转速安全吗？**
 FanFan 只在风扇上报的最低与最高转速之间设置，超出范围的请求会被辅助进程拒绝。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
 
-**M 系列芯片的 Mac 能用吗？**
-支持。FanFan 是 Apple Silicon 与 Intel 通用版本，要求 macOS 26 及以上。MacBook Air 等无风扇机型仅显示温度。
+**M 系列芯片的 Mac 能用吗？支持哪些 macOS？**
+支持。FanFan 是 Apple Silicon 与 Intel 通用版本，要求 macOS 26 及以上，更早的系统无法安装。MacBook Air 等无风扇机型仅显示温度，不显示风扇控制。
 
 **为什么需要允许后台运行？**
 向 SMC 写入风扇转速需要 root 权限。为避免 App 本身以 root 运行，FanFan 注册了一个精简的 root 辅助进程，macOS 会要求在「登录项与扩展」中允许一次。仅读取温度不需要额外权限。
 
+**FanFan 会收集数据吗？**
+不会。App 代码里没有统计或上报，温度和风扇数据只在本机读取。唯一的联网行为是 Sparkle 检查更新，可以在「设置 › 关于」里关闭。
+
+**怎么卸载？**
+`brew uninstall --cask fanfan`（加 `--zap` 清除偏好设置）；手动安装的版本退出后从「应用程序」删除，再到「登录项与扩展」里移除残留条目。详见上文「卸载」。
+
+**风扇没反应或看不到风扇控制怎么办？**
+先确认机型有风扇（无风扇的 MacBook Air 不显示控制）。如果有，到「系统设置 › 通用 › 登录项与扩展」确认 FanFan 的辅助进程已被允许。可读取的传感器和转速范围因机型而异。问题仍在可以到 [Issues](https://github.com/hoobnn/fanfan/issues) 反馈，请附上机型和 macOS 版本。
+
 **与 Macs Fan Control、smcFanControl 有何区别？**
-核心功能相同：读取 SMC 传感器、设置风扇转速。FanFan 免费开源（MIT），唯一的第三方依赖是负责应用内更新的 Sparkle。
+核心功能相同：读取 SMC 传感器、设置风扇转速。FanFan 免费开源（MIT），要求 macOS 26 及以上，唯一的第三方依赖是负责应用内更新的 Sparkle。如果你的 Mac 还停留在 macOS 26 之前的系统，需要选择仍支持旧系统的其他工具。
 
 ## 工作原理
 

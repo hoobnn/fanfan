@@ -4,7 +4,7 @@
 
 # FanFan
 
-An open-source macOS menu bar app for monitoring temperatures and controlling fan speed.
+A free, open-source Mac fan control and temperature monitor for the macOS menu bar.
 
 [![release](https://img.shields.io/github/v/release/hoobnn/fanfan?style=flat-square)](https://github.com/hoobnn/fanfan/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/hoobnn/fanfan/total?style=flat-square)](https://github.com/hoobnn/fanfan/releases)
@@ -16,7 +16,7 @@ An open-source macOS menu bar app for monitoring temperatures and controlling fa
 
 </div>
 
-FanFan sits in the menu bar and shows your Mac's temperatures and fan speeds. You can pin the fans to a fixed speed, let FanFan adjust them by temperature, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later.
+FanFan is a free, open-source (MIT) Mac fan control and temperature monitoring app that lives in the macOS menu bar. It shows CPU, GPU, SSD and battery temperatures and fan speeds. You can pin the fans to a fixed speed, let FanFan adjust them along a temperature curve, or hand them back to macOS. It runs on Apple Silicon and Intel Macs with macOS 26 or later and installs with Homebrew.
 
 <table>
   <tr>
@@ -72,17 +72,29 @@ fanfan checks for updates on its own (via [Sparkle](https://sparkle-project.org)
 
 ## FAQ
 
+**Is FanFan free?**
+Yes. It is open source under the [MIT](LICENSE) license, with no paid tier and no in-app purchases.
+
 **Is it safe to change fan speed?**
 FanFan only sets speeds between the minimum and maximum RPM the fan reports, and the helper rejects anything outside that range. If the app crashes, hangs or quits, the fans go back to macOS firmware control.
 
-**Does it work on Apple Silicon (M-series) Macs?**
-Yes. It's a universal app for Apple Silicon and Intel on macOS 26 or later. Fanless models such as the MacBook Air only show temperatures.
+**Does it work on Apple Silicon (M-series) Macs? Which macOS versions?**
+Yes. It's a universal app for Apple Silicon and Intel and requires macOS 26 or later; older systems can't install it. Fanless models such as the MacBook Air only show temperatures and hide fan controls.
 
 **Why does it ask to run in the background?**
 Writing fan speeds to the SMC needs root. So that the app itself doesn't run as root, FanFan registers a small root helper, and macOS asks you to allow it once in Login Items & Extensions. Reading temperatures needs no extra permission.
 
+**Does FanFan collect any data?**
+No. The app has no analytics or reporting code, and temperature and fan readings stay on your Mac. Its only network activity is Sparkle checking for updates, which you can turn off in Settings › About.
+
+**How do I uninstall it?**
+`brew uninstall --cask fanfan` (add `--zap` to remove preferences). If you installed it manually, quit FanFan, delete it from Applications, then remove any leftover entry under Login Items & Extensions. See Uninstall above.
+
+**The fans don't respond, or I don't see fan controls. What should I check?**
+First confirm your Mac has a fan (fanless MacBook Airs show no controls). If it does, open System Settings › General › Login Items & Extensions and make sure the FanFan helper is allowed. Sensors and speed ranges vary by model. If it still fails, open an [issue](https://github.com/hoobnn/fanfan/issues) with your Mac model and macOS version.
+
 **How does it compare with Macs Fan Control or smcFanControl?**
-It does the same core job: read SMC sensors and set fan speeds. FanFan is free and open source (MIT); its only third-party dependency is Sparkle, for in-app updates.
+It does the same core job: read SMC sensors and set fan speeds. FanFan is free and open source (MIT) and requires macOS 26 or later; its only third-party dependency is Sparkle, for in-app updates. If your Mac is on an older macOS, pick a tool that still supports it.
 
 ## How it works
 
