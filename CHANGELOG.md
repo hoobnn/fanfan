@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) · [SemVer](https://semver.org/spec/v2.0.0.html)
 
+## [2.4.0] - 2026-11-11
+
+### Added
+- Settings › Monitoring can record temperature, each fan's speed and the target speed every 2 seconds, and export the recording as a CSV file to compare the fans' actual response with your curve.
+
+### Changed
+- Fan speeds now start at 0: below a strategy's start temperature, automatic mode stops the fans instead of holding them at the hardware's idle speed, and the manual slider can stop them too. Curves and the maximum-speed setting now span 0 to the hardware maximum, so the same settings run slightly slower than before.
+
+### Fixed
+- In automatic mode the fans no longer stay a few hundred RPM above the curve's lowest speed after cooling down.
+
 ## [2.3.3] - 2026-11-05
 
 ### Changed
