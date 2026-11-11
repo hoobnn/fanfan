@@ -298,3 +298,13 @@
 "settings.curve_undo" = "曲線の編集を取り消す";
 
 "settings.curve_redo" = "曲線の編集をやり直す";
+
+/* Recording */
+"settings.section.record" = "記録";
+"settings.record" = "温度と回転数を記録";
+"settings.record_desc" = "2 秒ごとに温度、各ファンの回転数、目標回転数を記録します。CSV に書き出して、実際の反応を見ながらファンカーブを調整できます。";
+"settings.record.start" = "記録を開始";
+"settings.record.stop" = "記録を停止";
+"settings.record.export" = "CSV を書き出す…";
+"settings.record.empty" = "記録はまだありません";
+"settings.record.status" = "%d 件 · %@";

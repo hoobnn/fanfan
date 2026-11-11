@@ -298,3 +298,13 @@
 "settings.curve_undo" = "撤销曲线编辑";
 
 "settings.curve_redo" = "重做曲线编辑";
+
+/* Recording */
+"settings.section.record" = "记录";
+"settings.record" = "记录温度与转速";
+"settings.record_desc" = "每 2 秒记录一次温度、各风扇转速和目标转速。导出为 CSV 后，可对照实际响应调整风扇曲线。";
+"settings.record.start" = "开始记录";
+"settings.record.stop" = "停止记录";
+"settings.record.export" = "导出 CSV…";
+"settings.record.empty" = "暂无记录";
+"settings.record.status" = "已记录 %d 条 · %@";

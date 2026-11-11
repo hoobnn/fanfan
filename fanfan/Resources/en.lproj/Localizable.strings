@@ -248,3 +248,13 @@
 "settings.curve_undo" = "Undo Curve Edit";
 
 "settings.curve_redo" = "Redo Curve Edit";
+
+/* Recording */
+"settings.section.record" = "Recording";
+"settings.record" = "Record temperature and fan speed";
+"settings.record_desc" = "Samples temperature, each fan's speed and the target every 2 seconds. Export as CSV to see how the fans responded and tune the curve.";
+"settings.record.start" = "Start Recording";
+"settings.record.stop" = "Stop Recording";
+"settings.record.export" = "Export CSV…";
+"settings.record.empty" = "No samples yet";
+"settings.record.status" = "%d samples · %@";

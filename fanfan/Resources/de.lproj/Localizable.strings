@@ -298,3 +298,13 @@
 "settings.curve_undo" = "Kurvenänderung widerrufen";
 
 "settings.curve_redo" = "Kurvenänderung wiederholen";
+
+/* Recording */
+"settings.section.record" = "Aufzeichnung";
+"settings.record" = "Temperatur und Lüfterdrehzahl aufzeichnen";
+"settings.record_desc" = "Erfasst alle 2 Sekunden Temperatur, die Drehzahl jedes Lüfters und die Zieldrehzahl. Als CSV exportieren, um das Verhalten der Lüfter zu prüfen und die Kurve anzupassen.";
+"settings.record.start" = "Aufzeichnung starten";
+"settings.record.stop" = "Aufzeichnung beenden";
+"settings.record.export" = "CSV exportieren …";
+"settings.record.empty" = "Noch keine Messwerte";
+"settings.record.status" = "%d Messwerte · %@";

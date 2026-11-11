@@ -298,3 +298,13 @@
 "settings.curve_undo" = "Deshacer edición de curva";
 
 "settings.curve_redo" = "Rehacer edición de curva";
+
+/* Recording */
+"settings.section.record" = "Registro";
+"settings.record" = "Registrar temperatura y velocidad de los ventiladores";
+"settings.record_desc" = "Registra cada 2 segundos la temperatura, la velocidad de cada ventilador y la velocidad objetivo. Expórtalo como CSV para ver cómo respondieron los ventiladores y ajustar la curva.";
+"settings.record.start" = "Iniciar registro";
+"settings.record.stop" = "Detener registro";
+"settings.record.export" = "Exportar CSV…";
+"settings.record.empty" = "Aún no hay muestras";
+"settings.record.status" = "%d muestras · %@";

@@ -62,6 +62,8 @@ class FanControlViewModel: ObservableObject {
 
     private let systemMonitor = SystemMonitor()
     let fanController: FanController
+    /// Temperature / fan-speed recording; lives here so it keeps going with Settings closed. / 中文：温度与转速记录；放在这里，关闭设置窗口后仍继续记录。
+    let recorder = ThermalRecorder()
     private var cancellables = Set<AnyCancellable>()
     private var wakeReapplyGeneration = 0
     
@@ -441,6 +443,27 @@ class FanControlViewModel: ObservableObject {
 
     func setMonitoringInterval(_ interval: TimeInterval) {
         systemMonitor.setMonitoringInterval(interval)
+    }
+
+    func startRecording() {
+        recorder.start { [weak self] in
+            guard let self else {
+                return ThermalSample(time: Date(), fanSpeeds: [], mode: .system, strategy: "")
+            }
+            let controller = self.fanController
+            let firmwareRuns = controller.mode == .system || !controller.isControlEnabled
+            return ThermalSample(
+                time: Date(),
+                maxTemperature: self.maxTemperature > 0 ? self.maxTemperature : nil,
+                cpuTemperature: self.cpuTemperature,
+                gpuTemperature: self.gpuTemperature,
+                fanSpeeds: Array(self.fanSpeeds.prefix(self.numberOfFans)),
+                targetRPM: firmwareRuns || controller.lastAppliedSpeed < 0 ? nil : controller.lastAppliedSpeed,
+                mode: controller.mode,
+                strategy: controller.mode == .automatic ? controller.activeStrategy.displayName : "",
+                powerWatts: BatteryMonitor.shared.batteryInfo.powerWatts
+            )
+        }
     }
 
     // MARK: - Fan Control / 中文：Fan Control 分区

@@ -8,6 +8,7 @@
 
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum StatusBarDisplayMode: String, CaseIterable {
     case none
@@ -113,6 +114,7 @@ struct SettingsView: View {
                 case .monitoring:
                     monitoringSection
                     protectionSection
+                    RecordingSection(viewModel: viewModel, recorder: viewModel.recorder)
                 case .strategies:
                     strategyListSection
                     strategyEditorSection
@@ -690,6 +692,76 @@ struct SettingsView: View {
         return b.isEmpty ? v : "\(v) (\(b))"
     }
 
+}
+
+// MARK: - Recording / 中文：记录
+
+/// Starts and stops a temperature / fan-speed recording and exports it as CSV. Its own view so it / 中文：开始、停止温度与转速记录并导出为 CSV。单独成视图，
+/// observes the recorder directly and refreshes as samples arrive. / 中文：直接观察记录器，随新采样刷新。
+private struct RecordingSection: View {
+    let viewModel: FanControlViewModel
+    @ObservedObject var recorder: ThermalRecorder
+
+    var body: some View {
+        Section(NSLocalizedString("settings.section.record", comment: "")) {
+            LabeledContent {
+                Button(NSLocalizedString(recorder.isRecording ? "settings.record.stop" : "settings.record.start",
+                                         comment: "")) {
+                    if recorder.isRecording {
+                        recorder.stop()
+                    } else {
+                        viewModel.startRecording()
+                    }
+                }
+            } label: {
+                Text(NSLocalizedString("settings.record", comment: ""))
+                Text(NSLocalizedString("settings.record_desc", comment: ""))
+            }
+
+            LabeledContent {
+                Button(NSLocalizedString("settings.record.export", comment: "")) {
+                    export()
+                }
+                .disabled(recorder.samples.isEmpty)
+            } label: {
+                Text(statusText)
+                    .font(Theme.num(12, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusText: String {
+        guard !recorder.samples.isEmpty else {
+            return NSLocalizedString("settings.record.empty", comment: "")
+        }
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .positional
+        formatter.zeroFormattingBehavior = .pad
+        return String(format: NSLocalizedString("settings.record.status", comment: ""),
+                      recorder.samples.count,
+                      formatter.string(from: recorder.duration) ?? "")
+    }
+
+    /// Saves a snapshot, so exporting mid-recording is fine and recording carries on. / 中文：保存当前快照；记录中途也能导出，记录不中断。
+    private func export() {
+        let samples = recorder.samples
+        guard let first = samples.first else { return }
+        let stamp = DateFormatter()
+        stamp.dateFormat = "yyyyMMdd-HHmm"
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "fanfan-\(stamp.string(from: first.time)).csv"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try ThermalRecorder.csvData(for: samples).write(to: url, options: .atomic)
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.runModal()
+        }
+    }
 }
 
 // MARK: - Dedicated Settings Window / 中文：独立设置窗口

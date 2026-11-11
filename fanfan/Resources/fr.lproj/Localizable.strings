@@ -298,3 +298,13 @@
 "settings.curve_undo" = "Annuler la modification";
 
 "settings.curve_redo" = "Rétablir la modification";
+
+/* Recording */
+"settings.section.record" = "Enregistrement";
+"settings.record" = "Enregistrer la température et la vitesse des ventilateurs";
+"settings.record_desc" = "Relève toutes les 2 secondes la température, la vitesse de chaque ventilateur et la vitesse cible. Exportez en CSV pour étudier la réponse des ventilateurs et ajuster la courbe.";
+"settings.record.start" = "Démarrer l’enregistrement";
+"settings.record.stop" = "Arrêter l’enregistrement";
+"settings.record.export" = "Exporter en CSV…";
+"settings.record.empty" = "Aucune mesure";
+"settings.record.status" = "%d mesures · %@";

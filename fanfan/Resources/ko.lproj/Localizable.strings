@@ -298,3 +298,13 @@
 "settings.curve_undo" = "곡선 편집 실행 취소";
 
 "settings.curve_redo" = "곡선 편집 다시 실행";
+
+/* Recording */
+"settings.section.record" = "기록";
+"settings.record" = "온도와 회전 속도 기록";
+"settings.record_desc" = "2초마다 온도, 각 팬의 회전 속도, 목표 회전 속도를 기록합니다. CSV로 내보내 실제 반응을 보며 팬 곡선을 조정할 수 있습니다.";
+"settings.record.start" = "기록 시작";
+"settings.record.stop" = "기록 중지";
+"settings.record.export" = "CSV 내보내기…";
+"settings.record.empty" = "아직 기록이 없습니다";
+"settings.record.status" = "%d개 · %@";
