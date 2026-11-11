@@ -114,7 +114,7 @@ final class FanControlTests: XCTestCase {
         let controller = FanController(systemMonitor: monitor)
         
         XCTAssertEqual(controller.mode, .automatic)
-        XCTAssertGreaterThanOrEqual(controller.manualSpeed, FanRPMBounds.absoluteWriteMinRPM)
+        XCTAssertGreaterThanOrEqual(controller.manualSpeed, FanRPMBounds.floorRPM)
         XCTAssertLessThanOrEqual(controller.manualSpeed, FanRPMBounds.absoluteWriteMaxRPM)
     }
     
@@ -132,7 +132,7 @@ final class FanControlTests: XCTestCase {
         XCTAssertLessThanOrEqual(controller.manualSpeed, FanRPMBounds.fallbackMaxWhenSMCUnreadable)
         
         controller.setManualSpeed(500)
-        XCTAssertGreaterThanOrEqual(controller.manualSpeed, FanRPMBounds.fallbackMinWhenSMCUnreadable)
+        XCTAssertGreaterThanOrEqual(controller.manualSpeed, FanRPMBounds.floorRPM)
     }
     
     func testFanControllerModeSwitch() {

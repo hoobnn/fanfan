@@ -89,7 +89,7 @@ struct FanDetailsListView: View {
 
     private func minRPM(atFan index: Int) -> Int {
         guard index >= 0, index < metrics.fanMinSpeeds.count else {
-            return FanRPMBounds.fallbackMinWhenSMCUnreadable
+            return FanRPMBounds.floorRPM
         }
         return metrics.fanMinSpeeds[index]
     }

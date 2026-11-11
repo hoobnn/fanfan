@@ -18,7 +18,7 @@ fanfan.app (user)  ──XPC──▶  fanfan-smcd (root)  ──IOKit──▶ 
 - **风扇写入**必须走守护进程。每条 XPC 消息在 `line` 键里带一行文本命令、在 `reply` 键里回一行文本，协议刻意保持极简：
   - `PINGV2` → `OK pong 2 <idle|active|restoring>`（仅健康 / 状态查询）
   - `RENEWV2` → `OK`，仅在存在活跃控制租约时返回
-  - `SETV2 <fan> <rpm>`（fan：0–7；rpm 由守护进程按硬件上下限钳制）
+  - `SETV2 <fan> <rpm>`（fan：0–7；rpm 范围 0 到硬件上限 `F%dMx`，0 即停转；`F%dMn` 只是固件怠速，不是写入下限）
   - `AUTOV2 <fan>`（把控制权交还固件）
 - XPC Mach service `com.ikuyu.fanfan.helper`（同时是 launchd label）。守护进程对每个连接设置签名要求：只接受团队 `8FUPL8QHFH` 签名、identifier 为 `com.ikuyu.fanfan` 或 `com.ikuyu.fanfan.debug` 的客户端；Release 版应用反向校验守护进程（identifier `fanfan-smcd`），Debug 版因守护进程是 ad-hoc 签名而跳过。
 - 手动控制基于租约：SET 活跃时应用每 3 秒续租；10 秒无活动则守护进程恢复固件 AUTO。租约同时绑定在发起 SET 的连接上：应用退出或崩溃、连接失效时立即恢复 AUTO。应用端因此必须保持单条长连接。

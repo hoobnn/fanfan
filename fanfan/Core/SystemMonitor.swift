@@ -752,14 +752,9 @@ class SystemMonitor: ObservableObject {
         var maxSpeeds: [Int] = []
         var allReadsSucceeded = true
         for i in 0..<fanCount {
-            let minKey = String(format: "F%dMn", i)
             let maxKey = String(format: "F%dMx", i)
-            if let m = readSMCFanSpeed(key: minKey) {
-                minSpeeds.append(validateFanRPM(m))
-            } else {
-                minSpeeds.append(FanRPMBounds.fallbackMinWhenSMCUnreadable)
-                allReadsSucceeded = false
-            }
+            // `F%dMn` is the firmware's idle speed, not a limit: fanfan may stop the fan. / 中文：`F%dMn` 是固件怠速而非下限，fanfan 可让风扇停转。
+            minSpeeds.append(FanRPMBounds.floorRPM)
             if let m = readSMCFanSpeed(key: maxKey) {
                 maxSpeeds.append(validateFanRPM(m))
             } else {
@@ -776,7 +771,7 @@ class SystemMonitor: ObservableObject {
         for i in maxSpeeds.indices where maxSpeeds[i] <= 0 {
             maxSpeeds[i] = peerMax ?? FanRPMBounds.fallbackMaxWhenSMCUnreadable
         }
-        // Only cache when every `Mn`/`Mx` read came back from SMC. Transient / 中文：只有当每个 `Mn`/`Mx` 都从 SMC 真实读到才缓存。
+        // Only cache when every `Mx` read came back from SMC. Transient / 中文：只有当每个 `Mx` 都从 SMC 真实读到才缓存。
         // failures (startup race, wake-from-sleep, SMC reconnect) used to / 中文：临时失败（启动期、唤醒、SMC 重连）以前每 tick 重读，
         // self-heal on the next tick — caching fallback values would freeze / 中文：会自然恢复；如果把 fallback 写进缓存，
         // them in place until the fan count changes (i.e. effectively never). / 中文：直到风扇数量变化（实际上永远不会）才解锁。

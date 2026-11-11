@@ -76,7 +76,7 @@ fanfan 会自动检查更新（基于 [Sparkle](https://sparkle-project.org)，�
 免费，开源，采用 [MIT](LICENSE) 许可证。没有付费版，也没有内购。
 
 **调风扇转速安全吗？**
-FanFan 只在风扇上报的最低与最高转速之间设置，超出范围的请求会被辅助进程拒绝。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
+FanFan 设置的转速不会超过风扇上报的最高转速，超出范围的请求会被辅助进程拒绝；低于起转温度时可以让风扇停转。App 崩溃、卡死或退出时，风扇会自动交回 macOS 固件控制。
 
 **M 系列芯片的 Mac 能用吗？支持哪些 macOS？**
 支持。FanFan 是 Apple Silicon 与 Intel 通用版本，要求 macOS 26 及以上，更早的系统无法安装。MacBook Air 等无风扇机型仅显示温度，不显示风扇控制。

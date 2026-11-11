@@ -58,9 +58,8 @@
 #define OLD_HELPER_LABEL "com.hoobnn.fanfan.helper"
 #define MAX_COMMAND_LENGTH 127
 #define MAX_FANS 8
-#define MIN_RPM 500
+#define MIN_RPM 0 /* 0 stops the fan; F%dMn is the firmware idle speed, not a limit */
 #define MAX_RPM 8000
-#define SAFE_FALLBACK_MIN_RPM 1000
 #define SAFE_FALLBACK_MAX_RPM 5200
 #define PROTOCOL_VERSION 2
 #define CONTROL_LEASE_TIMEOUT_MS 10000
@@ -307,21 +306,15 @@ static int smc_value_to_rpm(const SMCVal_t *val, int *rpm)
 
 static int probe_fan_limit(int fan)
 {
-    g_min_rpm[fan] = SAFE_FALLBACK_MIN_RPM;
+    /* F%dMn is only the firmware's idle speed: manual targets below it, down
+     * to 0, are accepted and stop the fan (measured on M4 Pro). */
+    g_min_rpm[fan] = MIN_RPM;
     g_max_rpm[fan] = SAFE_FALLBACK_MAX_RPM;
 
     char key[5];
     SMCVal_t value;
     int rpm = 0;
-    int min_known = 0;
     int max_known = 0;
-
-    snprintf(key, sizeof(key), "F%dMn", fan);
-    if (smc_read_key(key, &value) == kIOReturnSuccess &&
-        smc_value_to_rpm(&value, &rpm) && rpm >= 0 && rpm <= MAX_RPM) {
-        g_min_rpm[fan] = rpm > MIN_RPM ? rpm : MIN_RPM;
-        min_known = 1;
-    }
 
     snprintf(key, sizeof(key), "F%dMx", fan);
     if (smc_read_key(key, &value) == kIOReturnSuccess &&
@@ -329,7 +322,7 @@ static int probe_fan_limit(int fan)
         g_max_rpm[fan] = rpm;
         max_known = 1;
     }
-    g_limits_known[fan] = min_known && max_known;
+    g_limits_known[fan] = max_known;
     return g_limits_known[fan];
 }
 

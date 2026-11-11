@@ -76,7 +76,7 @@ fanfan checks for updates on its own (via [Sparkle](https://sparkle-project.org)
 Yes. It is open source under the [MIT](LICENSE) license, with no paid tier and no in-app purchases.
 
 **Is it safe to change fan speed?**
-FanFan only sets speeds between the minimum and maximum RPM the fan reports, and the helper rejects anything outside that range. If the app crashes, hangs or quits, the fans go back to macOS firmware control.
+FanFan never sets a speed above the maximum RPM the fan reports, and the helper rejects anything outside that range; below the start temperature it can stop the fans. If the app crashes, hangs or quits, the fans go back to macOS firmware control.
 
 **Does it work on Apple Silicon (M-series) Macs? Which macOS versions?**
 Yes. It's a universal app for Apple Silicon and Intel and requires macOS 26 or later; older systems can't install it. Fanless models such as the MacBook Air only show temperatures and hide fan controls.

@@ -269,7 +269,7 @@ struct SettingsView: View {
 
     /// Fan limits the curve is drawn against: the same bounds the controller clamps to. / 中文：曲线绘制所用的转速边界，与控制器夹取所用的边界一致。
     private var unifiedFloorRPM: Int {
-        viewModel.fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+        viewModel.fanMinSpeeds.max() ?? FanRPMBounds.floorRPM
     }
 
     private var unifiedHardwareMaxRPM: Int {

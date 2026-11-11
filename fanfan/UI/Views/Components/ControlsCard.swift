@@ -31,7 +31,7 @@ struct ControlsSnapshot: Equatable {
 
     func minRPM(atFan index: Int) -> Int {
         guard index >= 0, index < fanMinSpeeds.count else {
-            return FanRPMBounds.fallbackMinWhenSMCUnreadable
+            return FanRPMBounds.floorRPM
         }
         return fanMinSpeeds[index]
     }

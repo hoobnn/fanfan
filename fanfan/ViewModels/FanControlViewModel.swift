@@ -459,8 +459,8 @@ class FanControlViewModel: ObservableObject {
 
     /// Lower bound for unified sliders when SMC minima are known. / 中文：Lower bound for unified 滑杆s when SMC minima are known.
     var effectiveUnifiedMinRPM: Int {
-        guard !fanMinSpeeds.isEmpty else { return FanRPMBounds.fallbackMinWhenSMCUnreadable }
-        return fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+        guard !fanMinSpeeds.isEmpty else { return FanRPMBounds.floorRPM }
+        return fanMinSpeeds.max() ?? FanRPMBounds.floorRPM
     }
 
     /// Upper bound for unified sliders when SMC maxima are known. / 中文：Upper bound for unified 滑杆s when SMC maxima are known.
@@ -473,7 +473,7 @@ class FanControlViewModel: ObservableObject {
     }
 
     func minRPM(atFan index: Int) -> Int {
-        guard index >= 0, index < fanMinSpeeds.count else { return FanRPMBounds.fallbackMinWhenSMCUnreadable }
+        guard index >= 0, index < fanMinSpeeds.count else { return FanRPMBounds.floorRPM }
         return fanMinSpeeds[index]
     }
 
@@ -569,7 +569,7 @@ class FanControlViewModel: ObservableObject {
         let n = min(numberOfFans, fanSpeeds.count, fanMaxSpeeds.count)
 
         for i in 0..<n {
-            let mn = i < fanMinSpeeds.count ? fanMinSpeeds[i] : fanMinSpeeds.first ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+            let mn = i < fanMinSpeeds.count ? fanMinSpeeds[i] : fanMinSpeeds.first ?? FanRPMBounds.floorRPM
             let mx = fanMaxSpeeds[i]
             guard mx > mn else { continue }
             let p = Double(fanSpeeds[i] - mn) / Double(mx - mn)

@@ -343,7 +343,7 @@ class StatusBarManager: NSObject, ObservableObject {
         var sum = 0.0
         var count = 0
         for i in 0..<cachedFanSpeeds.count {
-            let mn = i < cachedFanMinRPM.count ? cachedFanMinRPM[i] : cachedFanMinRPM.first ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+            let mn = i < cachedFanMinRPM.count ? cachedFanMinRPM[i] : cachedFanMinRPM.first ?? FanRPMBounds.floorRPM
             guard i < cachedFanMaxRPM.count else { continue }
             let mx = cachedFanMaxRPM[i]
             guard mx > mn else { continue }

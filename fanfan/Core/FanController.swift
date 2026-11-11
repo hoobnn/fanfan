@@ -71,7 +71,9 @@ class FanController: ObservableObject {
     nonisolated static let defaultProtectionMaxFraction: Double = 0.8
     nonisolated static let protectionMaxFractionRange: ClosedRange<Double> = 0.5...1.0
     /// Largest target RPM last applied (used for auto-mode hysteresis). / 中文：Largest 目标 RPM last applied (used for auto-模式 滞回).
-    @Published var lastAppliedSpeed: Int = 0
+    /// `unappliedSpeed` until the first write; 0 itself is a real target (fan stopped). / 中文：首次写入前为 `unappliedSpeed`；0 本身是合法目标（停转）。
+    @Published var lastAppliedSpeed: Int = FanController.unappliedSpeed
+    nonisolated static let unappliedSpeed = -1
 
     private weak var systemMonitor: SystemMonitor?
     private var autoControlTimer: Timer?
@@ -114,6 +116,15 @@ class FanController: ObservableObject {
     /// `spinDownHysteresisRPM` (450) — too small to clear the band, so no
     /// further step ever ran and the fan sat up to 449 RPM above target.
     private var spinDownInProgress = false
+    /// When the auto target first sat at the floor (0 = fan stopped). Stopping bypasses the
+    /// spin-down dead-band — the fan never runs below ~1000 rpm, so any small target would
+    /// otherwise strand it there — but only after the target has held at the floor this long,
+    /// so the fan does not stop and restart while the temperature hovers at the start point.
+    /// 中文：自动目标开始停在下限（0 = 停转）的时间。停转可绕过降速死区——风扇实际最低约
+    /// 1000 rpm，否则小目标会让它一直卡在那里——但目标须在下限持续这么久，以免温度在起转点
+    /// 附近徘徊时风扇反复启停。
+    private var floorTargetSince: Date?
+    private static let stopDelaySeconds: TimeInterval = 30
     private var temperatureFailsafeRestorePending = false
     private var temperatureFailsafeRestoreRequired = false
     private var temperatureFailsafeRetryCount = 0
@@ -145,6 +156,7 @@ class FanController: ObservableObject {
     private func resetControlState() {
         smoothedTemp = nil  // re-seed the EMA on the next sample / 中文：下次采样时重新播种 EMA
         spinDownInProgress = false
+        floorTargetSince = nil
     }
 
     init(systemMonitor: SystemMonitor) {
@@ -191,7 +203,7 @@ class FanController: ObservableObject {
     // MARK: - Hardware-derived clamps / 中文：Hardware-derived clamps 分区
 
     private var unifiedMinClamp: Int {
-        systemMonitor?.fanMinSpeeds.max() ?? FanRPMBounds.fallbackMinWhenSMCUnreadable
+        systemMonitor?.fanMinSpeeds.max() ?? FanRPMBounds.floorRPM
     }
 
     private var unifiedMaxClamp: Int {
@@ -204,7 +216,7 @@ class FanController: ObservableObject {
         guard let monitor = systemMonitor,
               index >= 0,
               index < monitor.fanMinSpeeds.count else {
-            return FanRPMBounds.fallbackMinWhenSMCUnreadable
+            return FanRPMBounds.floorRPM
         }
         return monitor.fanMinSpeeds[index]
     }
@@ -240,7 +252,7 @@ class FanController: ObservableObject {
         if mode == .manual {
             applyManualTargets()
         } else if mode == .automatic && isControlEnabled {
-            lastAppliedSpeed = 0
+            lastAppliedSpeed = Self.unappliedSpeed
             updateAutoControl()
         }
     }
@@ -577,7 +589,7 @@ class FanController: ObservableObject {
             guard let self = self else { return }
             var allSuccess = true
             for (i, t) in targets.enumerated() {
-                let safe = max(FanRPMBounds.absoluteWriteMinRPM, min(FanRPMBounds.absoluteWriteMaxRPM, t))
+                let safe = max(FanRPMBounds.floorRPM, min(FanRPMBounds.absoluteWriteMaxRPM, t))
                 if !Self.runSmcHelper(args: ["set", "\(i)", "\(safe)"]) {
                     allSuccess = false
                 }
@@ -655,7 +667,7 @@ class FanController: ObservableObject {
                     if !success {
                         self.isControlEnabled = false
                         self.stopControlLease()
-                        self.lastAppliedSpeed = 0
+                        self.lastAppliedSpeed = Self.unappliedSpeed
                         self.lastWriteSuccess = false
                         self.applyDidFail = true
                         self.statusMessage = "Failed to renew fan-control lease"
@@ -825,7 +837,7 @@ class FanController: ObservableObject {
             // Ramp transition to avoid sudden noise changes / 中文：使用渐进过渡，避免噪声突然变化。
             let ramped = isCritical
                 ? representative
-                : rampTransition(from: lastAppliedSpeed, to: representative)
+                : rampTransition(from: max(0, lastAppliedSpeed), to: representative)
             // Ramping down out of a protection spike walks through RPMs above
             // the ceiling of the moment, so this clamp has to be the same one
             // used when the targets were built — the hardware maximum alone let
@@ -917,9 +929,21 @@ class FanController: ObservableObject {
 
     private func shouldApplySpeed(_ target: Int) -> Bool {
         // First application / 中文：首次应用目标值。
-        if lastAppliedSpeed == 0 { return true }
+        if lastAppliedSpeed == Self.unappliedSpeed { return true }
 
         let delta = target - lastAppliedSpeed
+
+        // Stopping: the 30 s floor hold outlasts the 8 s hold window below. / 中文：停转：30 秒的下限保持长于下面 8 秒的保持窗口。
+        if target == FanRPMBounds.floorRPM, delta < 0 {
+            let since = floorTargetSince ?? Date()
+            floorTargetSince = since
+            if Date().timeIntervalSince(since) >= Self.stopDelaySeconds {
+                spinDownInProgress = true
+                return true
+            }
+        } else {
+            floorTargetSince = nil
+        }
 
         // Minimum hold time check / 中文：检查最小保持时间。
         let elapsed = Date().timeIntervalSince(lastSpeedChangeTime)
@@ -1065,8 +1089,9 @@ class FanController: ObservableObject {
 
         perFanManualControl = defaults.bool(forKey: "perFanManualControl")
 
-        let savedManualSpeed = defaults.integer(forKey: "manualFanSpeed")
-        if savedManualSpeed >= FanRPMBounds.absoluteWriteMinRPM && savedManualSpeed <= FanRPMBounds.absoluteWriteMaxRPM {
+        // 0 is a valid speed (fan stopped), so a missing key must not read as one. / 中文：0 是合法转速（停转），缺省键不能当成 0。
+        if let savedManualSpeed = defaults.object(forKey: "manualFanSpeed") as? Int,
+           savedManualSpeed >= FanRPMBounds.floorRPM && savedManualSpeed <= FanRPMBounds.absoluteWriteMaxRPM {
             manualSpeed = savedManualSpeed
         }
 
